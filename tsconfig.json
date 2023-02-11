@@ -1,30 +1,40 @@
 {
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "commonjs",
-    "lib": [
-      "es2020"
-    ],
-    "declaration": true,
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "noImplicitThis": true,
-    "alwaysStrict": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": false,
-    "inlineSourceMap": true,
-    "inlineSources": true,
-    "experimentalDecorators": true,
-    "strictPropertyInitialization": false,
-    "typeRoots": [
-      "./node_modules/@types"
-    ]
-  },
-  "exclude": [
-    "node_modules",
-    "cdk.out"
-  ]
+	"extends": "./.nuxt/tsconfig.json",
+	"compilerOptions": {
+		"target": "ES2018",
+		"moduleResolution": "Node",
+		"module": "CommonJS",
+		"lib": [
+			"es2020",
+			"ES2015.Reflect",
+			"DOM"
+		],
+		"downlevelIteration": true,
+		"declaration": false,
+		"strict": true,
+		"noImplicitAny": true,
+		"strictNullChecks": true,
+		"noImplicitThis": true,
+		"alwaysStrict": true,
+		"noUnusedLocals": false,
+		"noUnusedParameters": false,
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": false,
+		"inlineSourceMap": false,
+		"inlineSources": false,
+		"sourceMap": true,
+		"experimentalDecorators": true,
+		"esModuleInterop": true,
+		"strictPropertyInitialization": false,
+		"emitDecoratorMetadata": true,
+		"typeRoots": [
+			"./node_modules/@types",
+			"./node_modules/vuetify/lib",
+			"./node_modules/vuetify/dist"
+		]
+	},
+	"exclude": [
+		"node_modules",
+		"cdk.out",
+	]
 }

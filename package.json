@@ -1,27 +1,74 @@
 {
-  "name": "justice-firm",
-  "version": "0.1.0",
-  "bin": {
-    "justice-firm": "bin/justice-firm.js"
-  },
-  "scripts": {
-    "build": "tsc",
-    "watch": "tsc -w",
-    "test": "jest",
-    "cdk": "cdk"
-  },
-  "devDependencies": {
-    "@types/jest": "^29.4.0",
-    "@types/node": "18.11.18",
-    "jest": "^29.4.1",
-    "ts-jest": "^29.0.5",
-    "aws-cdk": "2.63.2",
-    "ts-node": "^10.9.1",
-    "typescript": "~4.9.4"
-  },
-  "dependencies": {
-    "aws-cdk-lib": "2.63.2",
-    "constructs": "^10.0.0",
-    "source-map-support": "^0.5.21"
-  }
+	"name": "justice-firm",
+	"version": "0.1.0",
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"typecheck:watch": "tsc --noEmit --watch",
+		"server:build": "ts-node --esm --transpile-only src/server/esbuild-config.ts",
+		"server:watch": "ts-node --esm --transpile-only src/server/esbuild-config.ts --watch",
+		"nuxt:build": "nuxt build",
+		"nuxt:dev": "nuxt dev",
+		"nuxt:generate": "nuxt generate",
+		"nuxt:preview": "nuxt preview",
+		"nuxt:postinstall": "nuxt prepare"
+	},
+	"overrides": {
+		"vue": "latest"
+	},
+	"devDependencies": {
+		"@types/jest": "^29.4.0",
+		"@types/node": "18.11.18",
+		"aws-cdk": "2.63.2",
+		"jest": "^29.4.1",
+		"ts-jest": "^29.0.5",
+		"ts-node": "^10.9.1",
+		"typescript": "~4.9.4"
+	},
+	"dependencies": {
+		"@aws-sdk/client-s3": "^3.267.0",
+		"@aws-sdk/client-ssm": "^3.267.0",
+		"@fortawesome/fontawesome-svg-core": "^6.3.0",
+		"@fortawesome/free-brands-svg-icons": "^6.3.0",
+		"@fortawesome/free-regular-svg-icons": "^6.3.0",
+		"@fortawesome/free-solid-svg-icons": "^6.3.0",
+		"@fortawesome/vue-fontawesome": "^3.0.3",
+		"@pinia/nuxt": "^0.4.6",
+		"@sinclair/typebox": "^0.25.21",
+		"@types/aws-lambda": "^8.10.110",
+		"@types/core-js": "^2.5.5",
+		"@types/fs-extra": "^11.0.1",
+		"@types/lodash": "^4.14.191",
+		"@types/lodash-es": "^4.17.6",
+		"@types/lodash.mapvalues": "^4.6.7",
+		"@types/memoizee": "^0.4.8",
+		"aws-cdk-lib": "^2.63.2",
+		"commander": "^10.0.0",
+		"constructs": "^10.1.244",
+		"core-js": "^3.27.2",
+		"esbuild": "^0.17.6",
+		"esbuild-plugin-alias": "^0.2.1",
+		"fp-ts": "^2.13.1",
+		"fs-extra": "^11.1.0",
+		"io-ts": "^2.2.20",
+		"io-ts-transformer": "^1.1.8",
+		"lodash": "^4.17.21",
+		"lodash-es": "^4.17.21",
+		"lodash.mapvalues": "^4.6.0",
+		"mariadb": "^3.0.2",
+		"memoizee": "^0.4.15",
+		"nuxt": "^3.1.2",
+		"path": "^0.12.7",
+		"path-browserify": "^1.0.1",
+		"pinia": "^2.0.30",
+		"reflect-metadata": "^0.1.13",
+		"sass": "^1.58.0",
+		"source-map-support": "^0.5.21",
+		"stream": "^0.0.2",
+		"ts-loader": "^9.4.2",
+		"tslib": "^2.5.0",
+		"vee-validate": "^4.7.4",
+		"vite-plugin-vuetify": "^1.0.2",
+		"vuetify": "^3.1.4",
+		"yup": "^1.0.0"
+	}
 }
