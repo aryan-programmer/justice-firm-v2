@@ -1,5 +1,14 @@
-import {ArrayOptions, ObjectOptions, ObjectPropertyKeys, TObject, TOmit, TSchema, Type} from "@sinclair/typebox";
-import {GeolocationNotAvailableError}                                                   from "./errors";
+import {
+	ArrayOptions,
+	ObjectOptions,
+	ObjectPropertyKeys,
+	SchemaOptions,
+	TObject,
+	TOmit,
+	TSchema,
+	Type
+} from "@sinclair/typebox";
+import {GeolocationNotAvailableError} from "./errors";
 
 export function capitalizeFirstLetter (string: string) {
 	return string.charAt(0).toUpperCase() + string.slice(1);
@@ -15,6 +24,13 @@ export function ArrayOf<TS extends TSchema> (schema: TS, options?: ArrayOptions)
 export function InputOmit<T extends TObject, K extends ObjectPropertyKeys<T>[]> (schema: T, keys: readonly [...K], options?: ObjectOptions): TOmit<T, K> {
 	return Type.Omit(schema, keys, {
 		$id: `${schema.$id}Input`,
+		...options
+	});
+}
+
+export function Optional<T extends TSchema> (item: T, options?: SchemaOptions) {
+	return Type.Union([item, Type.Null(), Type.Undefined()], {
+		$id: `Optional${item.$id}`,
 		...options
 	});
 }

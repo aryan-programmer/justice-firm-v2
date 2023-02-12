@@ -1,13 +1,14 @@
-import * as cdk                                       from "aws-cdk-lib";
-import {aws_apigateway as apiGateway, aws_ssm as ssm} from "aws-cdk-lib";
-import {RestApi}                                      from "aws-cdk-lib/aws-apigateway";
-import {Code, Function, FunctionProps, Runtime}       from "aws-cdk-lib/aws-lambda";
-import {Construct}                                    from 'constructs';
-import {mapValues}                                    from "lodash";
+import * as cdk from "aws-cdk-lib";
+import {aws_apigateway as apiGateway, aws_ssm as ssm, CfnOutput, Duration, RemovalPolicy} from "aws-cdk-lib";
+import {RestApi} from "aws-cdk-lib/aws-apigateway";
+import {Code, Function, FunctionProps, Runtime} from "aws-cdk-lib/aws-lambda";
+import {Bucket, BucketAccessControl, BucketEncryption, HttpMethods} from "aws-cdk-lib/aws-s3";
+import {Construct} from 'constructs';
+import {mapValues} from "lodash";
 import 'reflect-metadata';
-import {justiceFirmApiSchema}                         from "../common/api-schema";
-import {Nuly}                                         from "../common/utils/types";
-import {pathSchemaToString}                           from "../singularity/helpers";
+import {justiceFirmApiSchema} from "../common/api-schema";
+import {Nuly} from "../common/utils/types";
+import {pathSchemaToString} from "../singularity/helpers";
 
 const path = require("path");
 
@@ -49,10 +50,25 @@ export class JusticeFirmStack extends cdk.Stack {
 	constructor (scope: Construct, id: string, props?: cdk.StackProps) {
 		super(scope, id, props);
 
-		let apiName = justiceFirmApiSchema.name;
+		const apiName = justiceFirmApiSchema.name;
 
 		const api = new RestApi(this, apiName, {
 			deploy: true,
+		});
+
+		const s3Bucket = new Bucket(this, `${apiName}-DataBucket`, {
+			removalPolicy:    RemovalPolicy.RETAIN,
+			encryption:       BucketEncryption.S3_MANAGED,
+			accessControl:    BucketAccessControl.PUBLIC_READ,
+			publicReadAccess: true,
+			cors:             [{
+				allowedOrigins: ["*"],
+				allowedMethods: [HttpMethods.GET],
+			}],
+		});
+
+		new CfnOutput(this, "S3BucketArn", {
+			value: s3Bucket.bucketArn,
 		});
 
 		const functionCommonProps: FunctionPropsMergeable = {
@@ -67,6 +83,11 @@ export class JusticeFirmStack extends cdk.Stack {
 			`${apiName}-DbPassword`,
 			{parameterName: "/justice-firm/db/password"}
 		);
+		const jwtSecret  = ssm.StringParameter.fromSecureStringParameterAttributes(
+			this,
+			`${apiName}-JWTSecret`,
+			{parameterName: "/justice-firm/jwt/secret"}
+		);
 
 		const lambda = new Function(this, `${apiName}-FunnelFunction`, {
 			...functionCommonProps,
@@ -74,13 +95,23 @@ export class JusticeFirmStack extends cdk.Stack {
 			handler:     `app.handler`,
 			code:        Code.fromAsset(path.resolve(__dirname, "../server/dist")),
 			environment: {
-				DB_ENDPOINT: dbEndpoint,
-				DB_PORT:     dbPort,
-				DB_USERNAME: dbUsername,
-				DB_PASSWORD: dbPassword.parameterName,
+				DB_ENDPOINT:  dbEndpoint,
+				DB_PORT:      dbPort,
+				DB_USERNAME:  dbUsername,
+				DB_PASSWORD:  dbPassword.parameterName,
+				S3_BUCKET:    s3Bucket.bucketName,
+				JWT_SECRET:   jwtSecret.parameterName,
+				NODE_OPTIONS: "--enable-source-maps --stack_trace_limit=200",
 			},
+			timeout:     Duration.minutes(1),
+			memorySize:  1024,
 		});
 		dbPassword.grantRead(lambda);
+		jwtSecret.grantRead(lambda);
+		s3Bucket.grantDelete(lambda);
+		s3Bucket.grantPut(lambda);
+		s3Bucket.grantPutAcl(lambda);
+		s3Bucket.grantReadWrite(lambda);
 
 		const lambdaIntegration = new apiGateway.LambdaIntegration(lambda);
 		const resourceMap       = new ResourceMap(api.root);

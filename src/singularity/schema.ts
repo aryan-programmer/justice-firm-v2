@@ -1,8 +1,7 @@
-import {APIGatewayProxyEvent, APIGatewayProxyResult}                                    from "aws-lambda";
+import {APIGatewayProxyEvent, APIGatewayProxyResult} from "aws-lambda";
 import {APIEndpoints, EndpointFnParamsFromRaw, EndpointSchema, PromiseOrEndpointResult} from "./endpoint";
-import {HttpMethods}                                                                    from "./httpMethods";
-import {CheckerErrorsOrNully}                                                           from "./types";
-
+import {HttpMethods} from "./httpMethods";
+import {CheckerErrorsOrNully} from "./types";
 
 export type APIImplementation<TSchema> = TSchema extends APIModelSchema<infer T> ? {
 	[K in keyof T]: T[K] extends EndpointSchema<infer TQueryParameters,

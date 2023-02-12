@@ -1,8 +1,9 @@
-import {defineNuxtPlugin}      from "#app";
-import {library}               from '@fortawesome/fontawesome-svg-core'
+import {defineNuxtPlugin} from "#app";
+import {library} from '@fortawesome/fontawesome-svg-core'
 import {faSquare as farSquare} from "@fortawesome/free-regular-svg-icons";
 import {
 	faBars,
+	faBugSlash,
 	faCertificate,
 	faCheckSquare,
 	faChevronDown,
@@ -13,13 +14,17 @@ import {
 	faImagePortrait,
 	faSearch,
 	faSignIn,
+	faSignOut,
 	faSquare,
+	faTable,
 	faTimesCircle,
-	faUserPlus
-}                              from "@fortawesome/free-solid-svg-icons";
-import {FontAwesomeIcon}       from '@fortawesome/vue-fontawesome'
-import {createVuetify}         from 'vuetify'
-import {aliases, fa}           from 'vuetify/iconsets/fa-svg'
+	faUser,
+	faUserPlus,
+	faUserTie
+} from "@fortawesome/free-solid-svg-icons";
+import {FontAwesomeIcon} from '@fortawesome/vue-fontawesome'
+import {createVuetify} from 'vuetify'
+import {aliases, fa} from 'vuetify/iconsets/fa-svg'
 
 library.add(
 	faGavel,
@@ -37,6 +42,11 @@ library.add(
 	faSquare,
 	faCheckSquare,
 	farSquare,
+	faSignOut,
+	faTable,
+	faUserTie,
+	faUser,
+	faBugSlash
 );
 // import * as components from 'vuetify/components'
 // import * as directives from 'vuetify/directives'

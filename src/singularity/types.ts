@@ -1,5 +1,5 @@
 import {Either} from "fp-ts/lib/Either";
-import {Nuly}   from "../common/utils/types";
+import {Nuly} from "../common/utils/types";
 
 export type TypeCheckError = { path: string; message: string; value: unknown; schemaId?: string; schemaTitle?: string };
 export type CheckerErrors = TypeCheckError[];

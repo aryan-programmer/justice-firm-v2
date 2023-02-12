@@ -1,7 +1,17 @@
 <script setup lang="ts">
+import {useRouter} from "#app";
+import {definePageMeta, navigateTo} from "#imports";
+import {isLeft} from "fp-ts/Either";
 import {useField, useForm} from 'vee-validate';
-import * as yup            from "yup";
-import {getSignInSchema}   from "~/utils/validationSchemas";
+import * as yup from "yup";
+import {getSignInSchema} from "~/utils/validationSchemas";
+import {AuthToken} from "../../common/api-types";
+import {useUserStore} from "../store/userStore";
+import {justiceFirmApi} from "../utils/apiImplementation";
+
+definePageMeta({
+	middleware: "no-user-page"
+});
 
 let validationSchema         = yup.object(getSignInSchema());
 const {handleSubmit, errors} = useForm({
@@ -11,13 +21,38 @@ const {handleSubmit, errors} = useForm({
 const email    = useField('email');
 const password = useField('password');
 
+const userStore = useUserStore();
+const router    = useRouter();
+
 const textFields = [
 	{field: email, label: "Email", type: "text"},
 	{field: password, label: "Password", type: "password"},
 ];
 
-const onSubmit = handleSubmit(values => {
-	console.log(JSON.stringify(values, null, 2));
+const onSubmit = handleSubmit(async values => {
+	if (!validationSchema.isType(values)) {
+		alert("Invalid data");
+		return;
+	}
+	const res = await justiceFirmApi.sessionLogin({
+		body: {
+			email:    values.email,
+			password: values.password,
+		},
+	});
+	console.log(res);
+	if (isLeft(res) || res.right.body == null) {
+		alert("Failed to sign in")
+		return;
+	}
+	if ("message" in res.right.body) {
+		alert("Failed to sign in: " + res.right.body.message)
+		return;
+	}
+	const authToken: AuthToken = res.right.body;
+	alert(`Signed in as a ${authToken.userType} successfully`);
+	userStore.signIn(authToken);
+	await navigateTo("/");
 });
 </script>
 

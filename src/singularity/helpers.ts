@@ -1,22 +1,23 @@
-import * as Types                                                                     from "@sinclair/typebox";
-import {Type}                                                                         from "@sinclair/typebox";
-import {TypeCheck, TypeCompiler}                                                      from "@sinclair/typebox/compiler";
-import {ValueError}                                                                   from "@sinclair/typebox/errors";
-import {chain as EitherChain, Either, left, right}                                    from "fp-ts/lib/Either";
-import {constants}                                                                    from "http2";
-import memoizee                                                                       from "memoizee";
-import {Nuly}                                                                         from "../common/utils/types";
+import * as Types from "@sinclair/typebox";
+import {SchemaOptions, TSchema, Type} from "@sinclair/typebox";
+import {TypeCheck, TypeCompiler} from "@sinclair/typebox/compiler";
+import {ValueError} from "@sinclair/typebox/errors";
+import {chain as EitherChain, Either, left, right} from "fp-ts/lib/Either";
+import memoizee from "memoizee";
+// @ts-ignore
+import memoizeWeakOrig from "memoizee/weak";
+import {Nuly} from "../common/utils/types";
+import {constants} from "./constants";
 import {
 	EndpointPathDefinition,
 	EndpointPathDefinitionWithPathParams,
 	EndpointResult,
 	PathParametersSchema,
 	PathParamSchema
-}                                                                                     from "./endpoint";
+} from "./endpoint";
 import {CheckerErrors, CheckerErrorsOrNully, CheckerFunction, Parser, TypeCheckError} from "./types";
 
-const memoizeWeak: <F extends (...args: any[]) => any>(f: F, options?: memoizee.Options<F>) => F & memoizee.Memoized<F> = require(
-	"memoizee/weak");
+const memoizeWeak: <F extends (...args: any[]) => any>(f: F, options?: memoizee.Options<F>) => F & memoizee.Memoized<F> = memoizeWeakOrig;
 
 // region ...CheckerFunction
 const fakeChecker: CheckerFunction<unknown> = {
@@ -206,6 +207,13 @@ export const Message = Type.Object({
 	message: Type.Any()
 }, {$id: "Message"});
 export type Message = Types.Static<typeof Message>;
+
+export function MessageOr<T extends TSchema> (item: T, options?: SchemaOptions) {
+	return Type.Union([Message, item], {
+		$id: `MessageOr${item.$id}`,
+		...options
+	});
+}
 
 export function response<T> (
 	statusCode: number,

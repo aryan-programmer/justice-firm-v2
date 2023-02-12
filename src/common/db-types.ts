@@ -1,5 +1,5 @@
 import {Static, Type} from "@sinclair/typebox";
-import {phoneRegex}   from "./utils/constants";
+import {ValidEmail, ValidPhone} from "./utils/constants";
 
 export const CaseType = Type.Object({
 	id:   Type.Number(),
@@ -25,10 +25,8 @@ export const StatusEnum_T = Type.Enum(StatusEnum, {$id: "StatusEnum"})
 export const User = Type.Object({
 	id:           Type.Number(),
 	name:         Type.String(),
-	email:        Type.String({
-		format: "email"
-	}),
-	phone:        Type.RegEx(phoneRegex),
+	email:        ValidEmail,
+	phone:        ValidPhone,
 	address:      Type.String(),
 	passwordHash: Type.String(),
 	photoPath:    Type.String(),

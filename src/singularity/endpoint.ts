@@ -2,10 +2,10 @@ import {
 	APIGatewayProxyEventPathParameters,
 	APIGatewayProxyEventQueryStringParameters,
 	APIGatewayProxyResult
-}                                                                                     from "aws-lambda/trigger/api-gateway-proxy";
+} from "aws-lambda/trigger/api-gateway-proxy";
 //import * as E from "fp-ts/lib/Either";
-import {Either, isLeft, isRight, left, right}                                         from "fp-ts/lib/Either";
-import {HttpMethods}                                                                  from "./httpMethods";
+import {Either, isLeft, isRight, left, right} from "fp-ts/lib/Either";
+import {HttpMethods} from "./httpMethods";
 import {CheckerErrors, CheckerErrorsOrNully, CheckerFunction, Parser, TypeCheckError} from "./types";
 
 export type PathParamSchema<TValue> = { name: string, parser: Parser<TValue> };

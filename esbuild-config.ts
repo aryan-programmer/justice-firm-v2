@@ -5,10 +5,12 @@ import {BuildOptions}    from "esbuild";
 import * as fs           from "fs-extra";
 import path              from "path";
 
+// TODO: moment-timezone/data/packed/latest.json
+
 // const __filename = fileURLToPath(import.meta.url);
 // const __dirname  = path.dirname(__filename);
-const sourcePath = path.resolve(__dirname, ".");
-const buildPath  = path.resolve(__dirname, "./dist");
+const sourcePath = path.resolve(__dirname, "./src/server");
+const buildPath  = path.resolve(__dirname, "./src/server/dist");
 
 program
 	.option("-w, --watch", "Watch files")
@@ -38,10 +40,11 @@ if (clean) {
 }
 
 let commonOptions: BuildOptions = {
-	bundle:   true,
-	format:   "cjs",
-	platform: "node",
-	//target: "node16",
+	bundle:        true,
+	format:        "cjs",
+	platform:      "node",
+	//target:        "node16",
+	tsconfig:      path.resolve(__dirname, "./tsconfig.json"),
 	sourcemap:     maps ? "linked" : false,
 	logLevel:      "info",
 	color:         true,

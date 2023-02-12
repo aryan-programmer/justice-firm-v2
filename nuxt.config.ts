@@ -8,6 +8,7 @@ export default defineNuxtConfig({
 	},
 	modules: [
 		'@pinia/nuxt',
+		'@vueuse/nuxt',
 		async (options, nuxt) => {
 			nuxt.hooks.hook('vite:extendConfig', config => {
 				config.plugins?.push(

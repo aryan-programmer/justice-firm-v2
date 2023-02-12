@@ -1,4 +1,4 @@
-import * as yup     from "yup";
+import * as yup from "yup";
 import {phoneRegex} from "~~/src/common/utils/constants";
 
 export function getSignInSchema () {

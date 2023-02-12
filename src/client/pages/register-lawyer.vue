@@ -1,11 +1,18 @@
 <script setup lang="ts">
-import {onMounted}                      from "#imports";
-import {useField, useForm}              from 'vee-validate';
-import * as yup                         from "yup";
-import {ISchema}                        from "yup";
+import {useRouter} from "#app";
+import {definePageMeta, justiceFirmApi, navigateTo, onMounted, readFileAsDataUrl} from "#imports";
+import {isLeft} from "fp-ts/Either";
+import {useField, useForm} from 'vee-validate';
+import * as yup from "yup";
+import {ISchema} from "yup";
 import {getRegistrationSchemaForLawyer} from "~/utils/validationSchemas";
-import {getCaseTypes}                   from "~~/src/common/utils/constants";
-import {getCurrentPosition}             from "~~/src/common/utils/functions";
+import {getCaseTypes, maxDataUrlLen, maxFileSize} from "~~/src/common/utils/constants";
+import {getCurrentPosition} from "~~/src/common/utils/functions";
+import {useUserStore} from "../store/userStore";
+
+definePageMeta({
+	middleware: "no-user-page"
+});
 
 let caseTypes                           = getCaseTypes();
 let caseSpecializationsValidationSchema = yup.object(caseTypes.reduce((previousValue, currentValue) => {
@@ -32,6 +39,12 @@ const certificate = useField('certificate');
 const latitude    = useField('latitude');
 const longitude   = useField('longitude');
 
+const userStore = useUserStore();
+const router    = useRouter();
+
+let photoData: string | null | undefined       = null;
+let certificateData: string | null | undefined = null;
+
 const caseSpecializationsFields = caseTypes.map((value, i) => useField(`caseSpecializations.id${i}`));
 
 const textFields = [
@@ -55,37 +68,68 @@ function photoClear (event: unknown) {
 	photo.setValue(null);
 }
 
-function photoChange (event: Event) {
-	console.log(event, 112);
+async function photoChange (event: Event) {
+	// console.log(event, 112);
+	// console.log(photoInputRef);
 	photo.handleChange(event);
-	const files      = (event.target as HTMLInputElement)?.files!;
-	let filename     = files[0].name;
-	const fileReader = new FileReader();
-	fileReader.addEventListener('load', () => {
-		const res = fileReader.result;
-		//console.log(filename, res, typeof res);
-	});
-	fileReader.readAsDataURL(files[0]);
+	const file = (event.target as HTMLInputElement)?.files?.[0];
+	if (file == null) return;
+	photoData = await readFileAsDataUrl(file);
+	if (photoData.length > maxDataUrlLen) {
+		alert(`The file must be less than ${maxFileSize} in size.`)
+	}
 }
 
 function certificateClear (event: unknown) {
 	certificate.setValue(null);
 }
 
-function certificateChange (event: Event) {
+async function certificateChange (event: Event) {
 	certificate.handleChange(event);
-	const files      = (event.target as HTMLInputElement)?.files!;
-	let filename     = files[0].name;
-	const fileReader = new FileReader()
-	fileReader.addEventListener('load', () => {
-		const res = fileReader.result;
-		//console.log(filename, res, typeof res);
-	});
-	fileReader.readAsDataURL(files[0]);
+	const file = (event.target as HTMLInputElement)?.files?.[0];
+	if (file == null) return;
+	certificateData = await readFileAsDataUrl(file);
+	if (certificateData.length > maxDataUrlLen) {
+		alert(`The file must be less than ${maxFileSize} in size.`)
+	}
 }
 
-const onSubmit = handleSubmit(values => {
-	console.log(JSON.stringify(values, null, 2));
+const onSubmit = handleSubmit(async values => {
+	if (photoData == null || !photoData.startsWith("data:")) {
+		alert("Upload a photo file first");
+		return;
+	}
+	if (certificateData == null || !certificateData.startsWith("data:")) {
+		alert("Upload a certification file first");
+		return;
+	}
+	if (!validationSchema.isType(values)) {
+		alert("Invalid data");
+		return;
+	}
+	const res = await justiceFirmApi.registerLawyer({
+		body: {
+			name:                values.name,
+			email:               values.email,
+			password:            values.password,
+			photoData,
+			address:             values.address,
+			phone:               values.phone,
+			certificationData:   certificateData,
+			latitude:            values.latitude,
+			longitude:           values.longitude,
+			specializationTypes: [],
+		},
+	});
+	if (isLeft(res) || !res.right.ok || res.right.body == null) {
+		console.log(res);
+		alert("Failed to sign up.")
+		return;
+	}
+	console.log(res.right.body);
+	alert("Registered as a lawyer successfully");
+	userStore.signIn(res.right.body);
+	await navigateTo("/");
 });
 
 onMounted(() => {

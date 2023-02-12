@@ -1,16 +1,8 @@
-import assert    from "assert";
-import {
-	APIGatewayProxyEvent,
-	APIGatewayProxyResult
-}                from "aws-lambda";
-import {
-	isLeft,
-	isRight
-}                from "fp-ts/lib/Either";
-import {
-	constants
-}                from "http2";
+import {APIGatewayProxyEvent, APIGatewayProxyResult} from "aws-lambda";
+import {isLeft, isRight} from "fp-ts/lib/Either";
 import mapValues from "lodash/mapValues";
+import {assert} from "../common/utils/asserts";
+import {constants} from "./constants";
 import {
 	APIEndpoints,
 	Endpoint,
@@ -18,19 +10,10 @@ import {
 	FnParams,
 	PathParametersSchema,
 	QueryParametersSchema
-}                from "./endpoint";
-import {
-	pathSchemaToString
-}                from "./helpers";
-import {
-	APIAwsFunnelWrapper,
-	APIAwsLambdaWrapper,
-	APIImplementation,
-	APIModelSchema
-}                from "./schema";
-import {
-	TypeCheckError
-}                from "./types";
+} from "./endpoint";
+import {pathSchemaToString} from "./helpers";
+import {APIAwsFunnelWrapper, APIAwsLambdaWrapper, APIImplementation, APIModelSchema} from "./schema";
+import {TypeCheckError} from "./types";
 
 function errorsToResponse (errors: TypeCheckError[]): APIGatewayProxyResult {
 	return {
@@ -45,8 +28,19 @@ function errorsToResponse (errors: TypeCheckError[]): APIGatewayProxyResult {
 //
 // }
 
+export function transformer (v: APIGatewayProxyResult): APIGatewayProxyResult {
+	return {
+		...v,
+		headers: {
+			"Access-Control-Allow-Headers": "*",
+			"Access-Control-Allow-Origin":  "*",
+			"Access-Control-Allow-Methods": "*",
+			...v.headers
+		},
+	}
+}
+
 function awsWrapGetter<TEndpoints extends APIEndpoints = APIEndpoints> (
-	modelSchema: APIModelSchema<TEndpoints>,
 	impl: APIImplementation<APIModelSchema<TEndpoints>>,
 	options?: { validateOutputs: boolean }
 ) {
@@ -58,7 +52,11 @@ function awsWrapGetter<TEndpoints extends APIEndpoints = APIEndpoints> (
 		endpoint: Endpoint<TQueryParameters, TReqBody, TPath, TResBody>,
 		key: string
 	) {
-		return async function (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+		return async function transformerFunction (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+			return transformer(await baseFunction(event));
+		}
+
+		async function baseFunction (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
 			try {
 				let body               = event.body == null ? null : JSON.parse(event.body);
 				let queryParamsOrError = endpoint.parseQueryParams(event.queryStringParameters);
@@ -93,6 +91,7 @@ function awsWrapGetter<TEndpoints extends APIEndpoints = APIEndpoints> (
 					body: JSON.stringify(origRes.body)
 				};
 			} catch (e) {
+				console.error(e);
 				return {
 					statusCode: constants.HTTP_STATUS_INTERNAL_SERVER_ERROR,
 					body:       JSON.stringify({error: e})
@@ -108,7 +107,7 @@ export function awsLambdaWrapper<TEndpoints extends APIEndpoints = APIEndpoints>
 	options?: { validateOutputs: boolean }
 ): APIAwsLambdaWrapper<APIModelSchema<TEndpoints>> {
 	return mapValues(modelSchema.endpoints,
-		awsWrapGetter(modelSchema, impl, options)) as APIAwsLambdaWrapper<APIModelSchema<TEndpoints>>;
+		awsWrapGetter(impl, options)) as APIAwsLambdaWrapper<APIModelSchema<TEndpoints>>;
 }
 
 export function awsLambdaFunnelWrapper<TEndpoints extends APIEndpoints = APIEndpoints> (
@@ -116,7 +115,7 @@ export function awsLambdaFunnelWrapper<TEndpoints extends APIEndpoints = APIEndp
 	impl: APIImplementation<APIModelSchema<TEndpoints>>,
 	options?: { validateOutputs: boolean }
 ): APIAwsFunnelWrapper {
-	const awsWrap = awsWrapGetter(modelSchema, impl, options);
+	const awsWrap = awsWrapGetter(impl, options);
 	const res     = {} as APIAwsFunnelWrapper;
 	for (const [key, endpoint] of Object.entries(modelSchema.endpoints)) {
 		(res[pathSchemaToString(endpoint.path)] ??= {})[endpoint.method] = awsWrap(endpoint, key);

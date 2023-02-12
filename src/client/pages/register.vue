@@ -1,7 +1,18 @@
 <script setup lang="ts">
-import {useField, useForm}              from 'vee-validate';
-import * as yup                         from "yup";
+import {navigateTo, useRouter} from "#app";
+import {definePageMeta} from "#imports";
+import {isLeft} from "fp-ts/lib/Either";
+import {useField, useForm} from 'vee-validate';
+import * as yup from "yup";
 import {getRegistrationSchemaForClient} from "~/utils/validationSchemas";
+import {maxDataUrlLen, maxFileSize} from "../../common/utils/constants";
+import {useUserStore} from "../store/userStore";
+import {justiceFirmApi} from "../utils/apiImplementation";
+import {readFileAsDataUrl} from "../utils/functions";
+
+definePageMeta({
+	middleware: "no-user-page"
+});
 
 let validationSchema         = yup.object({
 	...getRegistrationSchemaForClient(),
@@ -18,6 +29,13 @@ const phone      = useField('phone');
 const address    = useField('address');
 const photo      = useField('photo');
 
+// const photoInputRef = ref();
+
+const userStore = useUserStore();
+const router    = useRouter();
+
+let photoData: string | null | undefined = null;
+
 const textFields = [
 	{field: name, label: "Name", cols: 12, lg: 4, type: "text"},
 	{field: email, label: "Email", cols: 12, lg: 4, type: "text"},
@@ -30,22 +48,46 @@ function photoClear (event: unknown) {
 	photo.setValue(null);
 }
 
-function photoChange (event: Event) {
-	console.log(event, 112);
+async function photoChange (event: Event) {
+	// console.log(event, 112);
+	// console.log(photoInputRef);
 	photo.handleChange(event);
-	const files      = (event.target as HTMLInputElement)?.files!;
-	let filename     = files[0].name;
-	const fileReader = new FileReader()
-	fileReader.addEventListener('load', () => {
-		const res = fileReader.result;
-		if (typeof res !== "string") return;
-		console.log(filename, typeof res, res.length);
-	});
-	fileReader.readAsDataURL(files[0]);
+	const file = (event.target as HTMLInputElement)?.files?.[0];
+	if (file == null) return;
+	photoData = await readFileAsDataUrl(file);
+	if (photoData.length > maxDataUrlLen) {
+		alert(`The file must be less than ${maxFileSize} in size.`)
+	}
 }
 
-const onSubmit = handleSubmit(values => {
-	console.log(JSON.stringify(values, null, 2));
+const onSubmit = handleSubmit(async values => {
+	if (photoData == null || !photoData.startsWith("data:")) {
+		alert("Upload a photo file first");
+		return;
+	}
+	if (!validationSchema.isType(values)) {
+		alert("Invalid data");
+		return;
+	}
+	const res = await justiceFirmApi.registerClient({
+		body: {
+			name:     values.name,
+			email:    values.email,
+			password: values.password,
+			photoData,
+			address:  values.address,
+			phone:    values.phone,
+		},
+	});
+	if (isLeft(res) || !res.right.ok || res.right.body == null) {
+		console.log(res);
+		alert("Failed to sign up.")
+		return;
+	}
+	console.log(res.right.body);
+	alert("Registered as a client successfully");
+	userStore.signIn(res.right.body);
+	await navigateTo("/");
 });
 </script>
 

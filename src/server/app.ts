@@ -1,5 +1,5 @@
 import {APIGatewayProxyEvent, APIGatewayProxyResult} from "aws-lambda";
-import {HttpMethods}                                 from "../singularity/httpMethods";
+import {HttpMethods} from "../singularity/httpMethods";
 
 import {mathApiAwsFunnelFunctions} from "./api-impl";
 
