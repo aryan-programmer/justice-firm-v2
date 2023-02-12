@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import {useRouter} from "#app";
 import {definePageMeta, justiceFirmApi, navigateTo, onMounted, readFileAsDataUrl} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {useField, useForm} from 'vee-validate';
@@ -20,11 +19,11 @@ let caseSpecializationsValidationSchema = yup.object(caseTypes.reduce((previousV
 	return previousValue;
 }, {} as Record<string, ISchema<any>>));
 
-let validationSchema         = yup.object({
+let validationSchema = yup.object({
 	...getRegistrationSchemaForLawyer(),
 	caseSpecializations: caseSpecializationsValidationSchema,
 });
-const {handleSubmit, errors} = useForm({
+const form           = useForm({
 	validationSchema: validationSchema,
 });
 
@@ -40,12 +39,11 @@ const latitude    = useField('latitude');
 const longitude   = useField('longitude');
 
 const userStore = useUserStore();
-const router    = useRouter();
 
 let photoData: string | null | undefined       = null;
 let certificateData: string | null | undefined = null;
 
-const caseSpecializationsFields = caseTypes.map((value, i) => useField(`caseSpecializations.id${i}`));
+const caseSpecializationsFields = caseTypes.map((value, i) => useField(`caseSpecializations.id${i + 1}`));
 
 const textFields = [
 	{field: name, label: "Name", cols: 12, lg: 4, type: "text"},
@@ -94,7 +92,7 @@ async function certificateChange (event: Event) {
 	}
 }
 
-const onSubmit = handleSubmit(async values => {
+const onSubmit = form.handleSubmit(async values => {
 	if (photoData == null || !photoData.startsWith("data:")) {
 		alert("Upload a photo file first");
 		return;
@@ -107,18 +105,25 @@ const onSubmit = handleSubmit(async values => {
 		alert("Invalid data");
 		return;
 	}
+	const specializationTypes: number[] = [];
+	const specs                         = form.values.caseSpecializations;
+	for (const key of Object.keys(specs)) {
+		if (specs[key] != null) {
+			specializationTypes.push(+key.substring(2));
+		}
+	}
 	const res = await justiceFirmApi.registerLawyer({
 		body: {
-			name:                values.name,
-			email:               values.email,
-			password:            values.password,
+			name:              values.name,
+			email:             values.email,
+			password:          values.password,
 			photoData,
-			address:             values.address,
-			phone:               values.phone,
-			certificationData:   certificateData,
-			latitude:            values.latitude,
-			longitude:           values.longitude,
-			specializationTypes: [],
+			address:           values.address,
+			phone:             values.phone,
+			certificationData: certificateData,
+			latitude:          +values.latitude,
+			longitude:         +values.longitude,
+			specializationTypes,
 		},
 	});
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
@@ -235,7 +240,6 @@ onMounted(() => {
 				<v-btn
 					rounded
 					type="submit"
-					name="submit"
 					variant="elevated"
 					value="y"
 					color="orange-lighten-2">Register

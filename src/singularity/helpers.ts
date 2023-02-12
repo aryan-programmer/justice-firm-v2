@@ -3,9 +3,9 @@ import {SchemaOptions, TSchema, Type} from "@sinclair/typebox";
 import {TypeCheck, TypeCompiler} from "@sinclair/typebox/compiler";
 import {ValueError} from "@sinclair/typebox/errors";
 import {chain as EitherChain, Either, left, right} from "fp-ts/lib/Either";
-import memoizee from "memoizee";
 // @ts-ignore
 import memoizeWeakOrig from "memoizee/weak";
+import {memoizeWeak} from "../common/utils/memoizeWeak";
 import {Nuly} from "../common/utils/types";
 import {constants} from "./constants";
 import {
@@ -16,8 +16,6 @@ import {
 	PathParamSchema
 } from "./endpoint";
 import {CheckerErrors, CheckerErrorsOrNully, CheckerFunction, Parser, TypeCheckError} from "./types";
-
-const memoizeWeak: <F extends (...args: any[]) => any>(f: F, options?: memoizee.Options<F>) => F & memoizee.Memoized<F> = memoizeWeakOrig;
 
 // region ...CheckerFunction
 const fakeChecker: CheckerFunction<unknown> = {

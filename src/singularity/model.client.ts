@@ -1,6 +1,8 @@
-import {Either, left, right} from "fp-ts/lib/Either";
+import {Either, isLeft, left, right} from "fp-ts/lib/Either";
 import mapValues from "lodash/mapValues";
 import {assert} from "../common/utils/asserts";
+import {sleep} from "../common/utils/sleep";
+import {constants} from "./constants";
 import {
 	APIEndpoints,
 	Endpoint,
@@ -24,7 +26,7 @@ export type ModelResponse<T> = {
 	body?: T;
 };
 
-export type ModelResponseOrErr<T> = Either<CheckerErrors, ModelResponse<T>>;
+export type ModelResponseOrErr<T> = Either<CheckerErrors | Error, ModelResponse<T>>;
 
 export type APIFetchImplementation<TSchema> = TSchema extends APIModelSchema<infer T> ? {
 	[K in keyof T]: T[K] extends EndpointSchema<infer TQueryParameters,
@@ -47,6 +49,16 @@ export interface FetchImplMapperOptions {
 	baseUrl: string,
 }
 
+function shouldRetry<TResBody> (v: ModelResponseOrErr<TResBody>) {
+	if (isLeft(v)) {
+		return v.left instanceof Error;
+	}
+	const right = v.right;
+	return !right.ok
+	       && right.status !== constants.HTTP_STATUS_UNAUTHORIZED
+	       && right.status !== constants.HTTP_STATUS_NOT_FOUND;
+}
+
 function fetchImplementationMapper<TEndpoints extends APIEndpoints = APIEndpoints> (
 	options: FetchImplMapperOptions
 ) {
@@ -60,7 +72,33 @@ function fetchImplementationMapper<TEndpoints extends APIEndpoints = APIEndpoint
 	) {
 		assert(typeof endpoint.path === "string");
 		const endpointPath = baseUrl + endpoint.path;
-		return async function (event: Partial<EndpointFnParamsFromRaw<TReqBody, TQueryParameters, TPath>>): Promise<ModelResponseOrErr<TResBody>> {
+		return async function reFetcherFunction (event: Partial<EndpointFnParamsFromRaw<TReqBody, TQueryParameters, TPath>>): Promise<ModelResponseOrErr<TResBody>> {
+			const res1 = await errorLefter(event);
+			if (shouldRetry(res1)) {
+				console.log("Retrying on ", res1, " on event ", event);
+				await sleep(1000);
+				return await baseFunction(event);
+			}
+			return res1;
+		};
+
+		async function errorLefter (event: Partial<EndpointFnParamsFromRaw<TReqBody, TQueryParameters, TPath>>): Promise<ModelResponseOrErr<TResBody>> {
+			try {
+				return await baseFunction(event);
+			} catch (e) {
+				console.log(e);
+				if (e instanceof Error) {
+					return left(e);
+				}
+				return left([{
+					path:    "/",
+					message: "Error",
+					value:   e,
+				}]);
+			}
+		}
+
+		async function baseFunction (event: Partial<EndpointFnParamsFromRaw<TReqBody, TQueryParameters, TPath>>): Promise<ModelResponseOrErr<TResBody>> {
 			let {body, queryParams, pathParams} = event;
 			if (validateInputs) {
 				const errors = endpoint.checkBody(body);

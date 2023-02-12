@@ -6,6 +6,8 @@ import {modelSchema} from "../singularity/schema";
 import {AuthToken} from "./api-types";
 import {Client, Lawyer} from "./db-types";
 import {maxDataUrlLen, ValidEmail, ValidPassword} from "./utils/constants";
+import {ArrayOf, Optional} from "./utils/functions";
+import {Nuly} from "./utils/types";
 
 export const RegisterLawyerInput = Type.Intersect([
 	Type.Omit(Lawyer, ["id", "photoPath", "type", "certificationLink", "status", "passwordHash"]),
@@ -35,6 +37,36 @@ export type SessionLoginInput = Static<typeof SessionLoginInput>;
 
 export const MessageOrAuthToken = MessageOr(AuthToken);
 
+export const SearchLawyersBaseInput = Type.Partial(Type.Object({
+	name:    Type.String(),
+	address: Type.String(),
+}), {$id: "SearchLawyersBaseInput"});
+export type SearchLawyersBaseInput = Static<typeof SearchLawyersBaseInput>;
+
+const LawyerSearchResult = Type.Intersect([
+	Type.Omit(Lawyer, ["type", "passwordHash"]),
+	Type.Object({
+		distance: Optional(Type.Number()),
+	})
+], {$id: "LawyerSearchResult"});
+export type LawyerSearchResult = Omit<Lawyer, "type" | "passwordHash"> & { distance: number | Nuly };
+const LawyerSearchResults = ArrayOf(LawyerSearchResult);
+
+export const SearchAndSortLawyersInput = Type.Partial(Type.Object({
+	name:      Type.String(),
+	address:   Type.String(),
+	latitude:  Type.Number(),
+	longitude: Type.Number(),
+}), {$id: "SearchAndSortLawyersInput"});
+export type SearchAndSortLawyersInput = Static<typeof SearchAndSortLawyersInput>;
+
+export const SearchLawyersInput = Type.Union([SearchLawyersBaseInput, SearchAndSortLawyersInput],
+	{$id: "SearchLawyersInput"});
+export type SearchLawyersInput = SearchLawyersBaseInput | SearchAndSortLawyersInput;
+
+export const GetLawyerInput = Type.Pick(Lawyer, ["id"], {$id: "GetLawyerInput"});
+export type GetLawyerInput = Pick<Lawyer, "id">;
+
 export const justiceFirmApiSchema = modelSchema({
 	name:      "JusticeFirmApi",
 	endpoints: {
@@ -55,6 +87,18 @@ export const justiceFirmApiSchema = modelSchema({
 			path:                "/session",
 			requestBodyChecker:  lazyCheck(SessionLoginInput),
 			responseBodyChecker: lazyCheck(MessageOrAuthToken),
+		}),
+		searchLawyers:  endpoint({
+			method:              HttpMethods.POST,
+			path:                "/user/lawyer/search",
+			requestBodyChecker:  lazyCheck(SearchLawyersInput),
+			responseBodyChecker: lazyCheck(LawyerSearchResults),
+		}),
+		getLawyer:      endpoint({
+			method:              HttpMethods.POST,
+			path:                "/user/lawyer/get",
+			requestBodyChecker:  lazyCheck(GetLawyerInput),
+			responseBodyChecker: lazyCheck(Optional(LawyerSearchResult)),
 		}),
 		// test:           endpoint({
 		// 	method:              HttpMethods.GET,

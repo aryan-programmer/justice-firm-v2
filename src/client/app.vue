@@ -18,7 +18,7 @@ const userDeps = computed(args => {
 		return {
 			links: [
 				{icon: "fa-home", title: "Home", link: "/"},
-				{icon: "fa-search", title: "Search Lawyers", link: "/search-lawyer"},
+				{icon: "fa-search", title: "Search Lawyers", link: "/search-lawyers"},
 				{icon: "fa-user-plus", title: "Register", link: '/register'},
 				{icon: "fa-sign-in", title: "Sign in", link: "/sign-in"},
 			],
@@ -55,7 +55,7 @@ const userDeps = computed(args => {
 		return {
 			links: [
 				{icon: "fa-bug-slash", title: "Home", link: "/"},
-				{icon: "fa-search", title: "Search Lawyers", link: "/search-lawyer"},
+				{icon: "fa-search", title: "Search Lawyers", link: "/search-lawyers"},
 				{icon: "fa-table", title: "Admin Dashboard", link: "/admin-dashboard"},
 				// {icon: "fa-sign-out", title: "Sign out", link: "/sign-out"},
 			],

@@ -1,6 +1,14 @@
 import * as yup from "yup";
 import {phoneRegex} from "~~/src/common/utils/constants";
 
+function optionalNumberTransform (value: any) {
+	return isNaN(value) ? undefined : value;
+}
+
+export function optionalNumber () {
+	return yup.number().transform(optionalNumberTransform).nullable().optional().notRequired();
+}
+
 export function getSignInSchema () {
 	return {
 		email:    yup

@@ -3,11 +3,20 @@ import {GetParameterCommand, SSMClient} from "@aws-sdk/client-ssm";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {compareSync, hash} from "bcryptjs";
 import {sign} from "jsonwebtoken";
-import {Connection, createPool, Pool, UpsertResult} from "mariadb";
-import {justiceFirmApiSchema, RegisterClientInput, RegisterLawyerInput, SessionLoginInput} from "../common/api-schema";
+import {createPool, Pool, UpsertResult} from "mariadb";
+import {
+	GetLawyerInput,
+	justiceFirmApiSchema,
+	LawyerSearchResult,
+	RegisterClientInput,
+	RegisterLawyerInput,
+	SearchLawyersInput,
+	SessionLoginInput
+} from "../common/api-schema";
 import {AuthToken, PrivateAuthToken} from "../common/api-types";
-import {Client, UserAccessType} from "../common/db-types";
+import {StatusEnum, UserAccessType} from "../common/db-types";
 import {nn} from "../common/utils/asserts";
+import {toNumIfNotNull} from "../common/utils/functions";
 import {Nuly} from "../common/utils/types";
 import {constants} from "../singularity/constants";
 import {EndpointResult, FnParams} from "../singularity/endpoint";
@@ -37,9 +46,24 @@ function generateAuthTokenResponse (userId: number | bigint, userType: UserAcces
 	});
 }
 
+function recordToLawyerSearchResult (value: Record<string, any>) {
+	return {
+		id:                value.id.toString(),
+		name:              value.name.toString(),
+		email:             value.email.toString(),
+		phone:             value.phone.toString(),
+		address:           value.address.toString(),
+		photoPath:         value.photo_path.toString(),
+		latitude:          Number(value.latitude),
+		longitude:         Number(value.longitude),
+		certificationLink: value.certification_link.toString(),
+		status:            StatusEnum.Confirmed,
+		distance:          toNumIfNotNull(value.distance)
+	} as LawyerSearchResult;
+}
+
 export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmApiSchema> {
 	private pool: Pool | Nuly        = null;
-	private conn: Connection | Nuly  = null;
 	private jwtSecret: string | Nuly = null;
 
 	async registerLawyer (params: FnParams<RegisterLawyerInput>, event: APIGatewayProxyEvent): Promise<EndpointResult<AuthToken>> {
@@ -76,7 +100,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			console.log("Started transaction");
 
 			const userInsertRes: UpsertResult = await conn.execute(
-				"INSERT INTO `user`(`name`, `email`, `phone`, `address`, `password_hash`, `photo_path`, `type`) VALUES (?, ?, ?, ?, ?, ?, 'lawyer');",
+				"INSERT INTO user(name, email, phone, address, password_hash, photo_path, type) VALUES (?, ?, ?, ?, ?, ?, 'lawyer');",
 				[data.name, data.email, data.phone, data.address, passwordHash, photoRes.url]
 			);
 
@@ -85,7 +109,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			console.log(userInsertRes);
 
 			const lawyerInsertRes: UpsertResult = await conn.execute(
-				"INSERT INTO `lawyer`(`id`, `latitude`, `longitude`, `certification_link`) VALUES (?, ?, ?, ?);",
+				"INSERT INTO lawyer(id, latitude, longitude, certification_link, status) VALUES (?, ?, ?, ?, 'confirmed');",
 				[userId, data.latitude, data.longitude, certificationRes.url]
 			);
 
@@ -95,7 +119,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 				let params = data.specializationTypes.map(value => ([userId, value]));
 				console.log(params);
 				const specRes = await conn.batch(
-					"INSERT INTO `lawyer_specialization`(`lawyer_id`, `case_type_id`) VALUES (?, ?);",
+					"INSERT INTO lawyer_specialization(lawyer_id, case_type_id) VALUES (?, ?);",
 					params
 				);
 
@@ -109,6 +133,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			return generateAuthTokenResponse(userId, UserAccessType.Lawyer, jwtSecret);
 		} catch (e) {
 			await conn.rollback();
+			await conn.release();
 			throw e;
 		}
 	}
@@ -139,7 +164,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			console.log("Started transaction");
 
 			const userInsertRes: UpsertResult = await conn.execute(
-				"INSERT INTO `user`(`name`, `email`, `phone`, `address`, `password_hash`, `photo_path`, `type`) VALUES (?, ?, ?, ?, ?, ?, 'client');",
+				"INSERT INTO user(name, email, phone, address, password_hash, photo_path, type) VALUES (?, ?, ?, ?, ?, ?, 'client');",
 				[data.name, data.email, data.phone, data.address, passwordHash, photoRes.url]
 			);
 
@@ -148,7 +173,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			const userId = nn(userInsertRes.insertId);
 
 			const clientInsertRes: UpsertResult = await conn.execute(
-				"INSERT INTO `client`(`id`) VALUES (?);",
+				"INSERT INTO client(id) VALUES (?);",
 				[userId]
 			);
 
@@ -159,6 +184,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			return generateAuthTokenResponse(userId, UserAccessType.Client, jwtSecret);
 		} catch (e) {
 			await conn.rollback();
+			await conn.release();
 			throw e;
 		}
 	}
@@ -166,12 +192,16 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 	async sessionLogin (params: FnParams<SessionLoginInput>, event: APIGatewayProxyEvent): Promise<EndpointResult<AuthToken | Message>> {
 		const data: SessionLoginInput = params.body;
 
-		const [jwtSecret, conn] = await Promise.all([this.getJwtSecret(), this.getConnection()]);
-
-		const resSet: Pick<Client, "id" | "passwordHash" | "type">[] = await conn.execute(
-			"SELECT `id`, `password_hash` AS `passwordHash`, `type` FROM `user` WHERE `user`.`email` = ?;",
-			[data.email]
+		const resSetP:
+			      Promise<{ id: number | bigint, passwordHash: string, type: UserAccessType }[]> = this.getPool().then(
+			pool => pool.execute(
+				"SELECT id, password_hash AS passwordHash, type FROM user WHERE user.email = ?;",
+				[data.email]
+			)
 		);
+
+		const [jwtSecret, resSet] = await Promise.all([this.getJwtSecret(), resSetP]);
+
 		console.log(resSet);
 		if (resSet.length === 0) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Email not used to sign up a user");
@@ -182,6 +212,90 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		}
 		return generateAuthTokenResponse(id, type, jwtSecret);
 	}
+
+	async searchLawyers (params: FnParams<SearchLawyersInput>, event: APIGatewayProxyEvent): Promise<EndpointResult<LawyerSearchResult[]>> {
+		const data    = params.body;
+		const name    = `%${data.name}%`;
+		const address = `%${data.address}%`;
+
+		let res: Record<string, any>[];
+		if ("latitude" in data && "longitude" in data && data.latitude != null && data.longitude != null) {
+			res = await (await this.getPool()).execute(
+				`SELECT u.id,
+				        u.name,
+				        u.email,
+				        u.phone,
+				        u.address,
+				        u.photo_path,
+				        l.latitude,
+				        l.longitude,
+				        l.certification_link,
+				        ST_DISTANCE_SPHERE(POINT(l.latitude, l.longitude), POINT(?, ?)) AS distance
+				 FROM lawyer l
+				 JOIN user u
+				      ON u.id = l.id
+				 WHERE l.status = 'confirmed'
+				   AND u.name LIKE ?
+				   AND u.address LIKE ?
+				 ORDER BY distance ASC
+				 LIMIT 10;`, [data.latitude, data.longitude, name, address]);
+			console.log("Sphericals");
+		} else {
+			res = await (await this.getPool()).execute(
+				`SELECT u.id,
+				        u.name,
+				        u.email,
+				        u.phone,
+				        u.address,
+				        u.photo_path,
+				        l.latitude,
+				        l.longitude,
+				        l.certification_link
+				 FROM lawyer l
+				 JOIN user u
+				      ON u.id = l.id
+				 WHERE l.status = 'confirmed'
+				   AND u.name LIKE ?
+				   AND u.address LIKE ?
+				 ORDER BY name ASC
+				 LIMIT 25;`, [name, address]);
+			console.log("Standards");
+		}
+		console.log(res, data);
+
+		const lawyers: LawyerSearchResult[] = res.map(recordToLawyerSearchResult);
+		return response(200, lawyers);
+	}
+
+	async getLawyer (params: FnParams<GetLawyerInput>, event: APIGatewayProxyEvent): Promise<EndpointResult<LawyerSearchResult | Nuly>> {
+		const data = params.body;
+
+		const res: Record<string, any>[] = await (await this.getPool()).execute(
+			`SELECT u.id,
+			        u.name,
+			        u.email,
+			        u.phone,
+			        u.address,
+			        u.photo_path,
+			        l.latitude,
+			        l.longitude,
+			        l.certification_link
+			 FROM lawyer l
+			 JOIN user u
+			      ON u.id = l.id
+			 WHERE l.status = 'confirmed'
+			   AND l.id = ?;`, [+data.id]);
+		console.log("From id");
+		console.log(res, data);
+
+		if (res.length === 0) {
+			return response(404, null);
+		}
+
+		const lawyers: LawyerSearchResult = recordToLawyerSearchResult(res[0]);
+		return response(200, lawyers);
+	}
+
 
 	// async test (params: FnParams<UnknownBody>, event: APIGatewayProxyEvent): Promise<EndpointResult<Message>> {
 	// 	return message(200, {
@@ -198,6 +312,10 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 	}
 
 	private async getConnection () {
+		return await (await this.getPool()).getConnection();
+	}
+
+	private async getPool () {
 		if (this.pool == null) {
 			const password = await ssmClient.send(new GetParameterCommand({
 				Name:           process.env.DB_PASSWORD,
@@ -211,12 +329,12 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 				database: "justice_firm",
 			});
 		}
-		if (this.conn == null || !this.conn.isValid()) {
-			console.log("Opening new connection: ", {oldConn: this.conn, validity: this.conn?.isValid()});
-			await this.conn?.end();
-			return this.conn = await nn(this.pool).getConnection();
-		}
-		return this.conn;
+		console.log({
+			active: this.pool.activeConnections(),
+			idle:   this.pool.idleConnections(),
+			total:  this.pool.totalConnections(),
+		});
+		return this.pool;
 	}
 }
 

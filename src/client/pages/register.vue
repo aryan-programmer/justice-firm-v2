@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {navigateTo, useRouter} from "#app";
+import {navigateTo} from "#app";
 import {definePageMeta} from "#imports";
 import {isLeft} from "fp-ts/lib/Either";
 import {useField, useForm} from 'vee-validate';
@@ -32,7 +32,6 @@ const photo      = useField('photo');
 // const photoInputRef = ref();
 
 const userStore = useUserStore();
-const router    = useRouter();
 
 let photoData: string | null | undefined = null;
 

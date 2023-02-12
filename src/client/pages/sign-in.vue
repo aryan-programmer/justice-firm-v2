@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import {useRouter} from "#app";
 import {definePageMeta, navigateTo} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {useField, useForm} from 'vee-validate';
@@ -22,7 +21,6 @@ const email    = useField('email');
 const password = useField('password');
 
 const userStore = useUserStore();
-const router    = useRouter();
 
 const textFields = [
 	{field: email, label: "Email", type: "text"},
