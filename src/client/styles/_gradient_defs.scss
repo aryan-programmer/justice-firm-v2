@@ -11,7 +11,7 @@ $enable-btn-outline-gradients: false !default;
 	$main-value,
 	$gradient,
 	//$color,
-	//$blend-mode: 0
+	$blend-mode: 0
 ) {
 	.bg-#{$gradient-name} {
 		//@include shadows-from-color($main-value);

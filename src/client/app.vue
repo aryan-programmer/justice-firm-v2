@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {useRouter} from "#app";
-import {computed, navigateTo} from "#imports";
+import {computed} from "#imports";
 import {ref} from "vue";
 import {UserAccessType} from "../common/db-types";
 import {useUserStore} from "./store/userStore";
@@ -13,7 +13,6 @@ const rail   = ref(true);
 const router = useRouter();
 
 const userDeps = computed(args => {
-	console.log(router.currentRoute.value);
 	if (userStore.authToken == null) {
 		return {
 			links: [
@@ -111,11 +110,11 @@ function signOut () {
 		<v-list density="compact" nav>
 			<v-list-item
 				v-for="link in userDeps.links"
+				:to="link.link"
 				:prepend-icon="link.icon"
 				:title="link.title"
 				:value="link.link"
-				:active="router.currentRoute.value.fullPath === link.link"
-				@click="navigateTo(link.link)" />
+				:active="router.currentRoute.value.fullPath === link.link" />
 			<v-list-item
 				v-if="userStore.authToken!=null"
 				prepend-icon="fa-sign-out"

@@ -4,7 +4,7 @@ import {isLeft} from "fp-ts/Either";
 import {useField, useForm} from 'vee-validate';
 import * as yup from "yup";
 import {ISchema} from "yup";
-import {getRegistrationSchemaForLawyer} from "~/utils/validationSchemas";
+import {getRegistrationSchemaForLawyer} from "../utils/validation-schemas";
 import {getCaseTypes, maxDataUrlLen, maxFileSize} from "~~/src/common/utils/constants";
 import {getCurrentPosition} from "~~/src/common/utils/functions";
 import {useUserStore} from "../store/userStore";

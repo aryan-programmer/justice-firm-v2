@@ -3,8 +3,8 @@ import {endpoint} from "../singularity/endpoint";
 import {lazyCheck, MessageOr} from "../singularity/helpers";
 import {HttpMethods} from "../singularity/httpMethods";
 import {modelSchema} from "../singularity/schema";
-import {AuthToken} from "./api-types";
-import {Client, Lawyer} from "./db-types";
+import {AuthToken, ClientAuthToken} from "./api-types";
+import {Client, ID_T, Lawyer} from "./db-types";
 import {maxDataUrlLen, ValidEmail, ValidPassword} from "./utils/constants";
 import {ArrayOf, Optional} from "./utils/functions";
 import {Nuly} from "./utils/types";
@@ -64,41 +64,55 @@ export const SearchLawyersInput = Type.Union([SearchLawyersBaseInput, SearchAndS
 	{$id: "SearchLawyersInput"});
 export type SearchLawyersInput = SearchLawyersBaseInput | SearchAndSortLawyersInput;
 
-export const GetLawyerInput = Type.Pick(Lawyer, ["id"], {$id: "GetLawyerInput"});
+export const GetLawyerInput = Type.Object({id: ID_T}, {$id: "GetLawyerInput"});
 export type GetLawyerInput = Pick<Lawyer, "id">;
+
+export const OpenAppointmentRequestInput = Type.Object({
+	lawyerId:    ID_T,
+	authToken:   ClientAuthToken,
+	description: Type.String(),
+	timestamp:   Type.Optional(Type.String())
+}, {$id: "OpenAppointmentRequestInput"});
+export type OpenAppointmentRequestInput = Static<typeof OpenAppointmentRequestInput>;
 
 export const justiceFirmApiSchema = modelSchema({
 	name:      "JusticeFirmApi",
 	endpoints: {
-		registerLawyer: endpoint({
+		registerLawyer:         endpoint({
 			method:              HttpMethods.POST,
 			path:                "/user/lawyer",
 			requestBodyChecker:  lazyCheck(RegisterLawyerInput),
 			responseBodyChecker: lazyCheck(AuthToken),
 		}),
-		registerClient: endpoint({
+		registerClient:         endpoint({
 			method:              HttpMethods.POST,
 			path:                "/user/client",
 			requestBodyChecker:  lazyCheck(RegisterClientInput),
 			responseBodyChecker: lazyCheck(AuthToken),
 		}),
-		sessionLogin:   endpoint({
+		sessionLogin:           endpoint({
 			method:              HttpMethods.POST,
 			path:                "/session",
 			requestBodyChecker:  lazyCheck(SessionLoginInput),
 			responseBodyChecker: lazyCheck(MessageOrAuthToken),
 		}),
-		searchLawyers:  endpoint({
+		searchLawyers:          endpoint({
 			method:              HttpMethods.POST,
 			path:                "/user/lawyer/search",
 			requestBodyChecker:  lazyCheck(SearchLawyersInput),
 			responseBodyChecker: lazyCheck(LawyerSearchResults),
 		}),
-		getLawyer:      endpoint({
+		getLawyer:              endpoint({
 			method:              HttpMethods.POST,
 			path:                "/user/lawyer/get",
 			requestBodyChecker:  lazyCheck(GetLawyerInput),
 			responseBodyChecker: lazyCheck(Optional(LawyerSearchResult)),
+		}),
+		openAppointmentRequest: endpoint({
+			method:              HttpMethods.POST,
+			path:                "/appointment/new",
+			requestBodyChecker:  lazyCheck(OpenAppointmentRequestInput),
+			responseBodyChecker: lazyCheck(MessageOr(Nuly)),
 		}),
 		// test:           endpoint({
 		// 	method:              HttpMethods.GET,

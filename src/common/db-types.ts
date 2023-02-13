@@ -22,8 +22,9 @@ export enum StatusEnum {
 
 export const StatusEnum_T = Type.Enum(StatusEnum, {$id: "StatusEnum"})
 
+export const ID_T = Type.String();
 export const User = Type.Object({
-	id:           Type.String(),
+	id:           ID_T,
 	name:         Type.String(),
 	email:        ValidEmail,
 	phone:        ValidPhone,

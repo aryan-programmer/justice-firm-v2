@@ -2,25 +2,26 @@ import {S3Client} from "@aws-sdk/client-s3";
 import {GetParameterCommand, SSMClient} from "@aws-sdk/client-ssm";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {compareSync, hash} from "bcryptjs";
-import {sign} from "jsonwebtoken";
+import {sign, verify} from "jsonwebtoken";
 import {createPool, Pool, UpsertResult} from "mariadb";
 import {
 	GetLawyerInput,
 	justiceFirmApiSchema,
 	LawyerSearchResult,
+	OpenAppointmentRequestInput,
 	RegisterClientInput,
 	RegisterLawyerInput,
 	SearchLawyersInput,
 	SessionLoginInput
 } from "../common/api-schema";
-import {AuthToken, PrivateAuthToken} from "../common/api-types";
+import {AuthToken, JWTHashedData} from "../common/api-types";
 import {StatusEnum, UserAccessType} from "../common/db-types";
 import {nn} from "../common/utils/asserts";
 import {toNumIfNotNull} from "../common/utils/functions";
 import {Nuly} from "../common/utils/types";
 import {constants} from "../singularity/constants";
 import {EndpointResult, FnParams} from "../singularity/endpoint";
-import {message, Message, response} from "../singularity/helpers";
+import {message, Message, noContent, response} from "../singularity/helpers";
 import {awsLambdaFunnelWrapper} from "../singularity/model.server";
 import {APIImplementation} from "../singularity/schema";
 import {saltRounds} from "./utils/constants";
@@ -32,8 +33,8 @@ const ssmClient = new SSMClient({region});
 const s3Client  = new S3Client({region});
 
 function generateAuthTokenResponse (userId: number | bigint, userType: UserAccessType, jwtSecret: string) {
-	const expiryDate                     = null;
-	const privateToken: PrivateAuthToken = {
+	const expiryDate                  = null;
+	const privateToken: JWTHashedData = {
 		id: userId.toString(10),
 		userType,
 		expiryDate,
@@ -92,12 +93,8 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		const [conn, passwordHash, photoRes, certificationRes, jwtSecret] =
 			      await Promise.all([connP, passwordHashP, photoResP, certificationResP, jwtSecretP]);
 
-		console.log({conn, passwordHash, photoRes, certificationRes});
-
 		try {
 			await conn.beginTransaction();
-
-			console.log("Started transaction");
 
 			const userInsertRes: UpsertResult = await conn.execute(
 				"INSERT INTO user(name, email, phone, address, password_hash, photo_path, type) VALUES (?, ?, ?, ?, ?, ?, 'lawyer');",
@@ -106,14 +103,10 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 
 			const userId = nn(userInsertRes.insertId);
 
-			console.log(userInsertRes);
-
 			const lawyerInsertRes: UpsertResult = await conn.execute(
 				"INSERT INTO lawyer(id, latitude, longitude, certification_link, status) VALUES (?, ?, ?, ?, 'confirmed');",
 				[userId, data.latitude, data.longitude, certificationRes.url]
 			);
-
-			console.log(lawyerInsertRes);
 
 			if (data.specializationTypes.length > 0) {
 				let params = data.specializationTypes.map(value => ([userId, value]));
@@ -128,13 +121,12 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 
 			await conn.commit();
 
-			console.log("Committed");
-
 			return generateAuthTokenResponse(userId, UserAccessType.Lawyer, jwtSecret);
 		} catch (e) {
 			await conn.rollback();
-			await conn.release();
 			throw e;
+		} finally {
+			await conn.release();
 		}
 	}
 
@@ -161,14 +153,10 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		try {
 			await conn.beginTransaction();
 
-			console.log("Started transaction");
-
 			const userInsertRes: UpsertResult = await conn.execute(
 				"INSERT INTO user(name, email, phone, address, password_hash, photo_path, type) VALUES (?, ?, ?, ?, ?, ?, 'client');",
 				[data.name, data.email, data.phone, data.address, passwordHash, photoRes.url]
 			);
-
-			console.log(userInsertRes);
 
 			const userId = nn(userInsertRes.insertId);
 
@@ -177,15 +165,14 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 				[userId]
 			);
 
-			console.log(clientInsertRes);
-
 			await conn.commit();
 
 			return generateAuthTokenResponse(userId, UserAccessType.Client, jwtSecret);
 		} catch (e) {
 			await conn.rollback();
-			await conn.release();
 			throw e;
+		} finally {
+			await conn.release();
 		}
 	}
 
@@ -202,7 +189,6 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 
 		const [jwtSecret, resSet] = await Promise.all([this.getJwtSecret(), resSetP]);
 
-		console.log(resSet);
 		if (resSet.length === 0) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Email not used to sign up a user");
 		}
@@ -215,8 +201,8 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 
 	async searchLawyers (params: FnParams<SearchLawyersInput>, event: APIGatewayProxyEvent): Promise<EndpointResult<LawyerSearchResult[]>> {
 		const data    = params.body;
-		const name    = `%${data.name}%`;
-		const address = `%${data.address}%`;
+		const name    = `%${data.name ?? ""}%`;
+		const address = `%${data.address ?? ""}%`;
 
 		let res: Record<string, any>[];
 		if ("latitude" in data && "longitude" in data && data.latitude != null && data.longitude != null) {
@@ -239,7 +225,6 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 				   AND u.address LIKE ?
 				 ORDER BY distance ASC
 				 LIMIT 10;`, [data.latitude, data.longitude, name, address]);
-			console.log("Sphericals");
 		} else {
 			res = await (await this.getPool()).execute(
 				`SELECT u.id,
@@ -259,9 +244,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 				   AND u.address LIKE ?
 				 ORDER BY name ASC
 				 LIMIT 25;`, [name, address]);
-			console.log("Standards");
 		}
-		console.log(res, data);
 
 		const lawyers: LawyerSearchResult[] = res.map(recordToLawyerSearchResult);
 		return response(200, lawyers);
@@ -285,8 +268,6 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			      ON u.id = l.id
 			 WHERE l.status = 'confirmed'
 			   AND l.id = ?;`, [+data.id]);
-		console.log("From id");
-		console.log(res, data);
 
 		if (res.length === 0) {
 			return response(404, null);
@@ -294,6 +275,53 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 
 		const lawyers: LawyerSearchResult = recordToLawyerSearchResult(res[0]);
 		return response(200, lawyers);
+	}
+
+	async openAppointmentRequest (params: FnParams<OpenAppointmentRequestInput>, event: APIGatewayProxyEvent): Promise<EndpointResult<Nuly | Message>> {
+		const data: OpenAppointmentRequestInput = params.body;
+
+		const jwtSecret          = await this.getJwtSecret();
+		const decoded            = verify(data.authToken.jwt, jwtSecret);
+		const obj: JWTHashedData = typeof decoded === "string" ? JSON.parse(decoded) : decoded;
+		if (obj.userType !== UserAccessType.Client) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED,
+				"To open an appointment request the user must be authenticated as a client.");
+		}
+
+		const timestamp = data.timestamp == null ? new Date() : new Date(data.timestamp);
+
+		const conn = await this.getConnection();
+
+		try {
+			await conn.beginTransaction();
+
+			let lawyerId                       = data.lawyerId;
+			let clientId                       = data.authToken.id;
+			const groupInsertRes: UpsertResult = await conn.execute(
+				"INSERT INTO `group`(client_id, lawyer_id) VALUES (?, ?);",
+				[clientId, lawyerId]
+			);
+
+			console.log({groupInsertRes});
+
+			const groupId = nn(groupInsertRes.insertId);
+
+			const appointmentInsertRes: UpsertResult = await conn.execute(
+				"INSERT INTO appointment(client_id, lawyer_id, group_id, description, timestamp) VALUES (?, ?, ?, ?, ?);",
+				[clientId, lawyerId, groupId, data.description, timestamp]
+			);
+
+			console.log({appointmentInsertRes});
+
+			await conn.commit();
+
+			return noContent;
+		} catch (e) {
+			await conn.rollback();
+			throw e;
+		} finally {
+			await conn.release();
+		}
 	}
 
 

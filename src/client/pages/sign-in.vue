@@ -3,10 +3,10 @@ import {definePageMeta, navigateTo} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {useField, useForm} from 'vee-validate';
 import * as yup from "yup";
-import {getSignInSchema} from "~/utils/validationSchemas";
+import {getSignInSchema} from "../utils/validation-schemas";
 import {AuthToken} from "../../common/api-types";
 import {useUserStore} from "../store/userStore";
-import {justiceFirmApi} from "../utils/apiImplementation";
+import {justiceFirmApi} from "../utils/api-fetcher-impl";
 
 definePageMeta({
 	middleware: "no-user-page"

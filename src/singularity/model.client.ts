@@ -120,7 +120,7 @@ function fetchImplementationMapper<TEndpoints extends APIEndpoints = APIEndpoint
 				body:   JSON.stringify(body),
 				method: endpoint.method,
 			});
-			const origBody = await response.json();
+			const origBody = response.status === constants.HTTP_STATUS_NO_CONTENT ? undefined : await response.json();
 			if (validateOutputs) {
 				const errors = endpoint.checkResponse(origBody);
 				if (errors != null && errors.length !== 0) {

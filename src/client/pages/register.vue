@@ -4,10 +4,10 @@ import {definePageMeta} from "#imports";
 import {isLeft} from "fp-ts/lib/Either";
 import {useField, useForm} from 'vee-validate';
 import * as yup from "yup";
-import {getRegistrationSchemaForClient} from "~/utils/validationSchemas";
+import {getRegistrationSchemaForClient} from "../utils/validation-schemas";
 import {maxDataUrlLen, maxFileSize} from "../../common/utils/constants";
 import {useUserStore} from "../store/userStore";
-import {justiceFirmApi} from "../utils/apiImplementation";
+import {justiceFirmApi} from "../utils/api-fetcher-impl";
 import {readFileAsDataUrl} from "../utils/functions";
 
 definePageMeta({

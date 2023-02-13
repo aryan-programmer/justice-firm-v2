@@ -24,7 +24,13 @@ Office Address:
 		<a :href="props.lawyer.certificationLink">View certification</a>
 	</v-card-text>
 	<v-card-actions>
-		<v-btn color="teal-lighten-4" density="compact" rounded variant="tonal">Open appointment request</v-btn>
+		<v-btn
+			:to="`/open-appointment?id=${lawyer.id}`"
+			color="teal-lighten-4"
+			density="compact"
+			rounded
+			variant="tonal">Open appointment request
+		</v-btn>
 	</v-card-actions>
 </v-card>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {justiceFirmApi, onMounted, ref, useRouter} from "#imports";
+import {justiceFirmApi, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {useField, useForm} from 'vee-validate';
 import {LocationQueryValue} from "vue-router";
@@ -9,7 +9,7 @@ import {closeToZero, firstIfArray, getCurrentPosition, toNumIfNotNull} from "../
 import {Nuly} from "../../common/utils/types";
 import {ModelResponseOrErr} from "../../singularity/model.client";
 import LawyerCard from "../components/LawyerCard.vue";
-import {optionalNumber} from "../utils/validationSchemas";
+import {optionalNumber} from "../utils/validation-schemas";
 
 let validationSchema         = yup.object({
 	name:      yup.string(),
@@ -27,14 +27,16 @@ const latitude  = useField('latitude');
 const longitude = useField('longitude');
 
 const router = useRouter();
+const route  = useRoute();
 
 const lawyers = ref<LawyerSearchResult[] | Nuly>();
 
 async function setFromQuery (query: Record<string, LocationQueryValue | LocationQueryValue[]>) {
-	const name_      = name.value.value = firstIfArray(query.name) ?? undefined;
-	const address_   = address.value.value = firstIfArray(query.address) ?? undefined;
+	const name_      = name.value.value = firstIfArray(query.name);
+	const address_   = address.value.value = firstIfArray(query.address);
 	const latitude_  = latitude.value.value = toNumIfNotNull(firstIfArray(query.latitude)) ?? 0;
 	const longitude_ = longitude.value.value = toNumIfNotNull(firstIfArray(query.longitude)) ?? 0;
+	if (name_ == null || address_ == null) return;
 
 	let body = closeToZero(latitude_) || closeToZero(longitude_) ? {
 		name:    name_,
@@ -80,14 +82,9 @@ const onSubmit = handleSubmit(async values => {
 	});
 });
 
-router.afterEach((to) => {
-	setFromQuery(to.query);
-});
-
-onMounted(() => {
-	setFromQuery(router.currentRoute.value.query);
-	// autofillLatLon();
-});
+watch(() => route.query, value => {
+	setFromQuery(value);
+}, {immediate: true});
 </script>
 
 <template>
