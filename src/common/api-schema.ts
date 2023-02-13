@@ -4,7 +4,7 @@ import {lazyCheck, MessageOr} from "../singularity/helpers";
 import {HttpMethods} from "../singularity/httpMethods";
 import {modelSchema} from "../singularity/schema";
 import {AuthToken, ClientAuthToken} from "./api-types";
-import {Client, ID_T, Lawyer} from "./db-types";
+import {Client, ID_T, Lawyer, StatusEnum_T} from "./db-types";
 import {maxDataUrlLen, ValidEmail, ValidPassword} from "./utils/constants";
 import {ArrayOf, Optional} from "./utils/functions";
 import {Nuly} from "./utils/types";
@@ -75,6 +75,24 @@ export const OpenAppointmentRequestInput = Type.Object({
 }, {$id: "OpenAppointmentRequestInput"});
 export type OpenAppointmentRequestInput = Static<typeof OpenAppointmentRequestInput>;
 
+export const GetAppointmentsInput = Type.Object({
+	authToken:       AuthToken,
+	withStatus:      StatusEnum_T,
+	orderByOpenedOn: Optional(Type.Boolean())
+}, {$id: "GetAppointmentsInput"});
+export type GetAppointmentsInput = Static<typeof GetAppointmentsInput>;
+
+export const AppointmentSparseData = Type.Object({
+	id:          ID_T,
+	othId:       ID_T,
+	othName:     Type.String(),
+	groupId:     ID_T,
+	description: Type.String(),
+	timestamp:   Optional(Type.String()),
+	openedOn:    Type.String(),
+}, {$id: "AppointmentSparseData"});
+export type AppointmentSparseData = Static<typeof AppointmentSparseData>;
+
 export const justiceFirmApiSchema = modelSchema({
 	name:      "JusticeFirmApi",
 	endpoints: {
@@ -114,6 +132,12 @@ export const justiceFirmApiSchema = modelSchema({
 			requestBodyChecker:  lazyCheck(OpenAppointmentRequestInput),
 			responseBodyChecker: lazyCheck(MessageOr(Nuly)),
 		}),
+		getAppointments:        endpoint({
+			method:              HttpMethods.POST,
+			path:                "/appointment/get/by-status",
+			requestBodyChecker:  lazyCheck(GetAppointmentsInput),
+			responseBodyChecker: lazyCheck(MessageOr(ArrayOf(AppointmentSparseData)))
+		})
 		// test:           endpoint({
 		// 	method:              HttpMethods.GET,
 		// 	path:                "/test",

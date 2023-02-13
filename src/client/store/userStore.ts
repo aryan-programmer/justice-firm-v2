@@ -19,4 +19,6 @@ export const useUserStore = defineStore('UserStore', () => {
 			authToken.value = null;
 		}
 	};
-})
+});
+
+export type UserStore_T = ReturnType<typeof useUserStore>;

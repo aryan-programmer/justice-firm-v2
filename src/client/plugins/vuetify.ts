@@ -4,10 +4,13 @@ import {faSquare as farSquare} from "@fortawesome/free-regular-svg-icons";
 import {
 	faBars,
 	faBugSlash,
+	faCalendarDays,
+	faCaretDown,
 	faCertificate,
 	faCheckSquare,
 	faChevronDown,
 	faChevronLeft,
+	faChevronRight,
 	faChevronUp,
 	faGavel,
 	faHome,
@@ -15,7 +18,11 @@ import {
 	faSearch,
 	faSignIn,
 	faSignOut,
+	faSortDown,
+	faSortUp,
 	faSquare,
+	faStepBackward,
+	faStepForward,
 	faTable,
 	faTimesCircle,
 	faUser,
@@ -25,6 +32,14 @@ import {
 import {FontAwesomeIcon} from '@fortawesome/vue-fontawesome'
 import {createVuetify} from 'vuetify'
 import {aliases, fa} from 'vuetify/iconsets/fa-svg'
+import {
+	VDataTable,
+	VDataTableFooter,
+	VDataTableRow,
+	VDataTableRows,
+	VDataTableServer,
+	VDataTableVirtual
+} from 'vuetify/labs/VDataTable'
 
 library.add(
 	faGavel,
@@ -46,7 +61,14 @@ library.add(
 	faTable,
 	faUserTie,
 	faUser,
-	faBugSlash
+	faBugSlash,
+	faCalendarDays,
+	faSortUp,
+	faSortDown,
+	faCaretDown,
+	faStepBackward,
+	faChevronRight,
+	faStepForward,
 );
 // import * as components from 'vuetify/components'
 // import * as directives from 'vuetify/directives'
@@ -55,8 +77,17 @@ export default defineNuxtPlugin(nuxtApp => {
 	nuxtApp.vueApp.component("font-awesome-icon", FontAwesomeIcon);
 
 	const vuetify = createVuetify({
-		ssr:   false,
-		icons: {
+		ssr:        false,
+		components: {
+			VDataTable, VDataTableFooter, VDataTableRow, VDataTableServer, VDataTableVirtual, VDataTableRows
+		},
+		defaults:   {
+			VDataTable: {
+				fixedHeader: true,
+				noDataText:  'Results not found',
+			},
+		},
+		icons:      {
 			defaultSet: 'fa',
 			aliases,
 			sets:       {

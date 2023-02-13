@@ -31,7 +31,7 @@ const userDeps = computed(args => {
 		return {
 			links: [
 				{icon: "fa-gavel", title: "Home", link: "/"},
-				{icon: "fa-table", title: "Lawyer Dashboard", link: "/lawyer-dashboard"},
+				{icon: "fa-calendar-days", title: "Your appointments", link: "/lawyer-appointments"},
 				// {icon: "fa-sign-out", title: "Sign out", link: "/sign-out"},
 			],
 			color: "gradient--flying-lemon",
@@ -43,7 +43,7 @@ const userDeps = computed(args => {
 			links: [
 				{icon: "fa-user", title: "Home", link: "/"},
 				{icon: "fa-search", title: "Search Lawyers", link: "/search-lawyers"},
-				{icon: "fa-table", title: "Client Dashboard", link: "/client-dashboard"},
+				{icon: "fa-calendar-days", title: "Your Appointments", link: "/client-appointments"},
 				// {icon: "fa-sign-out", title: "Sign out", link: "/sign-out"},
 			],
 			color: "gradient--perfect-white",
@@ -114,7 +114,7 @@ function signOut () {
 				:prepend-icon="link.icon"
 				:title="link.title"
 				:value="link.link"
-				:active="router.currentRoute.value.fullPath === link.link" />
+				:active="router.currentRoute.value.path === link.link" />
 			<v-list-item
 				v-if="userStore.authToken!=null"
 				prepend-icon="fa-sign-out"

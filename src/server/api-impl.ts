@@ -5,6 +5,8 @@ import {compareSync, hash} from "bcryptjs";
 import {sign, verify} from "jsonwebtoken";
 import {createPool, Pool, UpsertResult} from "mariadb";
 import {
+	AppointmentSparseData,
+	GetAppointmentsInput,
 	GetLawyerInput,
 	justiceFirmApiSchema,
 	LawyerSearchResult,
@@ -63,11 +65,18 @@ function recordToLawyerSearchResult (value: Record<string, any>) {
 	} as LawyerSearchResult;
 }
 
+function verifyAndDecodeJwtToken (data: string, jwtSecret: string) {
+	const decoded            = verify(data, jwtSecret);
+	const obj: JWTHashedData = typeof decoded === "string" ? JSON.parse(decoded) : decoded;
+	return obj;
+}
+
 export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmApiSchema> {
 	private pool: Pool | Nuly        = null;
 	private jwtSecret: string | Nuly = null;
 
-	async registerLawyer (params: FnParams<RegisterLawyerInput>, event: APIGatewayProxyEvent): Promise<EndpointResult<AuthToken>> {
+	async registerLawyer (params: FnParams<RegisterLawyerInput>, event: APIGatewayProxyEvent):
+		Promise<EndpointResult<AuthToken>> {
 		const data: RegisterLawyerInput = params.body;
 
 		const jwtSecretP        = this.getJwtSecret();
@@ -130,7 +139,8 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		}
 	}
 
-	async registerClient (params: FnParams<RegisterClientInput>, event: APIGatewayProxyEvent): Promise<EndpointResult<AuthToken>> {
+	async registerClient (params: FnParams<RegisterClientInput>, event: APIGatewayProxyEvent):
+		Promise<EndpointResult<AuthToken>> {
 		const data: RegisterClientInput = params.body;
 
 		const jwtSecretP    = this.getJwtSecret();
@@ -176,7 +186,8 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		}
 	}
 
-	async sessionLogin (params: FnParams<SessionLoginInput>, event: APIGatewayProxyEvent): Promise<EndpointResult<AuthToken | Message>> {
+	async sessionLogin (params: FnParams<SessionLoginInput>, event: APIGatewayProxyEvent):
+		Promise<EndpointResult<AuthToken | Message>> {
 		const data: SessionLoginInput = params.body;
 
 		const resSetP:
@@ -199,7 +210,8 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		return generateAuthTokenResponse(id, type, jwtSecret);
 	}
 
-	async searchLawyers (params: FnParams<SearchLawyersInput>, event: APIGatewayProxyEvent): Promise<EndpointResult<LawyerSearchResult[]>> {
+	async searchLawyers (params: FnParams<SearchLawyersInput>, event: APIGatewayProxyEvent):
+		Promise<EndpointResult<LawyerSearchResult[]>> {
 		const data    = params.body;
 		const name    = `%${data.name ?? ""}%`;
 		const address = `%${data.address ?? ""}%`;
@@ -250,7 +262,8 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		return response(200, lawyers);
 	}
 
-	async getLawyer (params: FnParams<GetLawyerInput>, event: APIGatewayProxyEvent): Promise<EndpointResult<LawyerSearchResult | Nuly>> {
+	async getLawyer (params: FnParams<GetLawyerInput>, event: APIGatewayProxyEvent):
+		Promise<EndpointResult<LawyerSearchResult | Nuly>> {
 		const data = params.body;
 
 		const res: Record<string, any>[] = await (await this.getPool()).execute(
@@ -277,18 +290,20 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		return response(200, lawyers);
 	}
 
-	async openAppointmentRequest (params: FnParams<OpenAppointmentRequestInput>, event: APIGatewayProxyEvent): Promise<EndpointResult<Nuly | Message>> {
+	async openAppointmentRequest (params: FnParams<OpenAppointmentRequestInput>, event: APIGatewayProxyEvent):
+		Promise<EndpointResult<Nuly | Message>> {
 		const data: OpenAppointmentRequestInput = params.body;
 
-		const jwtSecret          = await this.getJwtSecret();
-		const decoded            = verify(data.authToken.jwt, jwtSecret);
-		const obj: JWTHashedData = typeof decoded === "string" ? JSON.parse(decoded) : decoded;
+		const jwtSecret = await this.getJwtSecret();
+		const obj       = verifyAndDecodeJwtToken(data.authToken.jwt, jwtSecret);
 		if (obj.userType !== UserAccessType.Client) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				"To open an appointment request the user must be authenticated as a client.");
 		}
 
-		const timestamp = data.timestamp == null ? new Date() : new Date(data.timestamp);
+		const timestamp = data.timestamp == null ? null : new Date(data.timestamp);
+
+		console.log("Now: ", new Date().toString());
 
 		const conn = await this.getConnection();
 
@@ -324,6 +339,66 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		}
 	}
 
+	async getAppointments (params: FnParams<GetAppointmentsInput>, event: APIGatewayProxyEvent):
+		Promise<EndpointResult<AppointmentSparseData[] | Message>> {
+		const data      = params.body;
+		const jwtSecret = await this.getJwtSecret();
+		const jwt       = verifyAndDecodeJwtToken(data.authToken.jwt, jwtSecret);
+		if (jwt.userType === UserAccessType.Admin) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED,
+				"To open an appointment request the user must be authenticated as a client.");
+		}
+
+		let sql: string;
+		if (jwt.userType === UserAccessType.Client) {
+			sql = `SELECT a.id,
+			              l.id   AS oth_id,
+			              l.name AS oth_name,
+			              a.description,
+			              a.group_id,
+			              a.timestamp,
+			              a.opened_on
+			       FROM appointment a
+			       JOIN user c
+			            ON c.id = a.client_id
+			       JOIN user l
+			            ON l.id = a.lawyer_id
+			       WHERE c.id = ?
+				     AND a.status = ?`;
+		} else {
+			sql = `SELECT a.id,
+			              c.id   AS oth_id,
+			              c.name AS oth_name,
+			              a.description,
+			              a.group_id,
+			              a.timestamp,
+			              a.opened_on
+			       FROM appointment a
+			       JOIN user c
+			            ON c.id = a.client_id
+			       JOIN user l
+			            ON l.id = a.lawyer_id
+			       WHERE l.id = ?
+				     AND a.status = ?`;
+		}
+		if (data.orderByOpenedOn === true) {
+			sql += " ORDER BY a.opened_on;";
+		} else {
+			sql += " ORDER BY a.timestamp;";
+		}
+		const res: Record<string, any>[] = await (await this.getPool()).execute(sql, [jwt.id, data.withStatus]);
+		return response(200, res.map(value => {
+			return {
+				id:          value.id.toString(),
+				othId:       value.oth_id.toString(),
+				othName:     value.oth_name.toString(),
+				description: value.description.toString(),
+				groupId:     value.group_id.toString(),
+				timestamp:   value.timestamp?.toString(),
+				openedOn:    value.opened_on.toString(),
+			} as AppointmentSparseData;
+		}));
+	}
 
 	// async test (params: FnParams<UnknownBody>, event: APIGatewayProxyEvent): Promise<EndpointResult<Message>> {
 	// 	return message(200, {

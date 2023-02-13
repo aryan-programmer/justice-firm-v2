@@ -12,6 +12,44 @@ import {GeolocationNotAvailableError} from "./errors";
 import {memoizeWeak} from "./memoizeWeak";
 import {Nuly} from "./types";
 
+export function trimStr (s: string, wordCount: number = 50): string {
+	const words = s.split(" ");
+	if (words.length > wordCount)
+		return words.slice(0, wordCount).join(" ") + "...";
+	else return s;
+}
+
+export function dateStringFormat (s: string | Nuly): string | Nuly {
+	return s == null ? null : new Date(s).toLocaleDateString(undefined, {
+		day:     "numeric",
+		weekday: "short",
+		month:   "short",
+		year:    "numeric",
+		hour:    "2-digit",
+		minute:  "2-digit",
+		second:  "2-digit",
+	});
+}
+
+export function dateFormat (d: Date | Nuly): string | Nuly {
+	return d?.toLocaleDateString(undefined, {
+		day:     "numeric",
+		weekday: "short",
+		month:   "short",
+		year:    "numeric",
+		hour:    "2-digit",
+		minute:  "2-digit",
+		second:  "2-digit",
+	});
+}
+
+export function compareDates (a: Date | Nuly, b: Date | Nuly) {
+	if (a == null && b == null) return 0;
+	if (a == null) return -1;
+	if (b == null) return 1;
+	return a.getTime() - b.getTime();
+}
+
 export function closeToZero (n: number) {
 	return Math.abs(n) <= 0.0000001;
 }
