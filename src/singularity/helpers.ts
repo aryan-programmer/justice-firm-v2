@@ -47,7 +47,7 @@ export function typeCheckErrorsFromValueErrors (errors: IterableIterator<ValueEr
 	});
 }
 
-export const memoizedCompiler = memoizeWeak(function check<T extends Types.TSchema> (schema: T, references?: Types.TSchema[]): TypeCheck<T> {
+export const memoizedCompiler = memoizeWeak(function memoizedCompiler<T extends Types.TSchema> (schema: T, references?: Types.TSchema[]): TypeCheck<T> {
 	// console.log("memoizedCompiler: ",{schema, references});
 	return TypeCompiler.Compile(schema, references);
 });
@@ -206,12 +206,12 @@ export const Message = Type.Object({
 }, {$id: "Message"});
 export type Message = Types.Static<typeof Message>;
 
-export function MessageOr<T extends TSchema> (item: T, options?: SchemaOptions) {
+export const MessageOr = memoizeWeak(function MessageOr<T extends TSchema> (item: T, options?: SchemaOptions) {
 	return Type.Union([Message, item], {
 		$id: `MessageOr${item.$id}`,
 		...options
 	});
-}
+});
 
 export function response<T> (
 	statusCode: number,

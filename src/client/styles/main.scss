@@ -15,3 +15,11 @@
 	border-radius: 20px;
 	border: transparent;
 }
+
+.v-data-table .v-table__wrapper > table > thead > tr > td, .v-data-table .v-table__wrapper > table > thead > tr th, .v-data-table .v-table__wrapper > table tbody > tr > td, .v-data-table .v-table__wrapper > table tbody > tr th {
+	background: unset !important;
+}
+
+.v-table.v-table--fixed-header > .v-table__wrapper > table > thead > tr > th {
+	background: rgb(255, 255, 255, 0.5) !important;
+}

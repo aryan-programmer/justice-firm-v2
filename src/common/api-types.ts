@@ -9,23 +9,31 @@ export const JWTHashedData = Type.Object({
 	userType:   UserAccessType_T,
 });
 
-export const AuthToken = Type.Object({
+const oth = {
 	id: Type.String(),
 	// TODO: Implement expiry date
 	expiryDate: Type.Any(),
-	userType:   UserAccessType_T,
 	jwt:        Type.String(),
+};
+
+export const AuthToken = Type.Object({
+	...oth,
+	userType: UserAccessType_T,
 }, {$id: "AuthToken"});
 
 export const ClientAuthToken = Type.Object({
-	id: Type.String(),
-	// TODO: Implement expiry date
-	expiryDate: Type.Any(),
-	userType:   Type.Literal(UserAccessType.Client),
-	jwt:        Type.String(),
+	...oth,
+	userType: Type.Literal(UserAccessType.Client),
 });
 
 export type ClientAuthToken = Static<typeof ClientAuthToken>;
+
+export const AdminAuthToken = Type.Object({
+	...oth,
+	userType: Type.Literal(UserAccessType.Admin),
+});
+
+export type AdminAuthToken = Static<typeof AdminAuthToken>;
 
 export const AuthTokenChecker = lazyCheck(AuthToken);
 

@@ -8,13 +8,15 @@ import {
 	AppointmentSparseData,
 	GetAppointmentsInput,
 	GetLawyerInput,
+	GetWaitingLawyersInput,
 	justiceFirmApiSchema,
 	LawyerSearchResult,
 	OpenAppointmentRequestInput,
 	RegisterClientInput,
 	RegisterLawyerInput,
 	SearchLawyersInput,
-	SessionLoginInput
+	SessionLoginInput,
+	SetLawyerStatusesInput
 } from "../common/api-schema";
 import {AuthToken, JWTHashedData} from "../common/api-types";
 import {StatusEnum, UserAccessType} from "../common/db-types";
@@ -113,7 +115,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			const userId = nn(userInsertRes.insertId);
 
 			const lawyerInsertRes: UpsertResult = await conn.execute(
-				"INSERT INTO lawyer(id, latitude, longitude, certification_link, status) VALUES (?, ?, ?, ?, 'confirmed');",
+				"INSERT INTO lawyer(id, latitude, longitude, certification_link, status) VALUES (?, ?, ?, ?, 'waiting');",
 				[userId, data.latitude, data.longitude, certificationRes.url]
 			);
 
@@ -236,7 +238,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 				   AND u.name LIKE ?
 				   AND u.address LIKE ?
 				 ORDER BY distance ASC
-				 LIMIT 10;`, [data.latitude, data.longitude, name, address]);
+				 LIMIT 25;`, [data.latitude, data.longitude, name, address]);
 		} else {
 			res = await (await this.getPool()).execute(
 				`SELECT u.id,
@@ -258,6 +260,35 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 				 LIMIT 25;`, [name, address]);
 		}
 
+		const lawyers: LawyerSearchResult[] = res.map(recordToLawyerSearchResult);
+		return response(200, lawyers);
+	}
+
+	async getWaitingLawyers (params: FnParams<GetWaitingLawyersInput>, event: APIGatewayProxyEvent):
+		Promise<EndpointResult<LawyerSearchResult[] | Message>> {
+		const data      = params.body;
+		const jwtSecret = await this.getJwtSecret();
+		const obj       = verifyAndDecodeJwtToken(data.authToken.jwt, jwtSecret);
+		if (obj.userType !== UserAccessType.Admin) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED,
+				"To get the list of waiting lawyers the user must be authenticated as an administrator.");
+		}
+
+		let res: Record<string, any>[]      = await (await this.getPool()).execute(
+			`SELECT u.id,
+			        u.name,
+			        u.email,
+			        u.phone,
+			        u.address,
+			        u.photo_path,
+			        l.latitude,
+			        l.longitude,
+			        l.certification_link
+			 FROM lawyer l
+			 JOIN user u
+			      ON u.id = l.id
+			 WHERE l.status = 'waiting'
+			 LIMIT 25;`);
 		const lawyers: LawyerSearchResult[] = res.map(recordToLawyerSearchResult);
 		return response(200, lawyers);
 	}
@@ -398,6 +429,53 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 				openedOn:    value.opened_on.toString(),
 			} as AppointmentSparseData;
 		}));
+	}
+
+	async setLawyerStatuses (params: FnParams<SetLawyerStatusesInput>, event: APIGatewayProxyEvent):
+		Promise<EndpointResult<Message | Nuly>> {
+		const data      = params.body;
+		const jwtSecret = await this.getJwtSecret();
+		const obj       = verifyAndDecodeJwtToken(data.authToken.jwt, jwtSecret);
+		if (obj.userType !== UserAccessType.Admin) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED,
+				"To set the statuses of lawyers the user must be authenticated as an administrator.");
+		}
+		if (data.rejected.length === 0 && data.confirmed.length === 0) return noContent;
+		const conn = await this.getConnection();
+		try {
+			await conn.beginTransaction();
+
+			if (data.confirmed.length > 0) {
+				const sqlConfirmTuple = "?" + ",?".repeat(data.confirmed.length - 1);
+
+				const confirmRes: UpsertResult = await conn.execute(
+					`UPDATE lawyer
+					 SET status = 'confirmed'
+					 WHERE id IN (${sqlConfirmTuple});`,
+					data.confirmed.map(BigInt)
+				);
+			}
+
+			if (data.rejected.length > 0) {
+				const sqlRejectTuple = "?" + ",?".repeat(data.rejected.length - 1);
+
+				const rejectRes: UpsertResult = await conn.execute(
+					`UPDATE lawyer
+					 SET status = 'rejected'
+					 WHERE id IN (${sqlRejectTuple});`,
+					data.rejected.map(BigInt)
+				);
+			}
+
+			await conn.commit();
+
+			return noContent;
+		} catch (e) {
+			await conn.rollback();
+			throw e;
+		} finally {
+			await conn.release();
+		}
 	}
 
 	// async test (params: FnParams<UnknownBody>, event: APIGatewayProxyEvent): Promise<EndpointResult<Message>> {

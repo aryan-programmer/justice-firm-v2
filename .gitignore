@@ -132,3 +132,4 @@ template.yaml
 .cdk.staging
 cdk.out
 scratch.ts
+scratch.sql

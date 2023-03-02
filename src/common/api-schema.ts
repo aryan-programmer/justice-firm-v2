@@ -3,7 +3,7 @@ import {endpoint} from "../singularity/endpoint";
 import {lazyCheck, MessageOr} from "../singularity/helpers";
 import {HttpMethods} from "../singularity/httpMethods";
 import {modelSchema} from "../singularity/schema";
-import {AuthToken, ClientAuthToken} from "./api-types";
+import {AdminAuthToken, AuthToken, ClientAuthToken} from "./api-types";
 import {Client, ID_T, Lawyer, StatusEnum_T} from "./db-types";
 import {maxDataUrlLen, ValidEmail, ValidPassword} from "./utils/constants";
 import {ArrayOf, Optional} from "./utils/functions";
@@ -44,12 +44,12 @@ export const SearchLawyersBaseInput = Type.Partial(Type.Object({
 export type SearchLawyersBaseInput = Static<typeof SearchLawyersBaseInput>;
 
 const LawyerSearchResult = Type.Intersect([
-	Type.Omit(Lawyer, ["type", "passwordHash"]),
+	Type.Omit(Lawyer, ["type", "passwordHash", "status"]),
 	Type.Object({
 		distance: Optional(Type.Number()),
 	})
 ], {$id: "LawyerSearchResult"});
-export type LawyerSearchResult = Omit<Lawyer, "type" | "passwordHash"> & { distance: number | Nuly };
+export type LawyerSearchResult = Omit<Lawyer, "type" | "passwordHash" | "status"> & { distance: number | Nuly };
 const LawyerSearchResults = ArrayOf(LawyerSearchResult);
 
 export const SearchAndSortLawyersInput = Type.Partial(Type.Object({
@@ -93,6 +93,18 @@ export const AppointmentSparseData = Type.Object({
 }, {$id: "AppointmentSparseData"});
 export type AppointmentSparseData = Static<typeof AppointmentSparseData>;
 
+export const GetWaitingLawyersInput = Type.Object({
+	authToken: AdminAuthToken,
+}, {$id: "GetWaitingLawyersInput"});
+export type GetWaitingLawyersInput = Static<typeof GetWaitingLawyersInput>;
+
+export const SetLawyerStatusesInput = Type.Object({
+	authToken: AdminAuthToken,
+	confirmed: ArrayOf(ID_T),
+	rejected:  ArrayOf(ID_T),
+}, {$id: "SetLawyerStatusesInput"});
+export type SetLawyerStatusesInput = Static<typeof SetLawyerStatusesInput>;
+
 export const justiceFirmApiSchema = modelSchema({
 	name:      "JusticeFirmApi",
 	endpoints: {
@@ -120,11 +132,23 @@ export const justiceFirmApiSchema = modelSchema({
 			requestBodyChecker:  lazyCheck(SearchLawyersInput),
 			responseBodyChecker: lazyCheck(LawyerSearchResults),
 		}),
+		getWaitingLawyers:      endpoint({
+			method:              HttpMethods.POST,
+			path:                "/user/lawyer/waiting",
+			requestBodyChecker:  lazyCheck(GetWaitingLawyersInput),
+			responseBodyChecker: lazyCheck(MessageOr(LawyerSearchResults))
+		}),
 		getLawyer:              endpoint({
 			method:              HttpMethods.POST,
 			path:                "/user/lawyer/get",
 			requestBodyChecker:  lazyCheck(GetLawyerInput),
 			responseBodyChecker: lazyCheck(Optional(LawyerSearchResult)),
+		}),
+		setLawyerStatuses:      endpoint({
+			method:              HttpMethods.POST,
+			path:                "/user/lawyer/set-status",
+			requestBodyChecker:  lazyCheck(SetLawyerStatusesInput),
+			responseBodyChecker: lazyCheck(MessageOr(Nuly)),
 		}),
 		openAppointmentRequest: endpoint({
 			method:              HttpMethods.POST,
@@ -137,7 +161,7 @@ export const justiceFirmApiSchema = modelSchema({
 			path:                "/appointment/get/by-status",
 			requestBodyChecker:  lazyCheck(GetAppointmentsInput),
 			responseBodyChecker: lazyCheck(MessageOr(ArrayOf(AppointmentSparseData)))
-		})
+		}),
 		// test:           endpoint({
 		// 	method:              HttpMethods.GET,
 		// 	path:                "/test",

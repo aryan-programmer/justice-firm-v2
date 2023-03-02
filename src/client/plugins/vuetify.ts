@@ -7,14 +7,17 @@ import {
 	faCalendarDays,
 	faCaretDown,
 	faCertificate,
+	faCheck,
 	faCheckSquare,
 	faChevronDown,
 	faChevronLeft,
 	faChevronRight,
 	faChevronUp,
+	faClose,
 	faGavel,
 	faHome,
 	faImagePortrait,
+	faQuestion,
 	faSearch,
 	faSignIn,
 	faSignOut,
@@ -27,7 +30,8 @@ import {
 	faTimesCircle,
 	faUser,
 	faUserPlus,
-	faUserTie
+	faUserTie,
+	faXmark
 } from "@fortawesome/free-solid-svg-icons";
 import {FontAwesomeIcon} from '@fortawesome/vue-fontawesome'
 import {createVuetify} from 'vuetify'
@@ -69,6 +73,10 @@ library.add(
 	faStepBackward,
 	faChevronRight,
 	faStepForward,
+	faCheck,
+	faClose,
+	faXmark,
+	faQuestion
 );
 // import * as components from 'vuetify/components'
 // import * as directives from 'vuetify/directives'

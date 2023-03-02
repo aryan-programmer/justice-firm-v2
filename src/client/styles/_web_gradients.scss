@@ -1240,12 +1240,12 @@
 //			(linear-gradient(-225deg, #FF057C 0%, #7C64D5 48%, #4CC3FF 100%)),
 //);
 //
-//// 178 Gagarin View
-//@include gradient_defs.define-gradient(
-//		gradient--gagarin-view,
-//		#9fbae8,
-//			(linear-gradient(-225deg, #69EACB 0%, #EACCF8 48%, #6654F1 100%)),
-//);
+// 178 Gagarin View
+@include gradient_defs.define-gradient(
+		gradient--gagarin-view,
+		#9fbae8,
+			(linear-gradient(-225deg, #69EACB 0%, #EACCF8 48%, #6654F1 100%)),
+);
 //
 //// 179 Fabled Sunset
 //@include gradient_defs.define-gradient(

@@ -38,16 +38,6 @@ const appointments = computed(() =>
 	}) ?? []);
 </script>
 
-<style lang="scss">
-.v-data-table .v-table__wrapper > table > thead > tr > td, .v-data-table .v-table__wrapper > table > thead > tr th, .v-data-table .v-table__wrapper > table tbody > tr > td, .v-data-table .v-table__wrapper > table tbody > tr th {
-	background: unset;
-}
-
-.v-table.v-table--fixed-header > .v-table__wrapper > table > thead > tr > th {
-	background: rgb(255, 255, 255, 0.5);
-}
-</style>
-
 <template>
 <v-data-table
 	:headers="dataTableHeaders"
