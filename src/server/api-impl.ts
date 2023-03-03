@@ -5,7 +5,10 @@ import {compareSync, hash} from "bcryptjs";
 import {sign, verify} from "jsonwebtoken";
 import {createPool, Pool, UpsertResult} from "mariadb";
 import {
+	AppointmentFullData,
 	AppointmentSparseData,
+	ClientDataResult,
+	GetAppointmentByIdInput,
 	GetAppointmentsInput,
 	GetLawyerInput,
 	GetWaitingLawyersInput,
@@ -16,6 +19,7 @@ import {
 	RegisterLawyerInput,
 	SearchLawyersInput,
 	SessionLoginInput,
+	SetAppointmentStatusInput,
 	SetLawyerStatusesInput
 } from "../common/api-schema";
 import {AuthToken, JWTHashedData} from "../common/api-types";
@@ -386,6 +390,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			              l.id   AS oth_id,
 			              l.name AS oth_name,
 			              a.description,
+			              a.case_id,
 			              a.group_id,
 			              a.timestamp,
 			              a.opened_on
@@ -401,6 +406,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			              c.id   AS oth_id,
 			              c.name AS oth_name,
 			              a.description,
+			              a.case_id,
 			              a.group_id,
 			              a.timestamp,
 			              a.opened_on
@@ -424,6 +430,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 				othId:       value.oth_id.toString(),
 				othName:     value.oth_name.toString(),
 				description: value.description.toString(),
+				caseId:      value.case_id?.toString(),
 				groupId:     value.group_id.toString(),
 				timestamp:   value.timestamp?.toString(),
 				openedOn:    value.opened_on.toString(),
@@ -478,6 +485,142 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		}
 	}
 
+	async getAppointmentRequest (params: FnParams<GetAppointmentByIdInput>):
+		Promise<EndpointResult<Message | AppointmentFullData | Nuly>> {
+		const data      = params.body;
+		const jwtSecret = await this.getJwtSecret();
+		const jwt       = verifyAndDecodeJwtToken(data.authToken.jwt, jwtSecret);
+		if (jwt == null) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid auth token");
+		}
+
+		const res: Record<string, any>[] = await (await this.getPool()).execute(
+			`
+				SELECT a.id                  AS a_id,
+				       a.group_id            AS a_group_id,
+				       a.case_id             AS a_case_id,
+				       a.description         AS a_description,
+				       a.timestamp           AS a_timestamp,
+				       a.opened_on           AS a_opened_on,
+				       a.status              AS a_status,
+				       c.id                  AS c_id,
+				       c.name                AS c_name,
+				       c.email               AS c_email,
+				       c.phone               AS c_phone,
+				       c.address             AS c_address,
+				       c.photo_path          AS c_photo_path,
+				       lu.id                 AS l_id,
+				       lu.name               AS l_name,
+				       lu.email              AS l_email,
+				       lu.phone              AS l_phone,
+				       lu.address            AS l_address,
+				       lu.photo_path         AS l_photo_path,
+				       ll.latitude           AS l_latitude,
+				       ll.longitude          AS l_longitude,
+				       ll.certification_link AS l_certification_link
+				FROM appointment a
+				JOIN user c
+				     ON c.id = a.client_id
+				JOIN user lu
+				     ON lu.id = a.lawyer_id
+				JOIN lawyer ll
+				     ON lu.id = ll.id
+				WHERE a.id = ?;`, [BigInt(data.id)]);
+
+		if (res.length === 0) {
+			return response(404, null);
+		}
+
+		const value                      = res[0];
+		const lawyer: LawyerSearchResult = {
+			id:                value.l_id.toString(),
+			name:              value.l_name.toString(),
+			email:             value.l_email.toString(),
+			phone:             value.l_phone.toString(),
+			address:           value.l_address.toString(),
+			photoPath:         value.l_photo_path.toString(),
+			latitude:          Number(value.l_latitude),
+			longitude:         Number(value.l_longitude),
+			certificationLink: value.l_certification_link.toString(),
+			status:            StatusEnum.Confirmed,
+			distance:          undefined,
+		} as LawyerSearchResult;
+		const client: ClientDataResult   = {
+			id:        value.c_id.toString(),
+			name:      value.c_name.toString(),
+			email:     value.c_email.toString(),
+			phone:     value.c_phone.toString(),
+			address:   value.c_address.toString(),
+			photoPath: value.c_photo_path.toString(),
+		} as ClientDataResult;
+		if (lawyer.id !== jwt.id && client.id !== jwt.id) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED,
+				`User id ${jwt.id} is not allowed access the details of appointment ${data.id}`);
+		}
+		const appointment: AppointmentFullData = {
+			id:          value.a_id.toString(),
+			description: value.a_description.toString(),
+			caseId:      value.a_case_id?.toString(),
+			groupId:     value.a_group_id.toString(),
+			timestamp:   value.a_timestamp?.toString(),
+			openedOn:    value.a_opened_on.toString(),
+			status:      value.a_status.toString(),
+			client,
+			lawyer,
+		};
+		return response(200, appointment);
+	}
+
+	async setAppointmentStatus (params: FnParams<SetAppointmentStatusInput>):
+		Promise<EndpointResult<Message | Nuly>> {
+		const data      = params.body;
+		const jwtSecret = await this.getJwtSecret();
+		const jwt       = verifyAndDecodeJwtToken(data.authToken.jwt, jwtSecret);
+		if (jwt.userType !== UserAccessType.Lawyer) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED,
+				"To set an appointment's status the user must be authenticated as a lawyer");
+		}
+		const pool = await this.getPool();
+		if (data.status === StatusEnum.Rejected) {
+			const rejectRes: UpsertResult = await pool.execute(
+				`UPDATE appointment
+				 SET status='rejected'
+				 WHERE id = ?
+				   AND lawyer_id = ?;`,
+				[data.appointmentId, jwt.id]
+			);
+			if (rejectRes.affectedRows === 0) {
+				return message(constants.HTTP_STATUS_BAD_REQUEST,
+					`Either the appointment with the id ${data.appointmentId} doesn't exist or you do not have access to edit it.`);
+			}
+		} else {
+			let confirmRes: UpsertResult;
+			if (data.timestamp == null) {
+				confirmRes = await pool.execute(
+					`UPDATE appointment
+					 SET status='confirmed'
+					 WHERE id = ?
+					   AND lawyer_id = ?;`,
+					[data.appointmentId, jwt.id]
+				);
+			} else {
+				confirmRes = await pool.execute(
+					`UPDATE appointment
+					 SET status='confirmed',
+					     timestamp=?
+					 WHERE id = ?
+					   AND lawyer_id = ?;`,
+					[new Date(data.timestamp), data.appointmentId, jwt.id]
+				);
+			}
+			if (confirmRes.affectedRows === 0) {
+				return message(constants.HTTP_STATUS_BAD_REQUEST,
+					`Either the appointment with the id ${data.appointmentId} doesn't exist or you do not have access to edit it.`);
+			}
+		}
+		return noContent;
+	}
+
 	// async test (params: FnParams<UnknownBody>, event: APIGatewayProxyEvent): Promise<EndpointResult<Message>> {
 	// 	return message(200, {
 	// 		msg: "Test successful"
@@ -503,11 +646,16 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 				WithDecryption: true
 			}));
 			this.pool      = createPool({
-				host:     nn(process.env.DB_ENDPOINT),
-				port:     +nn(process.env.DB_PORT),
-				user:     nn(process.env.DB_USERNAME),
-				password: nn(password.Parameter).Value,
-				database: "justice_firm",
+				host:                  nn(process.env.DB_ENDPOINT),
+				port:                  +nn(process.env.DB_PORT),
+				user:                  nn(process.env.DB_USERNAME),
+				password:              nn(password.Parameter).Value,
+				database:              "justice_firm",
+				acquireTimeout:        2500,
+				// AWS RDS MariaDB can't create more than 5-6 for some reason
+				connectionLimit:       4,
+				initializationTimeout: 1000,
+				leakDetectionTimeout:  3000,
 			});
 		}
 		console.log({

@@ -23,3 +23,9 @@
 .v-table.v-table--fixed-header > .v-table__wrapper > table > thead > tr > th {
 	background: rgb(255, 255, 255, 0.5) !important;
 }
+
+.clamp-image-height {
+	&.clamp-image-height, &.clamp-image-height img {
+		max-height: 200px;
+	}
+}

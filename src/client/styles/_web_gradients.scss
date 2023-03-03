@@ -92,12 +92,12 @@
 //			(linear-gradient(to top, #cfd9df 0%, #e2ebf0 100%)),
 //);
 //
-//// 014 Amy Crisp
-//@include gradient_defs.define-gradient(
-//		gradient--amy-crisp,
-//		#d2a3ca,
-//			(linear-gradient(120deg, #a6c0fe 0%, #f68084 100%)),
-//);
+// 014 Amy Crisp
+@include gradient_defs.define-gradient(
+		gradient--amy-crisp,
+		#d2a3ca,
+			(linear-gradient(120deg, #a6c0fe 0%, #f68084 100%)),
+);
 //
 //// 015 Mean Fruit
 //@include gradient_defs.define-gradient(
@@ -106,12 +106,12 @@
 //			(linear-gradient(120deg, #fccb90 0%, #d57eeb 100%)),
 //);
 //
-//// 016 Deep Blue // Renamed it avoid conflict with 039
-//@include gradient_defs.define-gradient(
-//		gradient--deep-light-blue,
-//		#bcc4fc,
-//			(linear-gradient(120deg, #e0c3fc 0%, #8ec5fc 100%)),
-//);
+// 016 Deep Blue // Renamed it avoid conflict with 039
+@include gradient_defs.define-gradient(
+		gradient--deep-light-blue,
+		#bcc4fc,
+			(linear-gradient(120deg, #e0c3fc 0%, #8ec5fc 100%)),
+);
 //
 //// 017 Ripe Malinka
 //@include gradient_defs.define-gradient(

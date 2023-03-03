@@ -1,0 +1,38 @@
+<script setup lang="ts">
+import {computed} from "#imports";
+import {ClientDataResult} from "../../common/api-schema";
+
+const props = defineProps<{
+	client: ClientDataResult,
+	sideBySide?: boolean,
+	class?: string,
+}>();
+
+const sideImage = computed(() => props.sideBySide === true);
+</script>
+
+<template>
+<v-card
+	color="gradient--amy-crisp"
+	:class="props.class"
+	theme="dark">
+	<v-img v-if="!sideImage" :src="props.client.photoPath" class="clamp-image-height" />
+	<v-card-text>
+		<v-row>
+			<v-col>
+				<v-card-title class="ps-0">
+					{{ props.client.name }}
+				</v-card-title>
+				Email: {{ props.client.email }}<br />
+				Phone: {{ props.client.phone }}<br />
+				<pre>
+Address:
+{{ props.client.address }}</pre>
+			</v-col>
+			<v-col v-if="sideImage" cols="5" class="pa-3">
+				<v-img :src="props.client.photoPath" class="clamp-image-height"></v-img>
+			</v-col>
+		</v-row>
+	</v-card-text>
+</v-card>
+</template>

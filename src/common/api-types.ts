@@ -35,6 +35,13 @@ export const AdminAuthToken = Type.Object({
 
 export type AdminAuthToken = Static<typeof AdminAuthToken>;
 
+export const LawyerAuthToken = Type.Object({
+	...oth,
+	userType: Type.Literal(UserAccessType.Lawyer),
+});
+
+export type LawyerAuthToken = Static<typeof LawyerAuthToken>;
+
 export const AuthTokenChecker = lazyCheck(AuthToken);
 
 export type JWTHashedData = Static<typeof JWTHashedData>;

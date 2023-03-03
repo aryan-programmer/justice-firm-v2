@@ -64,12 +64,15 @@ const userDeps = computed(args => {
 	}
 });
 
-userStore.$subscribe((mutation, state) => {
-	console.log({authToken: userStore.authToken});
-});
-
 function signOut () {
 	userStore.signOut();
+	router.push("/");
+}
+
+function pathCompare (link: string) {
+	const currPath = router.currentRoute.value.path;
+	if (link === "/") return currPath === "/";
+	return currPath.startsWith(link);
 }
 </script>
 
@@ -114,7 +117,7 @@ function signOut () {
 				:prepend-icon="link.icon"
 				:title="link.title"
 				:value="link.link"
-				:active="router.currentRoute.value.path === link.link" />
+				:active="pathCompare(link.link)" />
 			<v-list-item
 				v-if="userStore.authToken!=null"
 				prepend-icon="fa-sign-out"

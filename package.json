@@ -5,7 +5,7 @@
 		"typecheck": "tsc --noEmit",
 		"typecheck:watch": "tsc --noEmit --watch",
 		"server:build": "ts-node --esm --transpile-only esbuild-config.ts",
-		"server:watch": "ts-node --esm --transpile-only esbuild-config.ts --watch",
+		"server:min:watch": "ts-node --esm --transpile-only esbuild-config.ts --watch --minify",
 		"nuxt:build": "nuxt build",
 		"nuxt:dev": "nuxt dev",
 		"nuxt:generate": "nuxt generate",

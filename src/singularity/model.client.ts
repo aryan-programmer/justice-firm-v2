@@ -56,6 +56,7 @@ function shouldRetry<TResBody> (v: ModelResponseOrErr<TResBody>) {
 	const right = v.right;
 	return !right.ok
 	       && right.status !== constants.HTTP_STATUS_UNAUTHORIZED
+	       && right.status !== constants.HTTP_STATUS_FORBIDDEN
 	       && right.status !== constants.HTTP_STATUS_NOT_FOUND;
 }
 
