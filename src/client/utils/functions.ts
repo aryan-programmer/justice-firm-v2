@@ -3,7 +3,7 @@ import {isLeft} from "fp-ts/Either";
 import {AppointmentSparseData} from "../../common/api-schema";
 import {StatusEnum} from "../../common/db-types";
 import {assert, nn} from "../../common/utils/asserts";
-import {Nuly} from "../../common/utils/types";
+import {Nuly, Writeable} from "../../common/utils/types";
 import {UserStore_T} from "../store/userStore";
 import {justiceFirmApi} from "./api-fetcher-impl";
 
@@ -73,5 +73,20 @@ export async function fetchAppointmentsByCategory (
 		fetchAppointmentsIntoRefByUserType(StatusEnum.Confirmed, false, confirmedAppointments, userStore),
 	]);
 	await fetchAppointmentsIntoRefByUserType(StatusEnum.Rejected, true, rejectedAppointments, userStore);
+}
+
+export function forceRipple ($el: HTMLElement) {
+	return new Promise<void>(resolve => {
+		let ev     = new Event("mousedown") as Writeable<MouseEvent>;
+		let offset = $el.getBoundingClientRect();
+		ev.clientX = offset.left + offset.width / 2;
+		ev.clientY = offset.top + offset.height / 2;
+		$el.dispatchEvent(ev);
+
+		setTimeout(function () {
+			$el.dispatchEvent(new Event("mouseup"));
+			resolve();
+		}, 300);
+	})
 }
 

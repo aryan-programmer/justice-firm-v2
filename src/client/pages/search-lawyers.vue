@@ -60,7 +60,7 @@ async function setFromQuery (query: Record<string, LocationQueryValue | Location
 		return;
 	}
 
-	lawyers.value = res.right.body;
+	lawyers.value  = res.right.body;
 	showForm.value = false;
 	console.log(res.right.body);
 }

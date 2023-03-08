@@ -3,6 +3,7 @@ import {useRouter} from "#app";
 import {computed} from "#imports";
 import {ref} from "vue";
 import {UserAccessType} from "../common/db-types";
+import NavItem from "./components/NavItem.vue";
 import {useUserStore} from "./store/userStore";
 
 const userStore = useUserStore();
@@ -31,7 +32,7 @@ const userDeps = computed(args => {
 		return {
 			links: [
 				{icon: "fa-gavel", title: "Home", link: "/"},
-				{icon: "fa-calendar-days", title: "Your appointments", link: "/lawyer-appointments"},
+				{icon: "fa-calendar-days", title: "Appointments", link: "/lawyer-appointments"},
 				// {icon: "fa-sign-out", title: "Sign out", link: "/sign-out"},
 			],
 			color: "gradient--flying-lemon",
@@ -43,7 +44,7 @@ const userDeps = computed(args => {
 			links: [
 				{icon: "fa-user", title: "Home", link: "/"},
 				{icon: "fa-search", title: "Search Lawyers", link: "/search-lawyers"},
-				{icon: "fa-calendar-days", title: "Your Appointments", link: "/client-appointments"},
+				{icon: "fa-calendar-days", title: "Appointments", link: "/client-appointments"},
 				// {icon: "fa-sign-out", title: "Sign out", link: "/sign-out"},
 			],
 			color: "gradient--perfect-white",
@@ -81,50 +82,26 @@ function pathCompare (link: string) {
 	<v-navigation-drawer
 		v-model="drawer"
 		:rail="rail"
-		expand-on-hover
 		permanent
 		:color="userDeps.color"
 		:theme="userDeps.theme"
+		rail-width="120"
 	>
-		<v-list-item
-			title="Justice Firm"
-			nav
-		>
-			<template v-slot:prepend>
-			<v-avatar>
-				<v-btn
-					icon="fa-bars"
-					color="red-lighten-3"
-					@click="rail=!rail" />
-			</v-avatar>
-			</template>
-			<template v-slot:append>
-			<v-btn
-				v-if="!rail"
-				variant="text"
-				icon="fa-chevron-left"
-				@click.stop="rail = true"
-			/>
-			</template>
-		</v-list-item>
-
-		<v-divider></v-divider>
-
-		<v-list density="compact" nav>
-			<v-list-item
-				v-for="link in userDeps.links"
-				:to="link.link"
-				:prepend-icon="link.icon"
-				:title="link.title"
-				:value="link.link"
-				:active="pathCompare(link.link)" />
-			<v-list-item
-				v-if="userStore.authToken!=null"
-				prepend-icon="fa-sign-out"
-				title="Sign out"
-				value="sign-out"
-				@click="signOut" />
-		</v-list>
+		<NavItem
+			v-for="link in userDeps.links"
+			:link="link.link"
+			:icon="link.icon"
+			:title="link.title"
+			:value="link.link"
+			:theme="userDeps.theme"
+			:active="pathCompare(link.link)" />
+		<NavItem
+			v-if="userStore.authToken!=null"
+			icon="fa-sign-out"
+			title="Sign out"
+			value="sign-out"
+			:theme="userDeps.theme"
+			@click="signOut" />
 	</v-navigation-drawer>
 	<v-main>
 		<div class="w-100 pa-2">
