@@ -85,30 +85,31 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		Promise<EndpointResult<AuthToken>> {
 		const data: RegisterLawyerInput = params.body;
 
-		const jwtSecretP        = this.getJwtSecret();
-		const connP             = this.getConnection();
-		const passwordHashP     = hash(data.password, saltRounds);
-		const photoResP         = uploadDataUrlToS3({
-			s3Client,
-			s3Bucket,
-			region,
-			dataUrl: data.photoData,
-			name:    data.name,
-			prefix:  "lawyers/photos/"
-		});
-		const certificationResP = uploadDataUrlToS3({
-			s3Client,
-			s3Bucket,
-			region,
-			dataUrl: data.certificationData,
-			name:    data.name,
-			prefix:  "lawyers/certifications/"
-		});
-
-		const [conn, passwordHash, photoRes, certificationRes, jwtSecret] =
-			      await Promise.all([connP, passwordHashP, photoResP, certificationResP, jwtSecretP]);
-
+		const jwtSecretP    = this.getJwtSecret();
+		const passwordHashP = hash(data.password, saltRounds);
+		const conn          = await this.getConnection();
 		try {
+
+			const photoResP         = uploadDataUrlToS3({
+				s3Client,
+				s3Bucket,
+				region,
+				dataUrl: data.photoData,
+				name:    data.name,
+				prefix:  "lawyers/photos/"
+			});
+			const certificationResP = uploadDataUrlToS3({
+				s3Client,
+				s3Bucket,
+				region,
+				dataUrl: data.certificationData,
+				name:    data.name,
+				prefix:  "lawyers/certifications/"
+			});
+
+			const [passwordHash, photoRes, certificationRes, jwtSecret] =
+				      await Promise.all([passwordHashP, photoResP, certificationResP, jwtSecretP]);
+
 			await conn.beginTransaction();
 
 			const userInsertRes: UpsertResult = await conn.execute(
@@ -150,23 +151,22 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		const data: RegisterClientInput = params.body;
 
 		const jwtSecretP    = this.getJwtSecret();
-		const connP         = this.getConnection();
 		const passwordHashP = hash(data.password, saltRounds);
-		const photoResP     = uploadDataUrlToS3({
-			s3Client,
-			s3Bucket,
-			region,
-			dataUrl: data.photoData,
-			name:    data.name,
-			prefix:  "clients/photos/"
-		});
-
-		const [conn, passwordHash, photoRes, jwtSecret] =
-			      await Promise.all([connP, passwordHashP, photoResP, jwtSecretP]);
-
-		console.log({conn, passwordHash, photoRes});
-
+		const conn          = await this.getConnection()
 		try {
+			const photoResP = uploadDataUrlToS3({
+				s3Client,
+				s3Bucket,
+				region,
+				dataUrl: data.photoData,
+				name:    data.name,
+				prefix:  "clients/photos/"
+			});
+
+			const [passwordHash, photoRes, jwtSecret] =
+				      await Promise.all([passwordHashP, photoResP, jwtSecretP]);
+
+			console.log({conn, passwordHash, photoRes});
 			await conn.beginTransaction();
 
 			const userInsertRes: UpsertResult = await conn.execute(
@@ -301,7 +301,8 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		Promise<EndpointResult<LawyerSearchResult | Nuly>> {
 		const data = params.body;
 
-		const res: Record<string, any>[] = await (await this.getPool()).execute(
+		const pool                       = await this.getPool();
+		const res: Record<string, any>[] = await pool.execute(
 			`SELECT u.id,
 			        u.name,
 			        u.email,
@@ -322,6 +323,19 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		}
 
 		const lawyers: LawyerSearchResult = recordToLawyerSearchResult(res[0]);
+		if (data.getCaseSpecializations === true) {
+			const res: Record<string, any>[] = await pool.execute(
+				`SELECT ct.id,
+				        ct.name
+				 FROM lawyer_specialization ls
+				 JOIN case_type ct
+				      ON ct.id = ls.case_type_id
+				 WHERE ls.lawyer_id = ?;`, [BigInt(lawyers.id)]);
+			lawyers.caseSpecializations      = res.map(value => ({
+				id:   value.id.toString(),
+				name: value.name.toString(),
+			}));
+		}
 		return response(200, lawyers);
 	}
 
@@ -640,28 +654,31 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 	}
 
 	private async getPool () {
+		const connectionLimit = 3;
 		if (this.pool == null) {
 			const password = await ssmClient.send(new GetParameterCommand({
 				Name:           process.env.DB_PASSWORD,
 				WithDecryption: true
 			}));
 			this.pool      = createPool({
-				host:                  nn(process.env.DB_ENDPOINT),
-				port:                  +nn(process.env.DB_PORT),
-				user:                  nn(process.env.DB_USERNAME),
-				password:              nn(password.Parameter).Value,
-				database:              "justice_firm",
-				acquireTimeout:        2500,
+				host:           nn(process.env.DB_ENDPOINT),
+				port:           +nn(process.env.DB_PORT),
+				user:           nn(process.env.DB_USERNAME),
+				password:       nn(password.Parameter).Value,
+				database:       "justice_firm",
+				acquireTimeout: 2500,
 				// AWS RDS MariaDB can't create more than 5-6 for some reason
-				connectionLimit:       4,
+				connectionLimit:       connectionLimit,
 				initializationTimeout: 1000,
 				leakDetectionTimeout:  3000,
+				idleTimeout:           0,
 			});
 		}
 		console.log({
 			active: this.pool.activeConnections(),
 			idle:   this.pool.idleConnections(),
 			total:  this.pool.totalConnections(),
+			connectionLimit,
 		});
 		return this.pool;
 	}

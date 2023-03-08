@@ -83,10 +83,10 @@ export const InputOmit = memoizeWeak(function InputOmit<T extends TObject, K ext
 });
 
 export const Optional = memoizeWeak(function Optional<T extends TSchema> (item: T, options?: SchemaOptions) {
-	return Type.Union([item, Type.Null(), Type.Undefined()], {
+	return Type.Optional(Type.Union([item, Type.Null(), Type.Undefined()], {
 		$id: `Optional${item.$id}`,
 		...options
-	});
+	}));
 });
 
 export const PartialObject = memoizeWeak(function PartialObject<T extends TObject, K extends ObjectPropertyKeys<T>[]> (schema: T, options?: ObjectOptions) {

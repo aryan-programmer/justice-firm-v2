@@ -13,6 +13,7 @@ import {
 	faChevronLeft,
 	faChevronRight,
 	faChevronUp,
+	faCircle,
 	faClose,
 	faGavel,
 	faHome,
@@ -76,6 +77,7 @@ library.add(
 	faCheck,
 	faClose,
 	faXmark,
+	faCircle,
 	faQuestion
 );
 // import * as components from 'vuetify/components'

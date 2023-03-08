@@ -18,9 +18,9 @@ const sideImage = computed(() => props.sideBySide === true);
 	theme="dark">
 	<v-img v-if="!sideImage" :src="props.client.photoPath" class="clamp-image-height" />
 	<v-card-text>
-		<v-row>
+		<v-row no-gutters>
 			<v-col>
-				<v-card-title class="ps-0">
+				<v-card-title class="ps-0 pt-0">
 					{{ props.client.name }}
 				</v-card-title>
 				Email: {{ props.client.email }}<br />

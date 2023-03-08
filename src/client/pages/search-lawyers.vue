@@ -29,7 +29,8 @@ const longitude = useField('longitude');
 const router = useRouter();
 const route  = useRoute();
 
-const lawyers = ref<LawyerSearchResult[] | Nuly>();
+const lawyers  = ref<LawyerSearchResult[] | Nuly>();
+const showForm = ref<boolean>(false);
 
 async function setFromQuery (query: Record<string, LocationQueryValue | LocationQueryValue[]>) {
 	const name_      = name.value.value = firstIfArray(query.name);
@@ -60,6 +61,7 @@ async function setFromQuery (query: Record<string, LocationQueryValue | Location
 	}
 
 	lawyers.value = res.right.body;
+	showForm.value = false;
 	console.log(res.right.body);
 }
 
@@ -88,10 +90,12 @@ watch(() => route.query, value => {
 </script>
 
 <template>
-<v-form @submit.prevent="onSubmit">
-	<v-card color="gradient--plum-bath" theme="dark">
+<v-form
+	v-if="lawyers==null||lawyers.length===0||showForm"
+	@submit.prevent="onSubmit">
+	<v-card color="gradient--plum-bath" theme="dark" density="compact">
 		<v-card-title>
-			<p class="text-h2 mb-4">Search for a lawyer</p>
+			<p class="text-h4 mb-4">Search for a lawyer</p>
 		</v-card-title>
 		<v-card-text>
 			<!--			{{errors}}-->
@@ -159,16 +163,38 @@ watch(() => route.query, value => {
 			<div>
 				<v-btn
 					rounded
-					density="comfortable"
+					density="compact"
 					type="submit"
 					variant="elevated"
 					value="y"
 					color="cyan-lighten-2">Search
 				</v-btn>
+				<v-btn
+					v-if="!(lawyers==null||lawyers.length===0)"
+					rounded
+					density="compact"
+					variant="flat"
+					color="red-lighten-1"
+					class="ms-2"
+					@click="showForm = false"
+				>
+					Hide search form
+				</v-btn>
 			</div>
 		</v-card-text>
 	</v-card>
 </v-form>
+<v-btn
+	elevation="3"
+	rounded
+	density="default"
+	variant="tonal"
+	color="green-darken-2"
+	@click="showForm = true"
+	v-else
+>
+	<h3>Show search form</h3>
+</v-btn>
 <div v-if="lawyers != null">
 	<v-divider class="my-2" />
 	<div v-if="lawyers.length > 0">
@@ -180,7 +206,26 @@ watch(() => route.query, value => {
 				sm="6"
 				md="4"
 				lg="3">
-				<LawyerCard :lawyer="lawyer" />
+				<LawyerCard :lawyer="lawyer">
+					<template #actions>
+					<v-btn
+						:to="`/lawyer-details?id=${lawyer.id}`"
+						class=""
+						color="cyan-lighten-4"
+						density="compact"
+						rounded
+						variant="tonal">View more details
+					</v-btn>
+					<v-btn
+						:to="`/open-appointment?id=${lawyer.id}`"
+						class="ms-0 mt-2"
+						color="teal-lighten-4"
+						density="compact"
+						rounded
+						variant="tonal">Open appointment request
+					</v-btn>
+					</template>
+				</LawyerCard>
 			</v-col>
 		</v-row>
 	</div>

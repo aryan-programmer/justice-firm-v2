@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import {Option, program} from "commander";
-import * as esbuild      from "esbuild";
-import {BuildOptions}    from "esbuild";
-import * as fs           from "fs-extra";
-import path              from "path";
+import * as esbuild from "esbuild";
+import {BuildOptions} from "esbuild";
+import * as fs from "fs-extra";
+import path from "path";
 
 // TODO: moment-timezone/data/packed/latest.json
 
@@ -17,7 +17,8 @@ program
 	.option("--minify", "Minify output files")
 	.option("--clean-only", "Clean & delete all output files, and then exit")
 	.addOption(new Option("--no-clean", "Do not clean files").conflicts("cleanOnly"))
-	.option("--no-maps", "Output no source maps");
+	.option("--no-maps", "Output no source maps")
+	.option("--metafile", "Output metafile for module size analysis");
 
 program.parse();
 
@@ -27,6 +28,7 @@ let minify    = (opts.minify ?? false) === true;
 let maps      = (opts.maps ?? false) === true;
 let clean     = (opts.clean ?? false) === true;
 let cleanOnly = (opts.cleanOnly ?? false) === true;
+let metafile  = (opts.metafile ?? false) === true;
 
 console.log(opts);
 
@@ -40,9 +42,9 @@ if (clean) {
 }
 
 let commonOptions: BuildOptions = {
-	bundle:        true,
-	format:        "cjs",
-	platform:      "node",
+	bundle:   true,
+	format:   "cjs",
+	platform: "node",
 	//target:        "node16",
 	tsconfig:      path.resolve(__dirname, "./tsconfig.json"),
 	sourcemap:     maps ? "linked" : false,
@@ -54,6 +56,7 @@ let commonOptions: BuildOptions = {
 	},
 	minify,
 	absWorkingDir: __dirname,
+	metafile,
 };
 
 // let apiImplOptions: BuildOptions = {
@@ -84,7 +87,10 @@ let apiAppOptions: BuildOptions = {
 		await apiAppContext.watch();
 	} else {
 		// await esbuild.build(apiImplOptions);
-		await esbuild.build(apiAppOptions);
+		const res = await esbuild.build(apiAppOptions);
+		if (metafile) {
+			fs.writeFileSync('server-build-metafile.json', JSON.stringify(res.metafile));
+		}
 		process.exit(0);
 	}
 })();

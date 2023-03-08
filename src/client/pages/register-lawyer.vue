@@ -105,11 +105,11 @@ const onSubmit = form.handleSubmit(async values => {
 		alert("Invalid data");
 		return;
 	}
-	const specializationTypes: number[] = [];
+	const specializationTypes: string[] = [];
 	const specs                         = form.values.caseSpecializations;
 	for (const key of Object.keys(specs)) {
 		if (specs[key] != null) {
-			specializationTypes.push(+key.substring(2));
+			specializationTypes.push(key.substring(2));
 		}
 	}
 	const res = await justiceFirmApi.registerLawyer({
@@ -210,6 +210,7 @@ onMounted(() => {
 							title="Select case specializations"
 							expand-icon="fas fa-chevron-down"
 							collapse-icon="fas fa-chevron-up"
+							ripple
 						>
 							<v-expansion-panel-text>
 								<v-row no-gutters>
@@ -224,7 +225,7 @@ onMounted(() => {
 											v-model="caseSpecializationsFields[i].value.value"
 											hide-details
 											value="1"
-											:label="caseType.type"
+											:label="caseType.name"
 											density="compact"
 											type="checkbox"
 										></v-checkbox>

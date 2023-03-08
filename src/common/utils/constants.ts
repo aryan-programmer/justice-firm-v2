@@ -13,17 +13,17 @@ export const ValidPhone    = Type.RegEx(phoneRegex);
 
 export function getCaseTypes (): CaseType[] {
 	return [
-		{id: 1, type: "Bankruptcy"},
-		{id: 2, type: "Business/Corporate"},
-		{id: 3, type: "Constitutional"},
-		{id: 4, type: "Criminal Defense"},
-		{id: 5, type: "Employment and Labor"},
-		{id: 6, type: "Entertainment"},
-		{id: 7, type: "Estate Planning"},
-		{id: 8, type: "Family"},
-		{id: 9, type: "Immigration"},
-		{id: 10, type: "Intellectual Property"},
-		{id: 11, type: "Personal Injury"},
-		{id: 12, type: "Tax"}
+		{id: "1", name: "Bankruptcy"},
+		{id: "2", name: "Business/Corporate"},
+		{id: "3", name: "Constitutional"},
+		{id: "4", name: "Criminal Defense"},
+		{id: "5", name: "Employment and Labor"},
+		{id: "6", name: "Entertainment"},
+		{id: "7", name: "Estate Planning"},
+		{id: "8", name: "Family"},
+		{id: "9", name: "Immigration"},
+		{id: "10", name: "Intellectual Property"},
+		{id: "11", name: "Personal Injury"},
+		{id: "12", name: "Tax"}
 	]
 }

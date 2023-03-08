@@ -105,8 +105,17 @@ async function commonSendRes (params: SetAppointmentStatusInput, mode: string) {
 					:lawyer="appointment.lawyer"
 					class="h-100"
 					:side-by-side="true"
-					:hide-open-appointment-request-button="true"
-				/>
+				>
+					<template #actions>
+					<v-btn
+						:to="`/lawyer-details?id=${appointment.lawyer.id}`"
+						color="cyan-lighten-4"
+						density="compact"
+						rounded
+						variant="tonal">View details
+					</v-btn>
+					</template>
+				</LawyerCard>
 			</v-col>
 			<v-col md="6" cols="12">
 				<ClientCard

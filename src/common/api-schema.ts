@@ -4,10 +4,10 @@ import {lazyCheck, MessageOr} from "../singularity/helpers";
 import {HttpMethods} from "../singularity/httpMethods";
 import {modelSchema} from "../singularity/schema";
 import {AdminAuthToken, AuthToken, ClientAuthToken, LawyerAuthToken} from "./api-types";
-import {Client, ID_T, Lawyer, StatusEnum, StatusEnum_T} from "./db-types";
+import {CaseType, Client, ID_T, Lawyer, StatusEnum, StatusEnum_T} from "./db-types";
 import {maxDataUrlLen, ValidEmail, ValidPassword} from "./utils/constants";
 import {ArrayOf, Optional} from "./utils/functions";
-import {Nuly, String_T} from "./utils/types";
+import {Nuly, Number_T, OptionalBoolean_T, OptionalString_T, String_T} from "./utils/types";
 
 export const RegisterLawyerInput = Type.Intersect([
 	Type.Omit(Lawyer, ["id", "photoPath", "type", "certificationLink", "status", "passwordHash"]),
@@ -15,7 +15,7 @@ export const RegisterLawyerInput = Type.Intersect([
 		password:            ValidPassword,
 		photoData:           Type.String({maxLength: maxDataUrlLen}),
 		certificationData:   Type.String({maxLength: maxDataUrlLen}),
-		specializationTypes: Type.Array(Type.Number({minimum: 0})),
+		specializationTypes: Type.Array(ID_T),
 	})
 ], {$id: "RegisterLawyerInput"});
 export type RegisterLawyerInput = Static<typeof RegisterLawyerInput>;
@@ -46,17 +46,18 @@ export type SearchLawyersBaseInput = Static<typeof SearchLawyersBaseInput>;
 const LawyerSearchResult = Type.Intersect([
 	Type.Omit(Lawyer, ["type", "passwordHash", "status"]),
 	Type.Object({
-		distance: Optional(Type.Number()),
+		distance:            Optional(Number_T),
+		caseSpecializations: Optional(ArrayOf(CaseType))
 	})
 ], {$id: "LawyerSearchResult"});
-export type LawyerSearchResult = Omit<Lawyer, "type" | "passwordHash" | "status"> & { distance: number | Nuly };
+export type LawyerSearchResult = Static<typeof LawyerSearchResult>;
 const LawyerSearchResults = ArrayOf(LawyerSearchResult);
 
 export const SearchAndSortLawyersInput = Type.Partial(Type.Object({
 	name:      String_T,
 	address:   String_T,
-	latitude:  Type.Number(),
-	longitude: Type.Number(),
+	latitude:  Number_T,
+	longitude: Number_T,
 }), {$id: "SearchAndSortLawyersInput"});
 export type SearchAndSortLawyersInput = Static<typeof SearchAndSortLawyersInput>;
 
@@ -64,21 +65,24 @@ export const SearchLawyersInput = Type.Union([SearchLawyersBaseInput, SearchAndS
 	{$id: "SearchLawyersInput"});
 export type SearchLawyersInput = SearchLawyersBaseInput | SearchAndSortLawyersInput;
 
-export const GetLawyerInput = Type.Object({id: ID_T}, {$id: "GetLawyerInput"});
-export type GetLawyerInput = Pick<Lawyer, "id">;
+export const GetLawyerInput = Type.Object({
+	id:                     ID_T,
+	getCaseSpecializations: OptionalBoolean_T,
+}, {$id: "GetLawyerInput"});
+export type GetLawyerInput = Static<typeof GetLawyerInput>;
 
 export const OpenAppointmentRequestInput = Type.Object({
 	lawyerId:    ID_T,
 	authToken:   ClientAuthToken,
 	description: String_T,
-	timestamp:   Type.Optional(String_T)
+	timestamp:   OptionalString_T
 }, {$id: "OpenAppointmentRequestInput"});
 export type OpenAppointmentRequestInput = Static<typeof OpenAppointmentRequestInput>;
 
 export const GetAppointmentsInput = Type.Object({
 	authToken:       AuthToken,
 	withStatus:      StatusEnum_T,
-	orderByOpenedOn: Optional(Type.Boolean())
+	orderByOpenedOn: OptionalBoolean_T
 }, {$id: "GetAppointmentsInput"});
 export type GetAppointmentsInput = Static<typeof GetAppointmentsInput>;
 
@@ -89,7 +93,7 @@ export const AppointmentSparseData = Type.Object({
 	caseId:      Optional(ID_T),
 	groupId:     ID_T,
 	description: String_T,
-	timestamp:   Optional(String_T),
+	timestamp:   OptionalString_T,
 	openedOn:    String_T,
 }, {$id: "AppointmentSparseData"});
 export type AppointmentSparseData = Static<typeof AppointmentSparseData>;
@@ -122,7 +126,7 @@ export const AppointmentFullData = Type.Object({
 	caseId:      Optional(ID_T),
 	groupId:     ID_T,
 	description: String_T,
-	timestamp:   Optional(String_T),
+	timestamp:   OptionalString_T,
 	openedOn:    String_T,
 	status:      StatusEnum_T,
 }, {$id: "AppointmentFullData"});
@@ -138,7 +142,7 @@ export const SetAppointmentStatusInput = Type.Union([
 		authToken:     LawyerAuthToken,
 		appointmentId: ID_T,
 		status:        Type.Literal(StatusEnum.Confirmed),
-		timestamp:     Optional(String_T)
+		timestamp:     OptionalString_T
 	})
 ], {$id: "SetAppointmentStatusInput"});
 export type SetAppointmentStatusInput = Static<typeof SetAppointmentStatusInput>;
