@@ -22,7 +22,7 @@ import {
 	SetAppointmentStatusInput,
 	SetLawyerStatusesInput
 } from "../common/api-schema";
-import {AuthToken, JWTHashedData} from "../common/api-types";
+import {AuthToken, ClientAuthToken, ConstrainedAuthToken, JWTHashedData, LawyerAuthToken} from "../common/api-types";
 import {StatusEnum, UserAccessType} from "../common/db-types";
 import {nn} from "../common/utils/asserts";
 import {toNumIfNotNull} from "../common/utils/functions";
@@ -40,7 +40,12 @@ const s3Bucket  = nn(process.env.S3_BUCKET);
 const ssmClient = new SSMClient({region});
 const s3Client  = new S3Client({region});
 
-function generateAuthTokenResponse (userId: number | bigint, userType: UserAccessType, jwtSecret: string) {
+function generateAuthTokenResponse<T extends UserAccessType> (
+	userId: number | bigint,
+	userType: T,
+	jwtSecret: string,
+	userName: string | undefined = undefined
+): EndpointResult<ConstrainedAuthToken<T>> {
 	const expiryDate                  = null;
 	const privateToken: JWTHashedData = {
 		id: userId.toString(10),
@@ -48,10 +53,11 @@ function generateAuthTokenResponse (userId: number | bigint, userType: UserAcces
 		expiryDate,
 	};
 	return response(200, {
-		id:  userId.toString(10),
+		id:   userId.toString(10),
 		userType,
 		expiryDate,
-		jwt: sign(privateToken, jwtSecret)
+		jwt:  sign(privateToken, jwtSecret),
+		name: userName,
 	});
 }
 
@@ -82,7 +88,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 	private jwtSecret: string | Nuly = null;
 
 	async registerLawyer (params: FnParams<RegisterLawyerInput>, event: APIGatewayProxyEvent):
-		Promise<EndpointResult<AuthToken>> {
+		Promise<EndpointResult<LawyerAuthToken>> {
 		const data: RegisterLawyerInput = params.body;
 
 		const jwtSecretP    = this.getJwtSecret();
@@ -137,7 +143,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 
 			await conn.commit();
 
-			return generateAuthTokenResponse(userId, UserAccessType.Lawyer, jwtSecret);
+			return generateAuthTokenResponse(userId, UserAccessType.Lawyer, jwtSecret, data.name);
 		} catch (e) {
 			await conn.rollback();
 			throw e;
@@ -147,7 +153,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 	}
 
 	async registerClient (params: FnParams<RegisterClientInput>, event: APIGatewayProxyEvent):
-		Promise<EndpointResult<AuthToken>> {
+		Promise<EndpointResult<ClientAuthToken>> {
 		const data: RegisterClientInput = params.body;
 
 		const jwtSecretP    = this.getJwtSecret();
@@ -183,7 +189,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 
 			await conn.commit();
 
-			return generateAuthTokenResponse(userId, UserAccessType.Client, jwtSecret);
+			return generateAuthTokenResponse(userId, UserAccessType.Client, jwtSecret, data.name);
 		} catch (e) {
 			await conn.rollback();
 			throw e;
@@ -196,24 +202,21 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		Promise<EndpointResult<AuthToken | Message>> {
 		const data: SessionLoginInput = params.body;
 
-		const resSetP:
-			      Promise<{ id: number | bigint, passwordHash: string, type: UserAccessType }[]> = this.getPool().then(
-			pool => pool.execute(
-				"SELECT id, password_hash AS passwordHash, type FROM user WHERE user.email = ?;",
-				[data.email]
-			)
-		);
+		const jwtSecret = await this.getJwtSecret();
 
-		const [jwtSecret, resSet] = await Promise.all([this.getJwtSecret(), resSetP]);
+		const resSet: { id: number | bigint, passwordHash: string, type: UserAccessType, name: string }[] = await (await this.getPool()).execute(
+			"SELECT id, name, password_hash AS passwordHash, type FROM user WHERE user.email = ?;",
+			[data.email]
+		);
 
 		if (resSet.length === 0) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Email not used to sign up a user");
 		}
-		const {passwordHash, id, type} = resSet[0];
-		if (!compareSync(data.password, passwordHash)) {
+		const {passwordHash, id, type, name} = resSet[0];
+		if (!compareSync(data.password, passwordHash.toString())) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid password");
 		}
-		return generateAuthTokenResponse(id, type, jwtSecret);
+		return generateAuthTokenResponse(id, type, jwtSecret, name.toString());
 	}
 
 	async searchLawyers (params: FnParams<SearchLawyersInput>, event: APIGatewayProxyEvent):

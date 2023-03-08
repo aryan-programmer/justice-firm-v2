@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {computed, useSlots} from "#imports";
+import {useDisplay} from "vuetify";
 import {LawyerSearchResult} from "../../common/api-schema";
 
 const props = defineProps<{
@@ -8,9 +9,13 @@ const props = defineProps<{
 	class?: string
 }>();
 
-const slots = useSlots();
+const slots                             = useSlots();
+const display                           = useDisplay();
+const {smAndDown: ignoreSideBySideTrue} = display;
 
-const sideImage = computed(() => props.sideBySide === true);
+const sideImage = computed(() =>
+	props.sideBySide === true && !ignoreSideBySideTrue.value
+);
 </script>
 
 <template>
@@ -20,8 +25,8 @@ const sideImage = computed(() => props.sideBySide === true);
 	theme="dark">
 	<v-img v-if="!sideImage" :src="props.lawyer.photoPath" class="clamp-image-height" />
 	<v-card-text>
-		<v-row class="justify-space-between">
-			<v-col cols="auto" class="pt-0 mt-0">
+		<v-row no-gutters class="justify-space-between">
+			<v-col cols="12" md="7" class="pt-0 mt-0">
 				<v-card-title class="ps-0 mt-0 pt-0">
 					{{ props.lawyer.name }}
 				</v-card-title>
@@ -34,11 +39,13 @@ Office Address:
 {{ props.lawyer.address }}</pre>
 				<a :href="props.lawyer.certificationLink" class="text-white mt-3">View certification</a>
 			</v-col>
-			<img :src="props.lawyer.photoPath" v-if="sideImage" class="clamp-image-height v-col-auto" />
+			<v-col v-if="sideImage" cols="5" class="pa-3">
+				<v-img :src="props.lawyer.photoPath" class="clamp-image-height"></v-img>
+			</v-col>
 		</v-row>
 		<v-expansion-panels v-if="lawyer.caseSpecializations != null" class="mt-3">
 			<v-expansion-panel
-				title="Select case specializations"
+				title="View case specializations"
 				expand-icon="fas fa-chevron-down"
 				collapse-icon="fas fa-chevron-up"
 				ripple

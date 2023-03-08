@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {computed} from "#imports";
+import {useDisplay} from "vuetify";
 import {ClientDataResult} from "../../common/api-schema";
 
 const props = defineProps<{
@@ -8,7 +9,12 @@ const props = defineProps<{
 	class?: string,
 }>();
 
-const sideImage = computed(() => props.sideBySide === true);
+const display                           = useDisplay();
+const {smAndDown: ignoreSideBySideTrue} = display;
+
+const sideImage = computed(() =>
+	props.sideBySide === true && !ignoreSideBySideTrue.value
+);
 </script>
 
 <template>

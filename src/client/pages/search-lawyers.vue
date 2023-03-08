@@ -3,6 +3,7 @@ import {justiceFirmApi, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {useField, useForm} from 'vee-validate';
 import {LocationQueryValue} from "vue-router";
+import {useDisplay} from "vuetify";
 import * as yup from "yup";
 import {LawyerSearchResult} from "../../common/api-schema";
 import {closeToZero, firstIfArray, getCurrentPosition, toNumIfNotNull} from "../../common/utils/functions";
@@ -26,8 +27,10 @@ const address   = useField('address');
 const latitude  = useField('latitude');
 const longitude = useField('longitude');
 
-const router = useRouter();
-const route  = useRoute();
+const router                              = useRouter();
+const route                               = useRoute();
+const display                             = useDisplay();
+const {smAndDown: moveAutoFillButtonDown} = display;
 
 const lawyers  = ref<LawyerSearchResult[] | Nuly>();
 const showForm = ref<boolean>(false);
@@ -120,44 +123,46 @@ watch(() => route.query, value => {
 				hide-details
 			/>
 			<v-row no-gutters>
-				<div class="d-flex align-center me-1" style="width: fit-content">
+				<div class="d-flex align-center me-1 my-2" style="width: fit-content">
 					Sort by distance from
 				</div>
-				<v-col class="d-flex align-center">
-					<v-text-field
-						class="me-1"
-						@blur="latitude.handleBlur"
-						v-model="latitude.value.value"
-						:error-messages="latitude.errorMessage.value"
-						label="Latitude"
-						density="compact"
-						type="number"
-						hide-details
-					/>
-				</v-col>
-				<v-col class="d-flex align-center">
-					<v-text-field
-						class="me-1"
-						@blur="longitude.handleBlur"
-						v-model="longitude.value.value"
-						:error-messages="longitude.errorMessage.value"
-						label="Longitude"
-						density="compact"
-						type="number"
-						hide-details
-					/>
-				</v-col>
-				<v-col class="d-flex align-center" cols="2" md="1">
-					<v-btn
-						class="w-100"
-						color="green-lighten-3"
-						type="button"
-						variant="flat"
-						density="compact"
-						@click="autofillLatLon"
-					>Autofill
-					</v-btn>
-				</v-col>
+				<v-row no-gutters>
+					<v-col class="d-flex align-center" :cols="moveAutoFillButtonDown ? '6' : ''">
+						<v-text-field
+							class="me-1"
+							@blur="latitude.handleBlur"
+							v-model="latitude.value.value"
+							:error-messages="latitude.errorMessage.value"
+							label="Latitude"
+							density="compact"
+							type="number"
+							hide-details
+						/>
+					</v-col>
+					<v-col class="d-flex align-center" :cols="moveAutoFillButtonDown ? '6' : ''">
+						<v-text-field
+							:class="moveAutoFillButtonDown?'':'me-1'"
+							@blur="longitude.handleBlur"
+							v-model="longitude.value.value"
+							:error-messages="longitude.errorMessage.value"
+							label="Longitude"
+							density="compact"
+							type="number"
+							hide-details
+						/>
+					</v-col>
+					<v-col class="d-flex align-center" :cols="moveAutoFillButtonDown ? '12' : '2'">
+						<v-btn
+							:class="`w-100 ${moveAutoFillButtonDown?'mt-1':''}`"
+							color="green-lighten-3"
+							type="button"
+							variant="flat"
+							density="compact"
+							@click="autofillLatLon"
+						>Autofill
+						</v-btn>
+					</v-col>
+				</v-row>
 			</v-row>
 			<v-divider class="my-1" />
 			<div>

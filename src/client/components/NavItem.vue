@@ -20,7 +20,6 @@ const id            = ref("i-" + uniqId());
 const buttonElement = ref<VBtn | Nuly>(null);
 
 const buttonColor = computed(() => {
-	console.log(props.title, props.theme, props.active);
 	if (props.theme === "dark")
 		return props.active ? 'blue-lighten-2' : 'white';
 	return props.active ? 'blue-darken-2' : 'black';
@@ -62,7 +61,7 @@ function onClick () {
 <NuxtLink
 	:to="props.link"
 	@click="onClick"
-	:class="`nav-item nav-link pa-1 text-${buttonColor} ${active?'active':''}`"
+	:class="`nav-item nav-link px-1 py-1 pt-2 text-${buttonColor} ${active?'active':''}`"
 >
 	<v-btn
 		ref="buttonElement"

@@ -2,18 +2,30 @@
 import {useRouter} from "#app";
 import {computed} from "#imports";
 import {ref} from "vue";
+import {useDisplay} from "vuetify";
 import {UserAccessType} from "../common/db-types";
+import {capitalizeFirstLetter} from "../common/utils/functions";
 import NavItem from "./components/NavItem.vue";
 import {useUserStore} from "./store/userStore";
 
 const userStore = useUserStore();
 
-const drawer = ref(true);
-const rail   = ref(true);
+const isSideNavVisible            = ref(false);
+const display                     = useDisplay();
+const {xs: hideSideNavBreakpoint} = display;
+const rail                        = computed(() => !hideSideNavBreakpoint.value);
 
 const router = useRouter();
 
-const userDeps = computed(args => {
+const userInfo = computed(() => {
+	// console.log(display, {isSideNavVisible:isSideNavVisible.value, hideSideNavBreakpoint: hideSideNavBreakpoint.value}, display.name.value);
+	if (userStore.authToken == null) {
+		return "Anonymous user";
+	}
+	return capitalizeFirstLetter(userStore.authToken.userType) + " " + userStore.authToken.name
+})
+
+const userDeps = computed(() => {
 	if (userStore.authToken == null) {
 		return {
 			links: [
@@ -79,14 +91,39 @@ function pathCompare (link: string) {
 
 <template>
 <v-layout>
+	<v-app-bar
+		:color="userDeps.color"
+		:theme="userDeps.theme"
+		density="compact"
+		elevation="3"
+	>
+		<template v-slot:prepend>
+		<v-app-bar-nav-icon
+			v-if="hideSideNavBreakpoint"
+			@click="isSideNavVisible = !isSideNavVisible"
+		></v-app-bar-nav-icon>
+		</template>
+
+		<v-app-bar-title>
+			<h3>Justice firm</h3>
+		</v-app-bar-title>
+
+		<template v-slot:append>
+		Welcome, {{ userInfo }}
+		</template>
+	</v-app-bar>
 	<v-navigation-drawer
-		v-model="drawer"
+		:modelValue="isSideNavVisible || !hideSideNavBreakpoint"
+		@update:modelValue="v=>isSideNavVisible=v"
 		:rail="rail"
-		permanent
+		:permanent="!hideSideNavBreakpoint"
+		:temporary="hideSideNavBreakpoint"
 		:color="userDeps.color"
 		:theme="userDeps.theme"
 		rail-width="120"
+		elevation="3"
 	>
+		<div class="pt-2"></div>
 		<NavItem
 			v-for="link in userDeps.links"
 			:link="link.link"
@@ -102,6 +139,7 @@ function pathCompare (link: string) {
 			value="sign-out"
 			:theme="userDeps.theme"
 			@click="signOut" />
+		<div class="pt-2"></div>
 	</v-navigation-drawer>
 	<v-main>
 		<div class="w-100 pa-2">

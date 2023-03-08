@@ -46,30 +46,31 @@ watch(() => route.query.id, async value => {
 .lawyer-details-card {
 	margin-right: auto;
 	margin-left: auto;
-	min-width: 50%;
 }
 </style>
 
 <template>
-<div
+<v-row
 	v-if="lawyer!=null"
 	class="lawyer-details-card-parent"
 >
-	<LawyerCard
-		:lawyer="lawyer"
-		side-by-side
-		class="lawyer-details-card"
-	>
-		<template #actions>
-		<v-btn
-			:to="`/open-appointment?id=${lawyer.id}`"
-			color="teal-lighten-3"
-			density="default"
-			elevation="2"
-			rounded
-			variant="elevated">Open appointment request
-		</v-btn>
-		</template>
-	</LawyerCard>
-</div>
+	<div class="v-col v-col-12 v-col-sm-9 lawyer-details-card">
+		<LawyerCard
+			:lawyer="lawyer"
+			side-by-side
+			class=""
+		>
+			<template #actions>
+			<v-btn
+				:to="`/open-appointment?id=${lawyer.id}`"
+				color="teal-lighten-3"
+				density="default"
+				elevation="2"
+				rounded
+				variant="elevated">Open appointment request
+			</v-btn>
+			</template>
+		</LawyerCard>
+	</div>
+</v-row>
 </template>
