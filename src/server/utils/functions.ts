@@ -1,4 +1,5 @@
 import {PutObjectCommand, S3Client} from "@aws-sdk/client-s3";
+import {fileTypeFromBuffer} from "file-type";
 import {extension} from "mime-types";
 import fetch from 'node-fetch';
 import {Stream} from "stream";
@@ -16,19 +17,27 @@ export async function streamToBuffer (stream: Stream): Promise<Buffer> {
 	});
 }
 
+export async function getMimeTypeFromUrlServerSide (dataUrl: string) {
+	const dataUrlResponse = await fetch(dataUrl);
+	if (dataUrlResponse.body == null) return "text/plain";
+	let bodyBuffer = await streamToBuffer(nn(await dataUrlResponse.body));
+	const fileType = await fileTypeFromBuffer(bodyBuffer);
+	return fileType?.mime ?? dataUrlResponse.headers.get('Content-Type') ?? "text/plain";
+}
+
 export async function uploadDataUrlToS3 (args: {
 	name: string,
 	dataUrl: string,
 	s3Client: S3Client,
+	contentType: string,
 	s3Bucket: string,
 	prefix: string,
 	region: string,
 }) {
-	const {dataUrl, s3Client, name, s3Bucket, prefix, region} = args;
+	const {dataUrl, s3Client, name, s3Bucket, prefix, region, contentType} = args;
 
 	const fileName        = name.replace(badFileNameChars, '_');
 	const dataUrlResponse = await fetch(dataUrl);
-	const contentType     = dataUrlResponse.headers.get('Content-Type') ?? "text/plain";
 	const ext             = extension(contentType);
 	const uid             = uniqId();
 	let fileKey           = `${prefix}${fileName}${uid}.${ext}`;

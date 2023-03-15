@@ -24,7 +24,18 @@
 	background: rgb(255, 255, 255, 0.5) !important;
 }
 
+// The multiple repetitions are for increasing the precedence of this selector
+.v-card-title.v-card-title.v-card-title {
+	// Vuetify sets
+	// white-space: nowrap;
+	// for v-card-title, while this may look nice,
+	// the text often gets sliced off on mobile devices & smaller screen sizes
+	// Hence:
+	white-space: normal;
+}
+
 .clamp-image-height {
+	// (As above) the multiple repetitions are for increasing the precedence of this selector
 	&.clamp-image-height, &.clamp-image-height img {
 		max-height: 200px;
 	}

@@ -154,13 +154,13 @@ export const justiceFirmApiSchema = modelSchema({
 			method:              HttpMethods.POST,
 			path:                "/user/lawyer",
 			requestBodyChecker:  lazyCheck(RegisterLawyerInput),
-			responseBodyChecker: lazyCheck(LawyerAuthToken),
+			responseBodyChecker: lazyCheck(MessageOr(LawyerAuthToken)),
 		}),
 		registerClient:         endpoint({
 			method:              HttpMethods.POST,
 			path:                "/user/client",
 			requestBodyChecker:  lazyCheck(RegisterClientInput),
-			responseBodyChecker: lazyCheck(ClientAuthToken),
+			responseBodyChecker: lazyCheck(MessageOr(ClientAuthToken)),
 		}),
 		sessionLogin:           endpoint({
 			method:              HttpMethods.POST,

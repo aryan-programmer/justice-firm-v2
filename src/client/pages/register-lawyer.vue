@@ -7,6 +7,7 @@ import {ISchema} from "yup";
 import {getCaseTypes, maxDataUrlLen, maxFileSize} from "~~/src/common/utils/constants";
 import {getCurrentPosition} from "~~/src/common/utils/functions";
 import {useUserStore} from "../store/userStore";
+import {validateDataUrlAsPhotoBrowserSide} from "../utils/functions";
 import {getRegistrationSchemaForLawyer} from "../utils/validation-schemas";
 
 definePageMeta({
@@ -72,9 +73,11 @@ async function photoChange (event: Event) {
 	photo.handleChange(event);
 	const file = (event.target as HTMLInputElement)?.files?.[0];
 	if (file == null) return;
-	photoData = await readFileAsDataUrl(file);
-	if (photoData.length > maxDataUrlLen) {
-		alert(`The file must be less than ${maxFileSize} in size.`)
+	const dataUrl = await readFileAsDataUrl(file);
+	if (await validateDataUrlAsPhotoBrowserSide(dataUrl)) {
+		photoData = dataUrl;
+	} else {
+		photoClear(null);
 	}
 }
 

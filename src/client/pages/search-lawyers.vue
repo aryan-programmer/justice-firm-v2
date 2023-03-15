@@ -97,7 +97,7 @@ watch(() => route.query, value => {
 	v-if="lawyers==null||lawyers.length===0||showForm"
 	@submit.prevent="onSubmit">
 	<v-card color="gradient--plum-bath" theme="dark" density="compact">
-		<v-card-title>
+		<v-card-title class="text-wrap">
 			<p class="text-h4 mb-4">Search for a lawyer</p>
 		</v-card-title>
 		<v-card-text>

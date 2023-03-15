@@ -25,6 +25,7 @@ import {
 import {AuthToken, ClientAuthToken, ConstrainedAuthToken, JWTHashedData, LawyerAuthToken} from "../common/api-types";
 import {StatusEnum, UserAccessType} from "../common/db-types";
 import {nn} from "../common/utils/asserts";
+import {invalidImageMimeTypeMessage, validImageMimeTypes} from "../common/utils/constants";
 import {toNumIfNotNull} from "../common/utils/functions";
 import {Nuly} from "../common/utils/types";
 import {constants} from "../singularity/constants";
@@ -33,7 +34,7 @@ import {message, Message, noContent, response} from "../singularity/helpers";
 import {awsLambdaFunnelWrapper} from "../singularity/model.server";
 import {APIImplementation} from "../singularity/schema";
 import {saltRounds} from "./utils/constants";
-import {uploadDataUrlToS3} from "./utils/functions";
+import {getMimeTypeFromUrlServerSide, uploadDataUrlToS3} from "./utils/functions";
 
 const region    = nn(process.env.AWS_REGION);
 const s3Bucket  = nn(process.env.S3_BUCKET);
@@ -88,34 +89,42 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 	private jwtSecret: string | Nuly = null;
 
 	async registerLawyer (params: FnParams<RegisterLawyerInput>, event: APIGatewayProxyEvent):
-		Promise<EndpointResult<LawyerAuthToken>> {
+		Promise<EndpointResult<LawyerAuthToken | Message>> {
 		const data: RegisterLawyerInput = params.body;
 
-		const jwtSecretP    = this.getJwtSecret();
-		const passwordHashP = hash(data.password, saltRounds);
-		const conn          = await this.getConnection();
+		const photoMimeType = await getMimeTypeFromUrlServerSide(data.photoData);
+
+		if (!validImageMimeTypes.includes(photoMimeType)) {
+			return message(constants.HTTP_STATUS_BAD_REQUEST, invalidImageMimeTypeMessage)
+		}
+
+		const certificateMimeType = await getMimeTypeFromUrlServerSide(data.certificationData);
+
+		const photoResP         = uploadDataUrlToS3({
+			s3Client,
+			s3Bucket,
+			region,
+			dataUrl:     data.photoData,
+			name:        data.name,
+			prefix:      "lawyers/photos/",
+			contentType: photoMimeType
+		});
+		const certificationResP = uploadDataUrlToS3({
+			s3Client,
+			s3Bucket,
+			region,
+			dataUrl:     data.certificationData,
+			name:        data.name,
+			prefix:      "lawyers/certifications/",
+			contentType: certificateMimeType
+		});
+		const jwtSecretP        = this.getJwtSecret();
+		const passwordHashP     = hash(data.password, saltRounds);
+
+		const [passwordHash, photoRes, certificationRes, jwtSecret] =
+			      await Promise.all([passwordHashP, photoResP, certificationResP, jwtSecretP]);
+		const conn                                                  = await this.getConnection();
 		try {
-
-			const photoResP         = uploadDataUrlToS3({
-				s3Client,
-				s3Bucket,
-				region,
-				dataUrl: data.photoData,
-				name:    data.name,
-				prefix:  "lawyers/photos/"
-			});
-			const certificationResP = uploadDataUrlToS3({
-				s3Client,
-				s3Bucket,
-				region,
-				dataUrl: data.certificationData,
-				name:    data.name,
-				prefix:  "lawyers/certifications/"
-			});
-
-			const [passwordHash, photoRes, certificationRes, jwtSecret] =
-				      await Promise.all([passwordHashP, photoResP, certificationResP, jwtSecretP]);
-
 			await conn.beginTransaction();
 
 			const userInsertRes: UpsertResult = await conn.execute(
@@ -153,26 +162,29 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 	}
 
 	async registerClient (params: FnParams<RegisterClientInput>, event: APIGatewayProxyEvent):
-		Promise<EndpointResult<ClientAuthToken>> {
+		Promise<EndpointResult<ClientAuthToken | Message>> {
 		const data: RegisterClientInput = params.body;
 
-		const jwtSecretP    = this.getJwtSecret();
-		const passwordHashP = hash(data.password, saltRounds);
-		const conn          = await this.getConnection()
+		const jwtSecret    = await this.getJwtSecret();
+		const passwordHash = await hash(data.password, saltRounds);
+
+		const photoMimeType = await getMimeTypeFromUrlServerSide(data.photoData);
+
+		if (!validImageMimeTypes.includes(photoMimeType)) {
+			return message(constants.HTTP_STATUS_BAD_REQUEST, invalidImageMimeTypeMessage)
+		}
+		const photoRes = await uploadDataUrlToS3({
+			s3Client,
+			s3Bucket,
+			region,
+			dataUrl:     data.photoData,
+			name:        data.name,
+			prefix:      "clients/photos/",
+			contentType: photoMimeType
+		});
+
+		const conn = await this.getConnection()
 		try {
-			const photoResP = uploadDataUrlToS3({
-				s3Client,
-				s3Bucket,
-				region,
-				dataUrl: data.photoData,
-				name:    data.name,
-				prefix:  "clients/photos/"
-			});
-
-			const [passwordHash, photoRes, jwtSecret] =
-				      await Promise.all([passwordHashP, photoResP, jwtSecretP]);
-
-			console.log({conn, passwordHash, photoRes});
 			await conn.beginTransaction();
 
 			const userInsertRes: UpsertResult = await conn.execute(

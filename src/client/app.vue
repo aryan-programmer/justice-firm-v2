@@ -17,20 +17,22 @@ const rail                        = computed(() => !hideSideNavBreakpoint.value)
 
 const router = useRouter();
 
-const userInfo = computed(() => {
+const userInfo    = computed(() => {
 	// console.log(display, {isSideNavVisible:isSideNavVisible.value, hideSideNavBreakpoint: hideSideNavBreakpoint.value}, display.name.value);
 	if (userStore.authToken == null) {
 		return "Anonymous user";
 	}
 	return capitalizeFirstLetter(userStore.authToken.userType) + " " + userStore.authToken.name
 })
-
-const userDeps = computed(() => {
+const commonLinks = [
+	{icon: "fa-search", title: "Find Lawyer", link: "/search-lawyers"},
+];
+const userDeps    = computed(() => {
 	if (userStore.authToken == null) {
 		return {
 			links: [
 				{icon: "fa-home", title: "Home", link: "/"},
-				{icon: "fa-search", title: "Search Lawyers", link: "/search-lawyers"},
+				...commonLinks,
 				{icon: "fa-user-plus", title: "Register", link: '/register'},
 				{icon: "fa-sign-in", title: "Sign in", link: "/sign-in"},
 			],
@@ -55,7 +57,7 @@ const userDeps = computed(() => {
 		return {
 			links: [
 				{icon: "fa-user", title: "Home", link: "/"},
-				{icon: "fa-search", title: "Search Lawyers", link: "/search-lawyers"},
+				...commonLinks,
 				{icon: "fa-calendar-days", title: "Appointments", link: "/client-appointments"},
 				// {icon: "fa-sign-out", title: "Sign out", link: "/sign-out"},
 			],
@@ -67,7 +69,7 @@ const userDeps = computed(() => {
 		return {
 			links: [
 				{icon: "fa-bug-slash", title: "Home", link: "/"},
-				{icon: "fa-search", title: "Search Lawyers", link: "/search-lawyers"},
+				...commonLinks,
 				{icon: "fa-table", title: "Admin Dashboard", link: "/admin-dashboard"},
 				// {icon: "fa-sign-out", title: "Sign out", link: "/sign-out"},
 			],
@@ -89,6 +91,15 @@ function pathCompare (link: string) {
 }
 </script>
 
+<style>
+.app-bar-title-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	width: 100%;
+}
+</style>
+
 <template>
 <v-layout>
 	<v-app-bar
@@ -105,7 +116,7 @@ function pathCompare (link: string) {
 		</template>
 
 		<v-app-bar-title>
-			<h3>Justice firm</h3>
+			<h3 class="app-bar-title-text">Justice firm</h3>
 		</v-app-bar-title>
 
 		<template v-slot:append>

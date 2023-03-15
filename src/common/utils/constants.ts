@@ -11,6 +11,13 @@ export const ValidPassword = Type.String({minLength: 8});
 export const ValidEmail    = Type.RegEx(emailRegex);
 export const ValidPhone    = Type.RegEx(phoneRegex);
 
+export const validImageMimeTypes: string[] = [
+	'image/jpeg',
+	'image/png',
+	'image/gif',
+];
+export const invalidImageMimeTypeMessage   = "Error: File must be a JPEG/JPG, PNG of GIF image";
+
 export function getCaseTypes (): CaseType[] {
 	return [
 		{id: "1", name: "Bankruptcy"},

@@ -3,6 +3,12 @@ import {isLeft} from "fp-ts/Either";
 import {AppointmentSparseData} from "../../common/api-schema";
 import {StatusEnum} from "../../common/db-types";
 import {assert, nn} from "../../common/utils/asserts";
+import {
+	invalidImageMimeTypeMessage,
+	maxDataUrlLen,
+	maxFileSize,
+	validImageMimeTypes
+} from "../../common/utils/constants";
 import {Nuly, Writeable} from "../../common/utils/types";
 import {UserStore_T} from "../store/userStore";
 import {justiceFirmApi} from "./api-fetcher-impl";
@@ -90,3 +96,16 @@ export function forceRipple ($el: HTMLElement) {
 	})
 }
 
+export async function validateDataUrlAsPhotoBrowserSide (dataUrl: string) {
+	if (dataUrl.length > maxDataUrlLen) {
+		alert(`The file must be less than ${maxFileSize} in size.`)
+	}
+	const response = await fetch(dataUrl);
+	const fileType = response.headers.get("Content-Type") ?? "text/plain";
+	if (fileType != null && validImageMimeTypes.includes(fileType)) {
+		return true;
+	} else {
+		alert(invalidImageMimeTypeMessage)
+	}
+	return false;
+}
