@@ -1,4 +1,12 @@
+import {
+	DeleteItemCommand,
+	DynamoDBClient,
+	PutItemCommand,
+	ReturnConsumedCapacity,
+	ReturnValue
+} from "@aws-sdk/client-dynamodb";
 import {S3Client} from "@aws-sdk/client-s3";
+import {SendEmailCommand, SESClient} from "@aws-sdk/client-ses";
 import {GetParameterCommand, SSMClient} from "@aws-sdk/client-ssm";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {compareSync, hash} from "bcryptjs";
@@ -17,7 +25,9 @@ import {
 	OpenAppointmentRequestInput,
 	RegisterClientInput,
 	RegisterLawyerInput,
+	ResetPasswordInput,
 	SearchLawyersInput,
+	SendPasswordResetOTPInput,
 	SessionLoginInput,
 	SetAppointmentStatusInput,
 	SetLawyerStatusesInput
@@ -25,7 +35,7 @@ import {
 import {AuthToken, ClientAuthToken, ConstrainedAuthToken, JWTHashedData, LawyerAuthToken} from "../common/api-types";
 import {StatusEnum, UserAccessType} from "../common/db-types";
 import {nn} from "../common/utils/asserts";
-import {invalidImageMimeTypeMessage, validImageMimeTypes} from "../common/utils/constants";
+import {invalidImageMimeTypeMessage, otpMaxNum, otpMinNum, validImageMimeTypes} from "../common/utils/constants";
 import {toNumIfNotNull} from "../common/utils/functions";
 import {Nuly} from "../common/utils/types";
 import {constants} from "../singularity/constants";
@@ -36,10 +46,18 @@ import {APIImplementation} from "../singularity/schema";
 import {saltRounds} from "./utils/constants";
 import {getMimeTypeFromUrlServerSide, uploadDataUrlToS3} from "./utils/functions";
 
-const region    = nn(process.env.AWS_REGION);
-const s3Bucket  = nn(process.env.S3_BUCKET);
-const ssmClient = new SSMClient({region});
-const s3Client  = new S3Client({region});
+const randomNumber = require("random-number-csprng");
+// import randomNumber from "random-number-csprng";
+
+const region                    = nn(process.env.AWS_REGION);
+const s3Bucket                  = nn(process.env.S3_BUCKET);
+const passwordResetOtpTableName = nn(process.env.PASSWORD_RESET_OTP_TABLE_NAME);
+const sesSourceEmailAddress     = nn(process.env.SES_SOURCE_EMAIL_ADDRESS);
+
+const ssmClient      = new SSMClient({region});
+const s3Client       = new S3Client({region});
+const dynamoDbClient = new DynamoDBClient({region});
+const sesClient      = new SESClient({region});
 
 function generateAuthTokenResponse<T extends UserAccessType> (
 	userId: number | bigint,
@@ -217,7 +235,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		const jwtSecret = await this.getJwtSecret();
 
 		const resSet: { id: number | bigint, passwordHash: string, type: UserAccessType, name: string }[] = await (await this.getPool()).execute(
-			"SELECT id, name, password_hash AS passwordHash, type FROM user WHERE user.email = ?;",
+			"SELECT id, name, password_hash AS passwordhash, type FROM user WHERE user.email = ?;",
 			[data.email]
 		);
 
@@ -251,7 +269,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 				        l.certification_link,
 				        ST_DISTANCE_SPHERE(POINT(l.latitude, l.longitude), POINT(?, ?)) AS distance
 				 FROM lawyer l
-				 JOIN user u
+				 JOIN user   u
 				      ON u.id = l.id
 				 WHERE l.status = 'confirmed'
 				   AND u.name LIKE ?
@@ -270,7 +288,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 				        l.longitude,
 				        l.certification_link
 				 FROM lawyer l
-				 JOIN user u
+				 JOIN user   u
 				      ON u.id = l.id
 				 WHERE l.status = 'confirmed'
 				   AND u.name LIKE ?
@@ -304,7 +322,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			        l.longitude,
 			        l.certification_link
 			 FROM lawyer l
-			 JOIN user u
+			 JOIN user   u
 			      ON u.id = l.id
 			 WHERE l.status = 'waiting'
 			 LIMIT 25;`);
@@ -328,7 +346,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			        l.longitude,
 			        l.certification_link
 			 FROM lawyer l
-			 JOIN user u
+			 JOIN user   u
 			      ON u.id = l.id
 			 WHERE l.status = 'confirmed'
 			   AND l.id = ?;`, [+data.id]);
@@ -343,7 +361,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 				`SELECT ct.id,
 				        ct.name
 				 FROM lawyer_specialization ls
-				 JOIN case_type ct
+				 JOIN case_type             ct
 				      ON ct.id = ls.case_type_id
 				 WHERE ls.lawyer_id = ?;`, [BigInt(lawyers.id)]);
 			lawyers.caseSpecializations      = res.map(value => ({
@@ -424,9 +442,9 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			              a.timestamp,
 			              a.opened_on
 			       FROM appointment a
-			       JOIN user c
+			       JOIN user        c
 			            ON c.id = a.client_id
-			       JOIN user l
+			       JOIN user        l
 			            ON l.id = a.lawyer_id
 			       WHERE c.id = ?
 				     AND a.status = ?`;
@@ -440,9 +458,9 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			              a.timestamp,
 			              a.opened_on
 			       FROM appointment a
-			       JOIN user c
+			       JOIN user        c
 			            ON c.id = a.client_id
-			       JOIN user l
+			       JOIN user        l
 			            ON l.id = a.lawyer_id
 			       WHERE l.id = ?
 				     AND a.status = ?`;
@@ -548,11 +566,11 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 				       ll.longitude          AS l_longitude,
 				       ll.certification_link AS l_certification_link
 				FROM appointment a
-				JOIN user c
+				JOIN user        c
 				     ON c.id = a.client_id
-				JOIN user lu
+				JOIN user        lu
 				     ON lu.id = a.lawyer_id
-				JOIN lawyer ll
+				JOIN lawyer      ll
 				     ON lu.id = ll.id
 				WHERE a.id = ?;`, [BigInt(data.id)]);
 
@@ -648,6 +666,86 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			}
 		}
 		return noContent;
+	}
+
+	async sendPasswordResetOTP (params: FnParams<SendPasswordResetOTPInput>):
+		Promise<EndpointResult<Message | Nuly>> {
+		return message(constants.HTTP_STATUS_NOT_IMPLEMENTED, "");
+// 		const email                         = params.body.email;
+// 		const result: Record<string, any>[] = await (await this.getPool()).execute(
+// 			"SELECT name FROM user WHERE email = ? LIMIT 1;",
+// 			[email]
+// 		);
+// 		if (result.length === 0) {
+// 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "That email has not been used to sign up a user");
+// 		}
+// 		const name = result[0].name;
+//
+// 		const now        = Date.now();
+// 		const otp        = await randomNumber(otpMinNum, otpMaxNum);
+// 		const putItemRes = await dynamoDbClient.send(new PutItemCommand({
+// 			TableName:              passwordResetOtpTableName,
+// 			Item:                   {
+// 				email:     {S: email}, // Primary
+// 				otp:       {S: otp.toString(10)}, // Sort
+// 				timestamp: {S: now.toString(10)},
+// 			},
+// 			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES
+// 		}));
+// 		console.log({ConsumedCapacity: putItemRes.ConsumedCapacity});
+// 		const emailContent     = `Hello ${name},
+// There was a request to change your password.
+// If you did not make this request then please ignore this email.
+// The OTP to reset the password is ${otp.toString(10)}
+//
+// Sincerely,
+// The Justice Firm Foundation`;
+// 		const emailContentHtml = emailContent.replace(/[\n\r]+/g, "<br/>");
+// 		const sendEmailRes     = await sesClient.send(new SendEmailCommand({
+// 			Source:      sesSourceEmailAddress,
+// 			Destination: {
+// 				ToAddresses: [email]
+// 			},
+// 			Message:     {
+// 				Subject: {
+// 					Charset: "UTF-8",
+// 					Data:    "Password Reset OTP"
+// 				},
+// 				Body:    {
+// 					Text: {
+// 						Charset: "UTF-8",
+// 						Data:    emailContent
+// 					},
+// 					Html: {
+// 						Charset: "UTF-8",
+// 						Data:    emailContentHtml
+// 					}
+// 				}
+// 			}
+// 		}));
+// 		console.log({sendEmailRes});
+// 		return noContent;
+	}
+
+	async resetPassword (params: FnParams<ResetPasswordInput>, event: APIGatewayProxyEvent):
+		Promise<EndpointResult<AuthToken | Message>> {
+		return message(constants.HTTP_STATUS_NOT_IMPLEMENTED, "");
+		// const data         = params.body;
+		// const res          = await dynamoDbClient.send(new DeleteItemCommand({
+		// 	TableName:              passwordResetOtpTableName,
+		// 	Key:                    {
+		// 		email: {S: data.email}, // Primary
+		// 		otp:   {S: data.otp}, // Sort
+		// 	},
+		// 	ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES,
+		// 	ReturnValues:           ReturnValue.ALL_OLD
+		// }));
+		// const timestampStr = res.Attributes?.timestamp.S;
+		// if (timestampStr == null) {
+		// 	return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid timestamp");
+		// }
+		// const timestamp = new Date(+timestampStr);
+		// return message(200, "");
 	}
 
 	// async test (params: FnParams<UnknownBody>, event: APIGatewayProxyEvent): Promise<EndpointResult<Message>> {

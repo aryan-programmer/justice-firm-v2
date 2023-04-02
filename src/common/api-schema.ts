@@ -5,7 +5,7 @@ import {HttpMethods} from "../singularity/httpMethods";
 import {modelSchema} from "../singularity/schema";
 import {AdminAuthToken, AuthToken, ClientAuthToken, LawyerAuthToken} from "./api-types";
 import {CaseType, Client, ID_T, Lawyer, StatusEnum, StatusEnum_T} from "./db-types";
-import {maxDataUrlLen, ValidEmail, ValidPassword} from "./utils/constants";
+import {maxDataUrlLen, ValidEmail, ValidOTP, ValidPassword} from "./utils/constants";
 import {ArrayOf, Optional} from "./utils/functions";
 import {Nuly, Number_T, OptionalBoolean_T, OptionalString_T, String_T} from "./utils/types";
 
@@ -147,6 +147,18 @@ export const SetAppointmentStatusInput = Type.Union([
 ], {$id: "SetAppointmentStatusInput"});
 export type SetAppointmentStatusInput = Static<typeof SetAppointmentStatusInput>;
 
+export const SendPasswordResetOTPInput = Type.Object({
+	email: ValidEmail
+}, {$id: "SendPasswordResetOTPInput"});
+export type SendPasswordResetOTPInput = Static<typeof SendPasswordResetOTPInput>;
+
+export const ResetPasswordInput = Type.Object({
+	email: ValidEmail,
+	password: ValidPassword,
+	otp: ValidOTP
+}, {$id: "ResetPasswordInput"});
+export type ResetPasswordInput = Static<typeof ResetPasswordInput>;
+
 export const justiceFirmApiSchema = modelSchema({
 	name:      "JusticeFirmApi",
 	endpoints: {
@@ -215,7 +227,19 @@ export const justiceFirmApiSchema = modelSchema({
 			path:                "/appointment/set/status",
 			requestBodyChecker:  lazyCheck(SetAppointmentStatusInput),
 			responseBodyChecker: lazyCheck(MessageOr(Nuly))
-		})
+		}),
+		sendPasswordResetOTP: endpoint({
+			method:              HttpMethods.POST,
+			path:                "/user/send-password-reset-otp",
+			requestBodyChecker:  lazyCheck(SendPasswordResetOTPInput),
+			responseBodyChecker: lazyCheck(MessageOr(Nuly))
+		}),
+		resetPassword: endpoint({
+			method:              HttpMethods.POST,
+			path:                "/user/reset-password",
+			requestBodyChecker:  lazyCheck(ResetPasswordInput),
+			responseBodyChecker: lazyCheck(MessageOr(AuthToken))
+		}),
 		// test:           endpoint({
 		// 	method:              HttpMethods.GET,
 		// 	path:                "/test",

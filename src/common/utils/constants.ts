@@ -4,12 +4,18 @@ import {CaseType} from "../db-types";
 export const badFileNameChars = /[^a-zA-Z0-9.]/g;
 export const emailRegex       = /^(([^<>()[\]\.,;:\s@\"]+(\.[^<>()[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$/i;
 export const phoneRegex       = /^[0-9]{3}([-\s]?)[0-9]{3}([-\s]?)[0-9]{4}$/;
+export const validOtpRegex    = /^[0-9]{6}$/g;
+export const otpLength        = 6;
 export const maxFileSize      = "2 MB";
 export const maxDataUrlLen    = 3100000; // A bit more than 2048 kb
 
-export const ValidPassword = Type.String({minLength: 8});
-export const ValidEmail    = Type.RegEx(emailRegex);
-export const ValidPhone    = Type.RegEx(phoneRegex);
+export const otpMinNum = +("1" + "0".repeat(otpLength - 1));
+export const otpMaxNum = +("9".repeat(otpLength));
+
+export const ValidPassword = Type.String({minLength: 8, $id: "ValidPassword"});
+export const ValidEmail    = Type.RegEx(emailRegex, {$id: "ValidEmail"});
+export const ValidPhone    = Type.RegEx(phoneRegex, {$id: "ValidPhone"});
+export const ValidOTP      = Type.RegEx(validOtpRegex, {$id: "ValidOTP"});
 
 export const validImageMimeTypes: string[] = [
 	'image/jpeg',

@@ -23,7 +23,7 @@ const password = useField('password');
 const userStore = useUserStore();
 
 const textFields = [
-	{field: email, label: "Email", type: "text"},
+	{field: email, label: "Email", type: "email"},
 	{field: password, label: "Password", type: "password"},
 ];
 
@@ -82,6 +82,10 @@ const onSubmit = handleSubmit(async values => {
 							value="y"
 							color="orange-lighten-2">Sign in
 						</v-btn>
+						<NuxtLink
+							class="d-block"
+							href="/password-reset/send-otp">Forgot your password? Reset it here.
+						</NuxtLink>
 					</div>
 				</v-card-text>
 			</v-card>
