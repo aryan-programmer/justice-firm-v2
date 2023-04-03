@@ -39,7 +39,7 @@ const onSubmit = handleSubmit(async values => {
 		},
 	});
 	console.log(res);
-	if (isLeft(res) || res.right.body == null) {
+	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		alert("Failed to sign in")
 		return;
 	}

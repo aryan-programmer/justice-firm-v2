@@ -47,6 +47,7 @@ const userDeps    = computed(() => {
 			links: [
 				{icon: "fa-gavel", title: "Home", link: "/"},
 				{icon: "fa-calendar-days", title: "Appointments", link: "/lawyer-appointments"},
+				{icon: "fa-briefcase", title: "Cases", link: "/lawyer-cases"},
 				// {icon: "fa-sign-out", title: "Sign out", link: "/sign-out"},
 			],
 			color: "gradient--flying-lemon",
@@ -59,7 +60,8 @@ const userDeps    = computed(() => {
 				{icon: "fa-user", title: "Home", link: "/"},
 				...commonLinks,
 				{icon: "fa-calendar-days", title: "Appointments", link: "/client-appointments"},
-				// {icon: "fa-sign-out", title: "Sign out", link: "/sign-out"},
+				{icon: "fa-briefcase", title: "Cases", link: "/client-cases"},
+// {icon: "fa-sign-out", title: "Sign out", link: "/sign-out"},
 			],
 			color: "gradient--perfect-white",
 			theme: "light",

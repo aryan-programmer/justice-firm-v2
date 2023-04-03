@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import {definePageMeta, navigateTo} from "#imports";
-import {isLeft} from "fp-ts/Either";
 import {useField, useForm} from 'vee-validate';
 import * as yup from "yup";
 import {useUserStore} from "../../store/userStore";
-import {justiceFirmApi} from "../../utils/api-fetcher-impl";
 
 definePageMeta({
 	middleware: "no-user-page"
@@ -17,7 +15,7 @@ const {handleSubmit, errors} = useForm({
 	validationSchema: validationSchema,
 });
 
-const email    = useField('email');
+const email = useField('email');
 
 const userStore = useUserStore();
 
@@ -38,7 +36,7 @@ const onSubmit = handleSubmit(async values => {
 	// }
 	alert(`Sent password reset OTP successfully`);
 	await navigateTo({
-		path: "/password-reset/set-new-password",
+		path:  "/password-reset/set-new-password",
 		query: {
 			email: email.value.value?.toString(),
 		}

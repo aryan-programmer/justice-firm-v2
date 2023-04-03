@@ -3,6 +3,7 @@ import {library} from '@fortawesome/fontawesome-svg-core'
 import {faSquare as farSquare} from "@fortawesome/free-regular-svg-icons";
 import {
 	faBars,
+	faBriefcase,
 	faBugSlash,
 	faCalendarDays,
 	faCaretDown,
@@ -78,7 +79,8 @@ library.add(
 	faClose,
 	faXmark,
 	faCircle,
-	faQuestion
+	faQuestion,
+	faBriefcase
 );
 // import * as components from 'vuetify/components'
 // import * as directives from 'vuetify/directives'

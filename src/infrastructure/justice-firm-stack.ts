@@ -1,6 +1,6 @@
 import {
 	aws_apigateway as apiGateway,
-	aws_dynamodb, aws_ses, aws_ses_actions,
+	aws_dynamodb,
 	aws_ssm as ssm,
 	CfnOutput,
 	Duration,
@@ -115,8 +115,8 @@ export class JusticeFirmStack extends Stack {
 		passwordResetOtpTable.grantReadWriteData(lambda);
 		lambda.addToRolePolicy(
 			new PolicyStatement({
-				effect: Effect.ALLOW,
-				actions: [
+				effect:    Effect.ALLOW,
+				actions:   [
 					'ses:SendEmail',
 					'ses:SendRawEmail',
 					'ses:SendTemplatedEmail',

@@ -2,6 +2,7 @@ import {Static, Type} from "@sinclair/typebox";
 import {ValidEmail, ValidPhone} from "./utils/constants";
 
 export const ID_T = Type.String({$id: "ID_T"});
+export type ID_T = string;
 
 export const CaseType = Type.Object({
 	id:   ID_T,
@@ -23,6 +24,14 @@ export enum StatusEnum {
 }
 
 export const StatusEnum_T = Type.Enum(StatusEnum, {$id: "StatusEnum"})
+
+export enum CaseStatusEnum {
+	Waiting = 'waiting',
+	Open    = 'open',
+	Closed  = 'closed'
+}
+
+export const CaseStatusEnum_T = Type.Enum(CaseStatusEnum, {$id: "CaseStatusEnum"})
 
 export const User = Type.Object({
 	id:           ID_T,

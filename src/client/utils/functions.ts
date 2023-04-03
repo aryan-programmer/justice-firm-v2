@@ -68,6 +68,29 @@ export async function fetchAppointmentsIntoRefByUserType (
 	appointmentsRef.value = res.right.body;
 }
 
+
+export async function fetchCasesIntoRef (
+	casesRef: Ref<AppointmentSparseData[] | Nuly>,
+	userStore: UserStore_T,
+) {
+	const res = await justiceFirmApi.getCasesData({
+		body: {
+			authToken: nn(userStore.authToken)
+		}
+	});
+	if (isLeft(res) || !res.right.ok || res.right.body == null) {
+		console.log(res);
+		alert(`Failed to get cases`);
+		return;
+	}
+	if ("message" in res.right.body) {
+		console.log(res);
+		alert(`Failed to get cases: ${res.right.body.message}`);
+		return;
+	}
+	casesRef.value = res.right.body;
+}
+
 export async function fetchAppointmentsByCategory (
 	waitingAppointments: Ref<AppointmentSparseData[] | Nuly>,
 	rejectedAppointments: Ref<AppointmentSparseData[] | Nuly>,

@@ -1,6 +1,12 @@
+export type SelectItemKey =
+	| boolean
+	| string
+	| (string | number)[]
+	| ((item: Record<string, any>, fallback?: any) => any);
+
 export type DataTableHeader<TObject> = {
 	key: keyof TObject
-	value?: string
+	value?: SelectItemKey
 	title: string
 	colspan?: number
 	rowspan?: number

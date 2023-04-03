@@ -4,7 +4,7 @@ import {lazyCheck, MessageOr} from "../singularity/helpers";
 import {HttpMethods} from "../singularity/httpMethods";
 import {modelSchema} from "../singularity/schema";
 import {AdminAuthToken, AuthToken, ClientAuthToken, LawyerAuthToken} from "./api-types";
-import {CaseType, Client, ID_T, Lawyer, StatusEnum, StatusEnum_T} from "./db-types";
+import {CaseStatusEnum_T, CaseType, Client, ID_T, Lawyer, StatusEnum, StatusEnum_T} from "./db-types";
 import {maxDataUrlLen, ValidEmail, ValidOTP, ValidPassword} from "./utils/constants";
 import {ArrayOf, Optional} from "./utils/functions";
 import {Nuly, Number_T, OptionalBoolean_T, OptionalString_T, String_T} from "./utils/types";
@@ -110,11 +110,11 @@ export const SetLawyerStatusesInput = Type.Object({
 }, {$id: "SetLawyerStatusesInput"});
 export type SetLawyerStatusesInput = Static<typeof SetLawyerStatusesInput>;
 
-export const GetAppointmentByIdInput = Type.Object({
+export const GetByIdInput = Type.Object({
 	authToken: AuthToken,
 	id:        ID_T,
-}, {$id: "GetAppointmentByIdInput"});
-export type GetAppointmentByIdInput = Static<typeof GetAppointmentByIdInput>;
+}, {$id: "GetByIdInput"});
+export type GetByIdInput = Static<typeof GetByIdInput>;
 
 const ClientDataResult = Type.Omit(Client, ["type", "passwordHash"], {$id: "ClientDataResult"});
 export type ClientDataResult = Omit<Client, "type" | "passwordHash">;
@@ -147,94 +147,150 @@ export const SetAppointmentStatusInput = Type.Union([
 ], {$id: "SetAppointmentStatusInput"});
 export type SetAppointmentStatusInput = Static<typeof SetAppointmentStatusInput>;
 
+export const UpgradeAppointmentToCaseInput = Type.Object({
+	authToken:     LawyerAuthToken,
+	appointmentId: ID_T,
+	description:   OptionalString_T,
+	type:          ID_T,
+	status:        Optional(CaseStatusEnum_T),
+}, {$id: "UpgradeAppointmentToCaseInput"});
+export type UpgradeAppointmentToCaseInput = Static<typeof UpgradeAppointmentToCaseInput>;
+
+export const CaseFullData = Type.Object({
+	id:          ID_T,
+	client:      ClientDataResult,
+	lawyer:      LawyerSearchResult,
+	caseType:    CaseType,
+	groupId:     ID_T,
+	description: String_T,
+	openedOn:    String_T,
+	status:      CaseStatusEnum_T,
+}, {$id: "CaseFullData"});
+export type CaseFullData = Static<typeof CaseFullData>;
+
+export const GetCasesDataInput = Type.Object({
+	authToken: AuthToken,
+}, {$id: "GetCasesDataInput"});
+export type GetCasesDataInput = Static<typeof GetCasesDataInput>;
+
+export const CaseSparseData = Type.Object({
+	id:          ID_T,
+	othId:       ID_T,
+	othName:     String_T,
+	caseType:    CaseType,
+	groupId:     ID_T,
+	description: String_T,
+	openedOn:    String_T,
+	status:      CaseStatusEnum_T,
+}, {$id: "CaseSparseData"});
+export type CaseSparseData = Static<typeof CaseSparseData>;
+
 export const SendPasswordResetOTPInput = Type.Object({
 	email: ValidEmail
 }, {$id: "SendPasswordResetOTPInput"});
 export type SendPasswordResetOTPInput = Static<typeof SendPasswordResetOTPInput>;
 
 export const ResetPasswordInput = Type.Object({
-	email: ValidEmail,
+	email:    ValidEmail,
 	password: ValidPassword,
-	otp: ValidOTP
+	otp:      ValidOTP
 }, {$id: "ResetPasswordInput"});
 export type ResetPasswordInput = Static<typeof ResetPasswordInput>;
 
 export const justiceFirmApiSchema = modelSchema({
 	name:      "JusticeFirmApi",
 	endpoints: {
-		registerLawyer:         endpoint({
+		registerLawyer:           endpoint({
 			method:              HttpMethods.POST,
 			path:                "/user/lawyer",
 			requestBodyChecker:  lazyCheck(RegisterLawyerInput),
 			responseBodyChecker: lazyCheck(MessageOr(LawyerAuthToken)),
 		}),
-		registerClient:         endpoint({
+		registerClient:           endpoint({
 			method:              HttpMethods.POST,
 			path:                "/user/client",
 			requestBodyChecker:  lazyCheck(RegisterClientInput),
 			responseBodyChecker: lazyCheck(MessageOr(ClientAuthToken)),
 		}),
-		sessionLogin:           endpoint({
+		sessionLogin:             endpoint({
 			method:              HttpMethods.POST,
 			path:                "/session",
 			requestBodyChecker:  lazyCheck(SessionLoginInput),
 			responseBodyChecker: lazyCheck(MessageOrAuthToken),
 		}),
-		searchLawyers:          endpoint({
+		searchLawyers:            endpoint({
 			method:              HttpMethods.POST,
 			path:                "/user/lawyer/search",
 			requestBodyChecker:  lazyCheck(SearchLawyersInput),
 			responseBodyChecker: lazyCheck(LawyerSearchResults),
 		}),
-		getWaitingLawyers:      endpoint({
+		getWaitingLawyers:        endpoint({
 			method:              HttpMethods.POST,
 			path:                "/user/lawyer/waiting",
 			requestBodyChecker:  lazyCheck(GetWaitingLawyersInput),
 			responseBodyChecker: lazyCheck(MessageOr(LawyerSearchResults))
 		}),
-		getLawyer:              endpoint({
+		getLawyer:                endpoint({
 			method:              HttpMethods.POST,
 			path:                "/user/lawyer/get",
 			requestBodyChecker:  lazyCheck(GetLawyerInput),
 			responseBodyChecker: lazyCheck(Optional(LawyerSearchResult)),
 		}),
-		setLawyerStatuses:      endpoint({
+		setLawyerStatuses:        endpoint({
 			method:              HttpMethods.POST,
 			path:                "/user/lawyer/set-status",
 			requestBodyChecker:  lazyCheck(SetLawyerStatusesInput),
 			responseBodyChecker: lazyCheck(MessageOr(Nuly)),
 		}),
-		openAppointmentRequest: endpoint({
+		openAppointmentRequest:   endpoint({
 			method:              HttpMethods.POST,
 			path:                "/appointment/new",
 			requestBodyChecker:  lazyCheck(OpenAppointmentRequestInput),
 			responseBodyChecker: lazyCheck(MessageOr(Nuly)),
 		}),
-		getAppointments:        endpoint({
+		getAppointments:          endpoint({
 			method:              HttpMethods.POST,
 			path:                "/appointment/get/by-status",
 			requestBodyChecker:  lazyCheck(GetAppointmentsInput),
 			responseBodyChecker: lazyCheck(MessageOr(ArrayOf(AppointmentSparseData)))
 		}),
-		getAppointmentRequest:  endpoint({
+		getAppointmentRequest:    endpoint({
 			method:              HttpMethods.POST,
 			path:                "/appointment/get/by-id",
-			requestBodyChecker:  lazyCheck(GetAppointmentByIdInput),
+			requestBodyChecker:  lazyCheck(GetByIdInput),
 			responseBodyChecker: lazyCheck(MessageOr(Optional(AppointmentFullData)))
 		}),
-		setAppointmentStatus:   endpoint({
+		setAppointmentStatus:     endpoint({
 			method:              HttpMethods.POST,
 			path:                "/appointment/set/status",
 			requestBodyChecker:  lazyCheck(SetAppointmentStatusInput),
 			responseBodyChecker: lazyCheck(MessageOr(Nuly))
 		}),
-		sendPasswordResetOTP: endpoint({
+		upgradeAppointmentToCase: endpoint({
+			method:              HttpMethods.POST,
+			path:                "/appointment/upgrade-to-case",
+			requestBodyChecker:  lazyCheck(UpgradeAppointmentToCaseInput),
+			responseBodyChecker: lazyCheck(MessageOr(ID_T))
+		}),
+		getCasesData:             endpoint({
+			method:              HttpMethods.POST,
+			path:                "/cases/get",
+			requestBodyChecker:  lazyCheck(GetCasesDataInput),
+			responseBodyChecker: lazyCheck(MessageOr(ArrayOf(CaseSparseData)))
+		}),
+		getCase:                  endpoint({
+			method:              HttpMethods.POST,
+			path:                "/case/get/by-id",
+			requestBodyChecker:  lazyCheck(GetByIdInput),
+			responseBodyChecker: lazyCheck(MessageOr(CaseFullData))
+		}),
+		sendPasswordResetOTP:     endpoint({
 			method:              HttpMethods.POST,
 			path:                "/user/send-password-reset-otp",
 			requestBodyChecker:  lazyCheck(SendPasswordResetOTPInput),
 			responseBodyChecker: lazyCheck(MessageOr(Nuly))
 		}),
-		resetPassword: endpoint({
+		resetPassword:            endpoint({
 			method:              HttpMethods.POST,
 			path:                "/user/reset-password",
 			requestBodyChecker:  lazyCheck(ResetPasswordInput),

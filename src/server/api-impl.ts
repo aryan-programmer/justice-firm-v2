@@ -1,23 +1,19 @@
-import {
-	DeleteItemCommand,
-	DynamoDBClient,
-	PutItemCommand,
-	ReturnConsumedCapacity,
-	ReturnValue
-} from "@aws-sdk/client-dynamodb";
+import {DynamoDBClient} from "@aws-sdk/client-dynamodb";
 import {S3Client} from "@aws-sdk/client-s3";
-import {SendEmailCommand, SESClient} from "@aws-sdk/client-ses";
+import {SESClient} from "@aws-sdk/client-ses";
 import {GetParameterCommand, SSMClient} from "@aws-sdk/client-ssm";
-import {APIGatewayProxyEvent} from "aws-lambda";
 import {compareSync, hash} from "bcryptjs";
 import {sign, verify} from "jsonwebtoken";
 import {createPool, Pool, UpsertResult} from "mariadb";
 import {
 	AppointmentFullData,
 	AppointmentSparseData,
+	CaseFullData,
+	CaseSparseData,
 	ClientDataResult,
-	GetAppointmentByIdInput,
 	GetAppointmentsInput,
+	GetByIdInput,
+	GetCasesDataInput,
 	GetLawyerInput,
 	GetWaitingLawyersInput,
 	justiceFirmApiSchema,
@@ -30,13 +26,14 @@ import {
 	SendPasswordResetOTPInput,
 	SessionLoginInput,
 	SetAppointmentStatusInput,
-	SetLawyerStatusesInput
+	SetLawyerStatusesInput,
+	UpgradeAppointmentToCaseInput
 } from "../common/api-schema";
 import {AuthToken, ClientAuthToken, ConstrainedAuthToken, JWTHashedData, LawyerAuthToken} from "../common/api-types";
-import {StatusEnum, UserAccessType} from "../common/db-types";
+import {CaseStatusEnum, ID_T, StatusEnum, UserAccessType} from "../common/db-types";
 import {nn} from "../common/utils/asserts";
-import {invalidImageMimeTypeMessage, otpMaxNum, otpMinNum, validImageMimeTypes} from "../common/utils/constants";
-import {toNumIfNotNull} from "../common/utils/functions";
+import {invalidImageMimeTypeMessage, validImageMimeTypes} from "../common/utils/constants";
+import {nullOrEmpty, nullOrEmptyCoalesce, toNumIfNotNull} from "../common/utils/functions";
 import {Nuly} from "../common/utils/types";
 import {constants} from "../singularity/constants";
 import {EndpointResult, FnParams} from "../singularity/endpoint";
@@ -106,7 +103,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 	private pool: Pool | Nuly        = null;
 	private jwtSecret: string | Nuly = null;
 
-	async registerLawyer (params: FnParams<RegisterLawyerInput>, event: APIGatewayProxyEvent):
+	async registerLawyer (params: FnParams<RegisterLawyerInput>):
 		Promise<EndpointResult<LawyerAuthToken | Message>> {
 		const data: RegisterLawyerInput = params.body;
 
@@ -179,7 +176,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		}
 	}
 
-	async registerClient (params: FnParams<RegisterClientInput>, event: APIGatewayProxyEvent):
+	async registerClient (params: FnParams<RegisterClientInput>):
 		Promise<EndpointResult<ClientAuthToken | Message>> {
 		const data: RegisterClientInput = params.body;
 
@@ -228,28 +225,29 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		}
 	}
 
-	async sessionLogin (params: FnParams<SessionLoginInput>, event: APIGatewayProxyEvent):
+	async sessionLogin (params: FnParams<SessionLoginInput>):
 		Promise<EndpointResult<AuthToken | Message>> {
 		const data: SessionLoginInput = params.body;
 
 		const jwtSecret = await this.getJwtSecret();
 
-		const resSet: { id: number | bigint, passwordHash: string, type: UserAccessType, name: string }[] = await (await this.getPool()).execute(
-			"SELECT id, name, password_hash AS passwordhash, type FROM user WHERE user.email = ?;",
+		const resSet: { id: number | bigint, password_hash: string, type: UserAccessType, name: string }[] = await (await this.getPool()).execute(
+			"SELECT id, name, password_hash, type FROM user WHERE user.email = ?;",
 			[data.email]
 		);
 
 		if (resSet.length === 0) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Email not used to sign up a user");
 		}
-		const {passwordHash, id, type, name} = resSet[0];
+		const {password_hash: passwordHash, id, type, name} = resSet[0];
+		console.log(resSet);
 		if (!compareSync(data.password, passwordHash.toString())) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid password");
 		}
 		return generateAuthTokenResponse(id, type, jwtSecret, name.toString());
 	}
 
-	async searchLawyers (params: FnParams<SearchLawyersInput>, event: APIGatewayProxyEvent):
+	async searchLawyers (params: FnParams<SearchLawyersInput>):
 		Promise<EndpointResult<LawyerSearchResult[]>> {
 		const data    = params.body;
 		const name    = `%${data.name ?? ""}%`;
@@ -301,7 +299,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		return response(200, lawyers);
 	}
 
-	async getWaitingLawyers (params: FnParams<GetWaitingLawyersInput>, event: APIGatewayProxyEvent):
+	async getWaitingLawyers (params: FnParams<GetWaitingLawyersInput>):
 		Promise<EndpointResult<LawyerSearchResult[] | Message>> {
 		const data      = params.body;
 		const jwtSecret = await this.getJwtSecret();
@@ -330,7 +328,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		return response(200, lawyers);
 	}
 
-	async getLawyer (params: FnParams<GetLawyerInput>, event: APIGatewayProxyEvent):
+	async getLawyer (params: FnParams<GetLawyerInput>):
 		Promise<EndpointResult<LawyerSearchResult | Nuly>> {
 		const data = params.body;
 
@@ -348,8 +346,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 			 FROM lawyer l
 			 JOIN user   u
 			      ON u.id = l.id
-			 WHERE l.status = 'confirmed'
-			   AND l.id = ?;`, [+data.id]);
+			 WHERE l.id = ?;`, [+data.id]);
 
 		if (res.length === 0) {
 			return response(404, null);
@@ -372,7 +369,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		return response(200, lawyers);
 	}
 
-	async openAppointmentRequest (params: FnParams<OpenAppointmentRequestInput>, event: APIGatewayProxyEvent):
+	async openAppointmentRequest (params: FnParams<OpenAppointmentRequestInput>):
 		Promise<EndpointResult<Nuly | Message>> {
 		const data: OpenAppointmentRequestInput = params.body;
 
@@ -421,7 +418,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		}
 	}
 
-	async getAppointments (params: FnParams<GetAppointmentsInput>, event: APIGatewayProxyEvent):
+	async getAppointments (params: FnParams<GetAppointmentsInput>):
 		Promise<EndpointResult<AppointmentSparseData[] | Message>> {
 		const data      = params.body;
 		const jwtSecret = await this.getJwtSecret();
@@ -485,7 +482,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		}));
 	}
 
-	async setLawyerStatuses (params: FnParams<SetLawyerStatusesInput>, event: APIGatewayProxyEvent):
+	async setLawyerStatuses (params: FnParams<SetLawyerStatusesInput>):
 		Promise<EndpointResult<Message | Nuly>> {
 		const data      = params.body;
 		const jwtSecret = await this.getJwtSecret();
@@ -532,7 +529,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		}
 	}
 
-	async getAppointmentRequest (params: FnParams<GetAppointmentByIdInput>):
+	async getAppointmentRequest (params: FnParams<GetByIdInput>):
 		Promise<EndpointResult<Message | AppointmentFullData | Nuly>> {
 		const data      = params.body;
 		const jwtSecret = await this.getJwtSecret();
@@ -575,31 +572,11 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 				WHERE a.id = ?;`, [BigInt(data.id)]);
 
 		if (res.length === 0) {
-			return response(404, null);
+			return message(404, "No such appointment found");
 		}
 
-		const value                      = res[0];
-		const lawyer: LawyerSearchResult = {
-			id:                value.l_id.toString(),
-			name:              value.l_name.toString(),
-			email:             value.l_email.toString(),
-			phone:             value.l_phone.toString(),
-			address:           value.l_address.toString(),
-			photoPath:         value.l_photo_path.toString(),
-			latitude:          Number(value.l_latitude),
-			longitude:         Number(value.l_longitude),
-			certificationLink: value.l_certification_link.toString(),
-			status:            StatusEnum.Confirmed,
-			distance:          undefined,
-		} as LawyerSearchResult;
-		const client: ClientDataResult   = {
-			id:        value.c_id.toString(),
-			name:      value.c_name.toString(),
-			email:     value.c_email.toString(),
-			phone:     value.c_phone.toString(),
-			address:   value.c_address.toString(),
-			photoPath: value.c_photo_path.toString(),
-		} as ClientDataResult;
+		const value            = res[0];
+		const {lawyer, client} = this.extractAndParseLawyerAndClientData(value);
 		if (lawyer.id !== jwt.id && client.id !== jwt.id) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				`User id ${jwt.id} is not allowed access the details of appointment ${data.id}`);
@@ -727,7 +704,7 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 // 		return noContent;
 	}
 
-	async resetPassword (params: FnParams<ResetPasswordInput>, event: APIGatewayProxyEvent):
+	async resetPassword (params: FnParams<ResetPasswordInput>):
 		Promise<EndpointResult<AuthToken | Message>> {
 		return message(constants.HTTP_STATUS_NOT_IMPLEMENTED, "");
 		// const data         = params.body;
@@ -748,7 +725,252 @@ export class JusticeFirmAPIImpl implements APIImplementation<typeof justiceFirmA
 		// return message(200, "");
 	}
 
-	// async test (params: FnParams<UnknownBody>, event: APIGatewayProxyEvent): Promise<EndpointResult<Message>> {
+	async upgradeAppointmentToCase (params: FnParams<UpgradeAppointmentToCaseInput>):
+		Promise<EndpointResult<ID_T | Message>> {
+		const data      = params.body;
+		const jwtSecret = await this.getJwtSecret();
+		const jwt       = verifyAndDecodeJwtToken(data.authToken.jwt, jwtSecret);
+		if (jwt == null || jwt.userType !== UserAccessType.Lawyer) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Auth token must be that of a lawyer");
+		}
+
+		const res: Record<string, any>[] = await (await this.getPool()).execute(
+			`
+				SELECT a.id          AS a_id,
+				       a.lawyer_id   AS l_id,
+				       a.client_id   AS c_id,
+				       a.group_id    AS a_group_id,
+				       a.case_id     AS a_case_id,
+				       a.description AS a_description
+				FROM appointment a
+				WHERE a.id = ?;`, [BigInt(data.appointmentId)]);
+
+		if (res.length === 0) {
+			return message(404, "No such appointment found");
+		}
+
+		const value    = res[0];
+		const lawyerId = value.l_id.toString();
+		const clientId = value.c_id.toString();
+
+		const appointmentData: Pick<AppointmentFullData, "id" | "description" | "caseId" | "groupId"> = {
+			id:          value.a_id.toString(),
+			description: value.a_description.toString(),
+			caseId:      value.a_case_id?.toString(),
+			groupId:     value.a_group_id.toString(),
+			// timestamp:   value.a_timestamp?.toString(),
+			// openedOn:    value.a_opened_on.toString(),
+			// status:      value.a_status.toString(),
+		};
+
+		if (jwt.id !== lawyerId) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED,
+				"You are not authorized to promote this appointment to a case.");
+		}
+
+		if (!nullOrEmpty(appointmentData.caseId)) {
+			return message(constants.HTTP_STATUS_BAD_REQUEST,
+				"This appointment has already been promoted to a case.");
+		}
+
+		const caseDesc = nullOrEmptyCoalesce(data.description, appointmentData.description);
+		const status   = data.status ?? CaseStatusEnum.Open;
+
+		console.log("Now: ", new Date().toString());
+
+		const conn = await this.getConnection();
+
+		try {
+			await conn.beginTransaction();
+
+			const caseInsertRes: UpsertResult = await conn.execute(
+				"INSERT INTO `case` (client_id, lawyer_id, type_id, group_id, description, status) VALUES (?,?,?,?,?,?);",
+				[clientId, lawyerId, data.type, appointmentData.groupId, caseDesc, status]
+			);
+
+			console.log({clientId, lawyerId, type: data.type, groupId: appointmentData.groupId, caseDesc, status});
+
+			console.log({caseInsertRes});
+
+			const caseId = nn(caseInsertRes.insertId);
+
+			const groupUpdateRes = await conn.execute(
+				"UPDATE `group` SET case_id = ? WHERE id = ?",
+				[caseId, appointmentData.groupId]
+			);
+
+			console.log({groupUpdateRes});
+
+			const appointmentUpdateRes = await conn.execute(
+				"UPDATE appointment SET case_id = ? WHERE id = ?",
+				[caseId, appointmentData.id]
+			);
+
+			console.log({appointmentUpdateRes});
+
+			await conn.commit();
+
+			return response(200, caseId.toString());
+		} catch (e) {
+			await conn.rollback();
+			throw e;
+		} finally {
+			await conn.release();
+		}
+	}
+
+	async getCasesData (params: FnParams<GetCasesDataInput>):
+		Promise<EndpointResult<CaseSparseData[] | Message>> {
+		const data      = params.body;
+		const jwtSecret = await this.getJwtSecret();
+		const jwt       = verifyAndDecodeJwtToken(data.authToken.jwt, jwtSecret);
+		if (jwt.userType === UserAccessType.Admin) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED,
+				"To open an appointment request the user must be authenticated as a client.");
+		}
+
+		let sql: string;
+		if (jwt.userType === UserAccessType.Client) {
+			sql = `SELECT s.id,
+			              l.id    AS oth_id,
+			              l.name  AS oth_name,
+			              s.description,
+			              s.type_id,
+			              ct.name AS type_name,
+			              s.group_id,
+			              s.opened_on,
+			              s.status
+			       FROM \`case\`  s
+			       JOIN user      l ON l.id = s.lawyer_id
+			       JOIN case_type ct ON ct.id = s.type_id
+			       WHERE s.client_id = ?
+			       ORDER BY s.opened_on;`;
+		} else {
+			sql = `SELECT s.id,
+			              c.id    AS oth_id,
+			              c.name  AS oth_name,
+			              s.description,
+			              s.type_id,
+			              ct.name AS type_name,
+			              s.group_id,
+			              s.opened_on,
+			              s.status
+			       FROM \`case\`  s
+			       JOIN user      c ON c.id = s.client_id
+			       JOIN case_type ct ON ct.id = s.type_id
+			       WHERE s.lawyer_id = ?
+			       ORDER BY s.opened_on;`;
+		}
+		const res: Record<string, any>[] = await (await this.getPool()).execute(sql, [jwt.id]);
+		return response(200, res.map(value => {
+			return {
+				id:          value.id.toString(),
+				othId:       value.oth_id.toString(),
+				othName:     value.oth_name.toString(),
+				description: value.description.toString(),
+				groupId:     value.group_id.toString(),
+				openedOn:    value.opened_on.toString(),
+				status:      value.status.toString(),
+				caseType:    {
+					id:   value.type_id.toString(),
+					name: value.type_name.toString(),
+				}
+			} as CaseSparseData;
+		}));
+	}
+
+	async getCase (params: FnParams<GetByIdInput>):
+		Promise<EndpointResult<Message | CaseFullData>> {
+		const data      = params.body;
+		const jwtSecret = await this.getJwtSecret();
+		const jwt       = verifyAndDecodeJwtToken(data.authToken.jwt, jwtSecret);
+		if (jwt == null) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid auth token");
+		}
+
+		const res: Record<string, any>[] = await (await this.getPool()).execute(
+			`
+				SELECT s.id                  AS s_id,
+				       s.group_id            AS s_group_id,
+				       s.type_id             AS s_type_id,
+				       ct.name               AS s_type_name,
+				       s.description         AS s_description,
+				       s.opened_on           AS s_opened_on,
+				       s.status              AS s_status,
+				       c.id                  AS c_id,
+				       c.name                AS c_name,
+				       c.email               AS c_email,
+				       c.phone               AS c_phone,
+				       c.address             AS c_address,
+				       c.photo_path          AS c_photo_path,
+				       lu.id                 AS l_id,
+				       lu.name               AS l_name,
+				       lu.email              AS l_email,
+				       lu.phone              AS l_phone,
+				       lu.address            AS l_address,
+				       lu.photo_path         AS l_photo_path,
+				       ll.latitude           AS l_latitude,
+				       ll.longitude          AS l_longitude,
+				       ll.certification_link AS l_certification_link
+				FROM \`case\`  s
+				JOIN user      c ON c.id = s.client_id
+				JOIN user      lu ON lu.id = s.lawyer_id
+				JOIN lawyer    ll ON lu.id = ll.id
+				JOIN case_type ct ON s.type_id = ct.id
+				WHERE s.id = ?;`, [BigInt(data.id)]);
+
+		if (res.length === 0) {
+			return message(404, "No such case found");
+		}
+
+		const value            = res[0];
+		const {lawyer, client} = this.extractAndParseLawyerAndClientData(value);
+		if (lawyer.id !== jwt.id && client.id !== jwt.id) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED,
+				`User id ${jwt.id} is not allowed access the details of case ${data.id}`);
+		}
+		const caseFullData: CaseFullData = {
+			id:          value.s_id.toString(),
+			description: value.s_description.toString(),
+			caseType:    {
+				id:   value.s_type_id.toString(),
+				name: value.s_type_name.toString(),
+			},
+			groupId:     value.s_group_id.toString(),
+			openedOn:    value.s_opened_on.toString(),
+			status:      value.s_status.toString(),
+			client,
+			lawyer,
+		};
+		return response(200, caseFullData);
+	}
+
+	private extractAndParseLawyerAndClientData (value: Record<string, any>) {
+		const lawyer: LawyerSearchResult = {
+			id:                value.l_id.toString(),
+			name:              value.l_name.toString(),
+			email:             value.l_email.toString(),
+			phone:             value.l_phone.toString(),
+			address:           value.l_address.toString(),
+			photoPath:         value.l_photo_path.toString(),
+			latitude:          Number(value.l_latitude),
+			longitude:         Number(value.l_longitude),
+			certificationLink: value.l_certification_link.toString(),
+			status:            StatusEnum.Confirmed,
+			distance:          undefined,
+		} as LawyerSearchResult;
+		const client: ClientDataResult   = {
+			id:        value.c_id.toString(),
+			name:      value.c_name.toString(),
+			email:     value.c_email.toString(),
+			phone:     value.c_phone.toString(),
+			address:   value.c_address.toString(),
+			photoPath: value.c_photo_path.toString(),
+		} as ClientDataResult;
+		return {lawyer, client};
+	}
+
+// async test (params: FnParams<UnknownBody>): Promise<EndpointResult<Message>> {
 	// 	return message(200, {
 	// 		msg: "Test successful"
 	// 		// env: process.env,

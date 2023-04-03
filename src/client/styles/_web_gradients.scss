@@ -22,12 +22,12 @@
 //			(linear-gradient(to top, #fad0c4 0%, #fad0c4 1%, #ffd1ff 100%)),
 //);
 //
-//// 004 Juicy Peach
-//@include gradient_defs.define-gradient(
-//		gradient--juicy-peach,
-//		#fed3ba,
-//			(linear-gradient(to right, #ffecd2 0%, #fcb69f 100%)),
-//);
+// 004 Juicy Peach
+@include gradient_defs.define-gradient(
+		gradient--juicy-peach,
+		#fed3ba,
+			(linear-gradient(to right, #ffecd2 0%, #fcb69f 100%)),
+);
 //
 //// 005 Young Passion
 //@include gradient_defs.define-gradient(
@@ -603,12 +603,12 @@
 //			(linear-gradient(-20deg, #6e45e2 0%, #88d3ce 100%)),
 //);
 //
-//// 087 Alchemist Lab
-//@include gradient_defs.define-gradient(
-//		gradient--alchemist-lab,
-//		#99a1af,
-//			(linear-gradient(-20deg, #d558c8 0%, #24d292 100%)),
-//);
+// 087 Alchemist Lab
+@include gradient_defs.define-gradient(
+		gradient--alchemist-lab,
+		#99a1af,
+			(linear-gradient(-20deg, #d558c8 0%, #24d292 100%)),
+);
 //
 //// 088 Over Sun
 //@include gradient_defs.define-gradient(

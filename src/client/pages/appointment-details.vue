@@ -6,8 +6,9 @@ import {AppointmentFullData, SetAppointmentStatusInput} from "../../common/api-s
 import {LawyerAuthToken} from "../../common/api-types";
 import {StatusEnum, UserAccessType} from "../../common/db-types";
 import {nn} from "../../common/utils/asserts";
-import {dateStringFormat, firstIfArray} from "../../common/utils/functions";
+import {dateStringFormat, firstIfArray, nullOrEmpty} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
+import CaseUpgradeDialog from "../components/CaseUpgradeDialog.vue";
 import ClientCard from "../components/ClientCard.vue";
 import LawyerCard from "../components/LawyerCard.vue";
 import {useUserStore} from "../store/userStore";
@@ -23,6 +24,21 @@ const appointment         = ref<AppointmentFullData | Nuly>(null);
 const rejectDialogOpen    = ref<boolean>(false);
 const confirmDialogOpen   = ref<boolean>(false);
 const appointmentDateTime = ref("");
+
+const showingAppointmentConfirmRejectButtons = computed(() =>
+	userStore.authToken?.userType === UserAccessType.Lawyer &&
+	appointment.value?.status === StatusEnum.Waiting
+);
+const showingUpgradeAppointmentButton        = computed(() =>
+	userStore.authToken?.userType === UserAccessType.Lawyer &&
+	appointment.value?.status === StatusEnum.Confirmed &&
+	nullOrEmpty(appointment.value?.caseId)
+);
+const showViewCaseButton                     = computed(() => !nullOrEmpty(appointment.value?.caseId));
+const shouldShowCardActions                  = computed(() =>
+	(showingAppointmentConfirmRejectButtons.value || showingUpgradeAppointmentButton.value || showViewCaseButton.value)
+);
+
 
 const showSetAppointmentTimestamp = computed(() => appointment.value?.timestamp == null || appointment.value.timestamp === "")
 const appointmentDateTimeValid    = computed(() => {
@@ -96,7 +112,7 @@ async function commonSendRes (params: SetAppointmentStatusInput, mode: string) {
 <template>
 <v-card v-if="appointment!=null" color="gradient--perfect-white" class="elevation-3">
 	<v-card-title>
-		<h4>Appointment details</h4>
+		<h3>Appointment details</h3>
 	</v-card-title>
 	<v-card-text>
 		<v-row>
@@ -146,104 +162,120 @@ Description:
 			<v-chip class="fw-bold" color="red-darken-2" variant="tonal">Rejected</v-chip>
 		</p>
 	</v-card-text>
-	<v-card-actions v-if="userStore.authToken?.userType === UserAccessType.Lawyer && appointment.status === StatusEnum.Waiting">
-		<v-dialog
-			v-model="confirmDialogOpen"
-			width="auto"
-		>
-			<template v-slot:activator="{ props }">
-			<v-btn
-				variant="elevated"
-				elevation="3"
-				color="green-lighten-2"
-				rounded="pill"
-				v-bind="props"
+	<v-card-actions v-if="shouldShowCardActions">
+		<div v-if="showingAppointmentConfirmRejectButtons">
+			<v-dialog
+				v-model="confirmDialogOpen"
+				width="auto"
 			>
-				Confirm
-			</v-btn>
-			</template>
-			<v-card color="gradient--deep-light-blue" class="pa-3" rounded="lg">
-				<v-card-title class="text-h5">
-					Confirm appointment
-				</v-card-title>
-				<v-card-text>
+				<template v-slot:activator="{ props }">
+				<v-btn
+					variant="elevated"
+					elevation="3"
+					color="green-lighten-2"
+					rounded="pill"
+					v-bind="props"
+				>
+					Confirm
+				</v-btn>
+				</template>
+				<v-card color="gradient--deep-light-blue" class="pa-3" rounded="lg">
+					<v-card-title class="text-h5">
+						Confirm appointment
+					</v-card-title>
+					<v-card-text>
 					<span v-if="!showSetAppointmentTimestamp">
 						Are you sure you want to confirm this appointment?
 					</span>
-					<div v-else>
-						<p>Set appointment timestamp to confirm</p>
-						<v-text-field
-							hide-details
-							v-model="appointmentDateTime"
-							label="Appointment timestamp"
-							density="comfortable"
-							type="datetime-local"
-							required
-						/>
-					</div>
-				</v-card-text>
-				<v-card-actions>
-					<v-btn
-						color="green-darken-1"
-						:elevation="appointmentDateTimeValid ? 3 : 0"
-						:variant="appointmentDateTimeValid ? 'elevated' : 'tonal'"
-						rounded="pill"
-						:disabled="!appointmentDateTimeValid"
-						@click="confirmAppointment"
-					>
-						Confirm
-					</v-btn>
-					<v-btn
-						color="red-darken-3"
-						variant="tonal"
-						rounded="pill"
-						@click="confirmDialogOpen = false"
-					>
-						Close
-					</v-btn>
-				</v-card-actions>
-			</v-card>
-		</v-dialog>
-		<v-dialog
-			v-model="rejectDialogOpen"
-			width="auto"
-		>
-			<template v-slot:activator="{ props }">
-			<v-btn
-				variant="tonal"
-				color="red-darken-2"
-				rounded="pill"
-				v-bind="props"
+						<div v-else>
+							<p>Set appointment timestamp to confirm</p>
+							<v-text-field
+								hide-details
+								v-model="appointmentDateTime"
+								label="Appointment timestamp"
+								density="comfortable"
+								type="datetime-local"
+								required
+							/>
+						</div>
+					</v-card-text>
+					<v-card-actions>
+						<v-btn
+							color="green-darken-1"
+							:elevation="appointmentDateTimeValid ? 3 : 0"
+							:variant="appointmentDateTimeValid ? 'elevated' : 'tonal'"
+							rounded="pill"
+							:disabled="!appointmentDateTimeValid"
+							@click="confirmAppointment"
+						>
+							Confirm
+						</v-btn>
+						<v-btn
+							color="red-darken-3"
+							variant="tonal"
+							rounded="pill"
+							@click="confirmDialogOpen = false"
+						>
+							Close
+						</v-btn>
+					</v-card-actions>
+				</v-card>
+			</v-dialog>
+			<v-dialog
+				v-model="rejectDialogOpen"
+				width="auto"
 			>
-				Reject
-			</v-btn>
-			</template>
-			<v-card color="gradient--amy-crisp" class="pa-3" rounded="lg">
-				<v-card-title class="text-h5">
-					Reject appointment
-				</v-card-title>
-				<v-card-text>Are you sure you want to reject this appointment?</v-card-text>
-				<v-card-actions>
-					<v-btn
-						color="amber-darken-1"
-						elevation="3"
-						variant="elevated"
-						rounded="pill"
-						@click="rejectAppointment"
-					>
-						Yes, I do want to reject
-					</v-btn>
-					<v-btn
-						color="cyan-darken-4"
-						variant="tonal"
-						rounded="pill"
-						@click="rejectDialogOpen = false"
-					>
-						No, I do not want to reject.
-					</v-btn>
-				</v-card-actions>
-			</v-card>
-		</v-dialog>
+				<template v-slot:activator="{ props }">
+				<v-btn
+					variant="tonal"
+					color="red-darken-2"
+					rounded="pill"
+					v-bind="props"
+				>
+					Reject
+				</v-btn>
+				</template>
+				<v-card color="gradient--amy-crisp" class="pa-3" rounded="lg">
+					<v-card-title class="text-h5">
+						Reject appointment
+					</v-card-title>
+					<v-card-text>Are you sure you want to reject this appointment?</v-card-text>
+					<v-card-actions>
+						<v-btn
+							color="amber-darken-1"
+							elevation="3"
+							variant="elevated"
+							rounded="pill"
+							@click="rejectAppointment"
+						>
+							Yes, I do want to reject
+						</v-btn>
+						<v-btn
+							color="cyan-darken-4"
+							variant="tonal"
+							rounded="pill"
+							@click="rejectDialogOpen = false"
+						>
+							No, I do not want to reject.
+						</v-btn>
+					</v-card-actions>
+				</v-card>
+			</v-dialog>
+		</div>
+		<div v-else-if="showingUpgradeAppointmentButton">
+			<CaseUpgradeDialog
+				:appointment-id="appointment.id"
+				:default-description="appointment.description" />
+		</div>
+		<v-btn
+			v-if="showViewCaseButton"
+			:to="`/case-details?id=${appointment.caseId}`"
+			color="teal-lighten-3"
+			density="default"
+			elevation="2"
+			rounded
+			variant="elevated">View Case
+		</v-btn>
 	</v-card-actions>
 </v-card>
 </template>

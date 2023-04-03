@@ -12,10 +12,18 @@ import {GeolocationNotAvailableError} from "./errors";
 import {memoizeWeak} from "./memoizeWeak";
 import {Nuly} from "./types";
 
-export function trimStr (s: string, wordCount: number = 50): string {
-	const words = s.split(" ");
+export function nullOrEmpty (s: string | Nuly) {
+	return s == null || s.length === 0;
+}
+
+export function nullOrEmptyCoalesce<T> (s: string | Nuly, s2: T) {
+	return nullOrEmpty(s) ? s2 : s;
+}
+
+export function trimStr (s: string, wordCount: number = 13): string {
+	const words = s.split(/([^A-Za-z0-9]+)/g);
 	if (words.length > wordCount)
-		return words.slice(0, wordCount).join(" ") + "...";
+		return words.slice(0, wordCount).join("") + "...";
 	else return s;
 }
 
