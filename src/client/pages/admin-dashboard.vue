@@ -19,9 +19,7 @@ onMounted(fetchLawyers);
 
 async function fetchLawyers () {
 	const res = await justiceFirmApi.getWaitingLawyers({
-		body: {
-			authToken: nn(userStore.authToken) as AdminAuthToken
-		}
+		authToken: nn(userStore.authToken) as AdminAuthToken
 	});
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		console.log(res);
@@ -42,7 +40,7 @@ async function fetchLawyers () {
 <AdminDashboardForm
 	:waiting-lawyers="waitingLawyers"
 	@apply-success="fetchLawyers"
-	v-if="waitingLawyers!==null && waitingLawyers.length>0"
+	v-if="waitingLawyers!=null && waitingLawyers.length>0"
 />
 <v-card v-else text="No waiting lawyers found" class="bg-gradient--gagarin-view" />
 </template>

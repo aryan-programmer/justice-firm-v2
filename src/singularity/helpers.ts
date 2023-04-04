@@ -8,13 +8,7 @@ import memoizeWeakOrig from "memoizee/weak";
 import {memoizeWeak} from "../common/utils/memoizeWeak";
 import {Nuly} from "../common/utils/types";
 import {constants} from "./constants";
-import {
-	EndpointPathDefinition,
-	EndpointPathDefinitionWithPathParams,
-	EndpointResult,
-	PathParametersSchema,
-	PathParamSchema
-} from "./endpoint";
+import {EndpointResult} from "./endpoint";
 import {CheckerErrors, CheckerErrorsOrNully, CheckerFunction, Parser, TypeCheckError} from "./types";
 
 // region ...CheckerFunction
@@ -48,7 +42,6 @@ export function typeCheckErrorsFromValueErrors (errors: IterableIterator<ValueEr
 }
 
 export const memoizedCompiler = memoizeWeak(function memoizedCompiler<T extends Types.TSchema> (schema: T, references?: Types.TSchema[]): TypeCheck<T> {
-	// console.log("memoizedCompiler: ",{schema, references});
 	return TypeCompiler.Compile(schema, references);
 });
 
@@ -65,7 +58,6 @@ class LazyChecker<T extends Types.TSchema> implements CheckerFunction<Types.Stat
 }
 
 export function lazyCheck<T extends Types.TSchema> (schema: T, references?: Types.TSchema[]): CheckerFunction<Types.Static<T>> {
-	// console.log("lazyCheck: ",{schema, references});
 	return new LazyChecker(schema, references);
 }
 
@@ -164,42 +156,6 @@ export function optionalParser<T> (parser: Parser<T>, nullString = "null"): Pars
 }
 
 // endregion Parser
-
-// region ...PathParams
-export function pathParams<TPathParams extends PathParametersSchema> (pathSegments: TemplateStringsArray, ...v: TPathParams): EndpointPathDefinitionWithPathParams<TPathParams> {
-	return {
-		pathSegments: [...pathSegments],
-		pathParams:   v,
-	}
-}
-
-export namespace pathParams {
-	export function parse<T> (name: string, parser: Parser<T>): PathParamSchema<T> {
-		return {name, parser};
-	}
-
-	export function string (name: string): PathParamSchema<string> {
-		return {name, parser: stringParser};
-	}
-
-	export function constrainedNumber (name: string, ...args: Parameters<typeof constrainedNumberParser>): PathParamSchema<number> {
-		return {name, parser: constrainedNumberParser(...args)};
-	}
-
-	export function number (name: string): PathParamSchema<number> {
-		return {name, parser: numberParser};
-	}
-}
-
-export function pathSchemaToString (val: string): string;
-export function pathSchemaToString<TPathParams extends PathParametersSchema> (val: EndpointPathDefinitionWithPathParams<TPathParams>): string;
-export function pathSchemaToString (val: EndpointPathDefinition<PathParametersSchema | null | undefined>): string
-export function pathSchemaToString (val: string | EndpointPathDefinitionWithPathParams): string {
-	if (typeof val === "string") return val;
-	return String.raw({raw: val.pathSegments}, ...val.pathParams.map(param => `{${param.name}}`));
-}
-
-// endregion PathParams
 
 export const Message = Type.Object({
 	message: Type.Any()

@@ -59,10 +59,8 @@ async function fetchAppointment (value: LocationQuery) {
 	}
 	console.log({id});
 	const res = await justiceFirmApi.getAppointmentRequest({
-		body: {
-			authToken: nn(userStore.authToken),
-			id,
-		}
+		authToken: nn(userStore.authToken),
+		id,
 	});
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
@@ -98,7 +96,7 @@ async function rejectAppointment () {
 }
 
 async function commonSendRes (params: SetAppointmentStatusInput, mode: string) {
-	const res = await justiceFirmApi.setAppointmentStatus({body: params});
+	const res = await justiceFirmApi.setAppointmentStatus(params);
 	if (isLeft(res) || !res.right.ok || (res.right.body != null && "message" in res.right.body)) {
 		console.log(res);
 		alert(`Failed to ${mode} appointment`);

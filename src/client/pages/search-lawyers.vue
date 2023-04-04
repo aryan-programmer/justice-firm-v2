@@ -52,9 +52,7 @@ async function setFromQuery (query: Record<string, LocationQueryValue | Location
 		longitude: longitude_,
 	};
 	console.log(body, query);
-	const resP: Promise<ModelResponseOrErr<LawyerSearchResult[]>> = justiceFirmApi.searchLawyers({
-		body: body
-	});
+	const resP: Promise<ModelResponseOrErr<LawyerSearchResult[]>> = justiceFirmApi.searchLawyers(body);
 
 	const res = await resP;
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {

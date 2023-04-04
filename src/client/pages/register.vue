@@ -70,16 +70,14 @@ const onSubmit = handleSubmit(async values => {
 		return;
 	}
 	const res = await justiceFirmApi.registerClient({
-		body: {
-			name:     values.name,
-			email:    values.email,
-			password: values.password,
-			photoData,
-			address:  values.address,
-			phone:    values.phone,
-		},
+		name:     values.name,
+		email:    values.email,
+		password: values.password,
+		photoData,
+		address:  values.address,
+		phone:    values.phone,
 	});
-	if (isLeft(res) || !res.right.ok || res.right.body == null) {
+	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
 		alert("Failed to sign up.")
 		return;

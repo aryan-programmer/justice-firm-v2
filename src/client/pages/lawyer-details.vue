@@ -19,10 +19,8 @@ watch(() => route.query.id, async value => {
 	}
 
 	const resP: Promise<ModelResponseOrErr<LawyerSearchResult | Nuly>> = justiceFirmApi.getLawyer({
-		body: {
-			id:                     id,
-			getCaseSpecializations: true,
-		}
+		id:                     id,
+		getCaseSpecializations: true,
 	});
 
 	const res = await resP;

@@ -49,11 +49,9 @@ export async function fetchAppointmentsIntoRefByUserType (
 	userStore: UserStore_T,
 ) {
 	const res = await justiceFirmApi.getAppointments({
-		body: {
-			withStatus: status,
-			orderByOpenedOn,
-			authToken:  nn(userStore.authToken)
-		}
+		withStatus: status,
+		orderByOpenedOn,
+		authToken:  nn(userStore.authToken)
 	});
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		console.log(res);
@@ -74,9 +72,7 @@ export async function fetchCasesIntoRef (
 	userStore: UserStore_T,
 ) {
 	const res = await justiceFirmApi.getCasesData({
-		body: {
-			authToken: nn(userStore.authToken)
-		}
+		authToken: nn(userStore.authToken)
 	});
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		console.log(res);

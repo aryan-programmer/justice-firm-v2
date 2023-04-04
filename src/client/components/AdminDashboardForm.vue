@@ -46,11 +46,9 @@ async function onApply () {
 	}
 	console.log({confirmed, rejected});
 	const res = await justiceFirmApi.setLawyerStatuses({
-		body: {
-			authToken: nn(userStore.authToken) as AdminAuthToken,
-			rejected,
-			confirmed
-		}
+		authToken: nn(userStore.authToken) as AdminAuthToken,
+		rejected,
+		confirmed
 	});
 	if (isLeft(res) || !res.right.ok || (res.right.body != null && "message" in res.right.body)) {
 		console.log(res);

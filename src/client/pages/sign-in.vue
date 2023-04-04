@@ -33,10 +33,8 @@ const onSubmit = handleSubmit(async values => {
 		return;
 	}
 	const res = await justiceFirmApi.sessionLogin({
-		body: {
-			email:    values.email,
-			password: values.password,
-		},
+		email:    values.email,
+		password: values.password,
 	});
 	console.log(res);
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {

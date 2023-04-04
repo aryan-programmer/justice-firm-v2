@@ -116,20 +116,18 @@ const onSubmit = form.handleSubmit(async values => {
 		}
 	}
 	const res = await justiceFirmApi.registerLawyer({
-		body: {
-			name:              values.name,
-			email:             values.email,
-			password:          values.password,
-			photoData,
-			address:           values.address,
-			phone:             values.phone,
-			certificationData: certificateData,
-			latitude:          +values.latitude,
-			longitude:         +values.longitude,
-			specializationTypes,
-		},
+		name:              values.name,
+		email:             values.email,
+		password:          values.password,
+		photoData,
+		address:           values.address,
+		phone:             values.phone,
+		certificationData: certificateData,
+		latitude:          +values.latitude,
+		longitude:         +values.longitude,
+		specializationTypes,
 	});
-	if (isLeft(res) || !res.right.ok || res.right.body == null) {
+	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
 		alert("Failed to sign up.")
 		return;

@@ -30,10 +30,8 @@ async function fetchCase (value: LocationQuery) {
 	}
 	console.log({id});
 	const res = await justiceFirmApi.getCase({
-		body: {
-			authToken: nn(userStore.authToken),
-			id,
-		}
+		authToken: nn(userStore.authToken),
+		id,
 	});
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);

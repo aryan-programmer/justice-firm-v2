@@ -1,15 +1,12 @@
 import {APIGatewayProxyEvent, APIGatewayProxyResult} from "aws-lambda";
-import {APIEndpoints, EndpointFnParamsFromRaw, EndpointSchema, PromiseOrEndpointResult} from "./endpoint";
+import {APIEndpoints, FnParams, EndpointSchema, PromiseOrEndpointResult} from "./endpoint";
 import {HttpMethods} from "./httpMethods";
 import {CheckerErrorsOrNully} from "./types";
 
 export type APIImplementation<TSchema> = TSchema extends APIModelSchema<infer T> ? {
-	[K in keyof T]: T[K] extends EndpointSchema<infer TQueryParameters,
-		                     infer TReqBody,
-		                     infer TPath,
-		                     infer TResBody> ?
-	                (params: EndpointFnParamsFromRaw<TReqBody, TQueryParameters, TPath>, event: APIGatewayProxyEvent) => PromiseOrEndpointResult<TResBody>
-	                                         : never;
+	[K in keyof T]: T[K] extends EndpointSchema<infer TReqBody, infer TResBody> ?
+	                (params: FnParams<TReqBody>, event: APIGatewayProxyEvent) => PromiseOrEndpointResult<TResBody>
+	                                                                            : never;
 } : never;
 
 //*
@@ -20,19 +17,13 @@ export type APIModelValidators<TSchema> =
 			true extends true
 				//*/
 	? {
-		[K in keyof T]: T[K] extends EndpointSchema<infer TQueryParameters,
-			                     infer TReqBody,
-			                     infer TPath,
-			                     infer TResBody> ?
-		                (params: any, out: { errors: CheckerErrorsOrNully }) => params is EndpointFnParamsFromRaw<TReqBody, TQueryParameters, TPath>
+		[K in keyof T]: T[K] extends EndpointSchema<infer TReqBody, infer TResBody> ?
+		                (params: any, out: { errors: CheckerErrorsOrNully }) => params is FnParams<TReqBody>
 		                                         : never;
 	} : never;
 
 export type APIAwsLambdaWrapper<TSchema> = TSchema extends APIModelSchema<infer T> ? {
-	[K in keyof T]: T[K] extends EndpointSchema<infer TQueryParameters,
-		                     infer TReqBody,
-		                     infer TPath,
-		                     infer TResBody> ?
+	[K in keyof T]: T[K] extends EndpointSchema<infer TReqBody, infer TResBody> ?
 	                (event: APIGatewayProxyEvent) => Promise<APIGatewayProxyResult>
 	                                         : never;
 } : never;

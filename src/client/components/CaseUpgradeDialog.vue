@@ -35,9 +35,7 @@ async function upgradeAppointmentToCase () {
 	};
 	console.log(body);
 	// return;
-	const res = await justiceFirmApi.upgradeAppointmentToCase({
-		body: body
-	});
+	const res = await justiceFirmApi.upgradeAppointmentToCase(body);
 	if (isLeft(res) || !res.right.ok || (res.right.body == null || typeof res.right.body != "string")) {
 		console.log(res);
 		alert(`Failed to upgrade appointment to a case`);

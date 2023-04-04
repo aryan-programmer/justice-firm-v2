@@ -14,10 +14,10 @@ import {Effect, PolicyStatement} from "aws-cdk-lib/aws-iam";
 import {Code, Function, FunctionProps, Runtime} from "aws-cdk-lib/aws-lambda";
 import {Bucket, BucketAccessControl, BucketEncryption, HttpMethods} from "aws-cdk-lib/aws-s3";
 import {Construct} from 'constructs';
-import {mapValues} from "lodash";
+import mapValues from "lodash/mapValues";
 import 'reflect-metadata';
 import {justiceFirmApiSchema} from "../common/api-schema";
-import {pathSchemaToString} from "../singularity/helpers";
+import {EndpointSchema} from "../singularity/endpoint";
 import {ApiGatewayResourceMap} from "./api-gateway-resource-map";
 
 const path = require("path");
@@ -130,10 +130,8 @@ export class JusticeFirmStack extends Stack {
 		const lambdaIntegration = new apiGateway.LambdaIntegration(lambda);
 		const resourceMap       = new ApiGatewayResourceMap(api.root);
 
-		mapValues(justiceFirmApiSchema.endpoints, (value, _key) => {
-			const apiPath  = pathSchemaToString(value.path);
-			const resource = resourceMap.getFromPath(apiPath);
-			resource.addMethod(value.method, lambdaIntegration);
+		mapValues(justiceFirmApiSchema.endpoints, <TReq, TRes>(value: EndpointSchema<TReq, TRes>) => {
+			resourceMap.getFromPath(value.path).addMethod(value.method, lambdaIntegration);
 		});
 	}
 }

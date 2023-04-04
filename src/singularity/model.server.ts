@@ -3,15 +3,7 @@ import {isLeft, isRight} from "fp-ts/lib/Either";
 import mapValues from "lodash/mapValues";
 import {assert} from "../common/utils/asserts";
 import {constants} from "./constants";
-import {
-	APIEndpoints,
-	Endpoint,
-	EndpointPathDefinition,
-	FnParams,
-	PathParametersSchema,
-	QueryParametersSchema
-} from "./endpoint";
-import {pathSchemaToString} from "./helpers";
+import {APIEndpoints, Endpoint, FnParams,} from "./endpoint";
 import {APIAwsFunnelWrapper, APIAwsLambdaWrapper, APIImplementation, APIModelSchema} from "./schema";
 import {TypeCheckError} from "./types";
 
@@ -45,13 +37,7 @@ function awsWrapGetter<TEndpoints extends APIEndpoints = APIEndpoints> (
 	options?: { validateOutputs: boolean }
 ) {
 	const {validateOutputs = true} = options ?? {};
-	return function awsWrap<TQueryParameters extends QueryParametersSchema,
-		TReqBody,
-		TPath extends EndpointPathDefinition<PathParametersSchema | null | undefined>,
-		TResBody> (
-		endpoint: Endpoint<TQueryParameters, TReqBody, TPath, TResBody>,
-		key: string
-	) {
+	return function awsWrap<TReqBody, TResBody> (endpoint: Endpoint<TReqBody, TResBody>, key: string) {
 		return async function transformerFunction (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
 			return transformer(await baseFunction(event));
 		}
@@ -59,24 +45,12 @@ function awsWrapGetter<TEndpoints extends APIEndpoints = APIEndpoints> (
 		async function baseFunction (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
 			try {
 				let body               = event.body == null ? null : JSON.parse(event.body);
-				let queryParamsOrError = endpoint.parseQueryParams(event.queryStringParameters);
-				let pathParamsOrError  = endpoint.parsePathParams(event.pathParameters);
 				let errors             = endpoint.checkBody(body);
-				if (isLeft(pathParamsOrError)) {
-					(errors ??= []).push(...pathParamsOrError.left);
-				}
-				if (isLeft(queryParamsOrError)) {
-					(errors ??= []).push(...queryParamsOrError.left);
-				}
 				if (errors != null && errors.length !== 0) {
 					return errorsToResponse(errors);
 				}
-				assert(isRight(pathParamsOrError));
-				assert(isRight(queryParamsOrError));
-				let params: FnParams<any, any, any> = {
+				let params: FnParams<any> = {
 					body,
-					queryParams: queryParamsOrError.right,
-					pathParams:  pathParamsOrError.right
 				};
 
 				const origRes = await impl[key](params, event);
@@ -118,7 +92,7 @@ export function awsLambdaFunnelWrapper<TEndpoints extends APIEndpoints = APIEndp
 	const awsWrap = awsWrapGetter(impl, options);
 	const res     = {} as APIAwsFunnelWrapper;
 	for (const [key, endpoint] of Object.entries(modelSchema.endpoints)) {
-		(res[pathSchemaToString(endpoint.path)] ??= {})[endpoint.method] = awsWrap(endpoint, key);
+		(res[endpoint.path] ??= {})[endpoint.method] = awsWrap(endpoint, key);
 	}
 	return res;
 }

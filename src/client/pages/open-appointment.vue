@@ -30,11 +30,7 @@ watch(() => route.query.id, async value => {
 		return;
 	}
 
-	const resP: Promise<ModelResponseOrErr<LawyerSearchResult | Nuly>> = justiceFirmApi.getLawyer({
-		body: {
-			id: id
-		}
-	});
+	const resP: Promise<ModelResponseOrErr<LawyerSearchResult | Nuly>> = justiceFirmApi.getLawyer({id});
 
 	const res = await resP;
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
@@ -62,12 +58,10 @@ async function handleSubmit () {
 	                  undefined;
 
 	const res = await justiceFirmApi.openAppointmentRequest({
-		body: {
-			authToken:   authToken as ClientAuthToken,
-			lawyerId:    lawyerVal.id,
-			description: description.value,
-			timestamp
-		}
+		authToken:   authToken as ClientAuthToken,
+		lawyerId:    lawyerVal.id,
+		description: description.value,
+		timestamp
 	});
 	if (isLeft(res) || !res.right.ok) {
 		console.log(res);

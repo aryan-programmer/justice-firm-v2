@@ -1,9 +1,12 @@
+import {checker} from 'vite-plugin-checker';
 import vuetify from 'vite-plugin-vuetify';
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 // @ts-ignore
 export default defineNuxtConfig({
-	srcDir: "./src/client",
-	nitro: {
+// @ts-ignore
+	srcDir:  "./src/client",
+	nitro:   {
 		preset: "netlify"
 	},
 	modules: [
@@ -19,9 +22,26 @@ export default defineNuxtConfig({
 			})
 		}
 	],
-	css: ["~/styles/main.scss"],
-	build: {
+	vite:         {
+		ssr:     {
+			noExternal: ['vuetify'],
+		},
+		css:     {
+			preprocessorOptions: {
+				scss: {
+					additionalData: `@use './src/client/styles/settings.scss' as *;`,
+				},
+			},
+		},
+		plugins: [
+			checker({
+				vueTsc: true,
+			}),
+		]
+	},
+	css:          ["~/styles/main.scss"],
+	build:        {
 		transpile: ['vuetify'],
 	},
-	ssr: false,
+	ssr:          false,
 })
