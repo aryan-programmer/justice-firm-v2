@@ -134,3 +134,4 @@ cdk.out
 scratch.ts
 scratch.sql
 /server-build-metafile.json
+/.output/

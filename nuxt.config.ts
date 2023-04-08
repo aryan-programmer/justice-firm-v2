@@ -22,7 +22,7 @@ export default defineNuxtConfig({
 			})
 		}
 	],
-	vite:         {
+	vite:    {
 		ssr:     {
 			noExternal: ['vuetify'],
 		},
@@ -39,9 +39,9 @@ export default defineNuxtConfig({
 			}),
 		]
 	},
-	css:          ["~/styles/main.scss"],
-	build:        {
-		transpile: ['vuetify'],
+	css:     ["~/styles/main.scss"],
+	build:   {
+		transpile:   ['vuetify'],
 	},
-	ssr:          false,
+	ssr:     false,
 })

@@ -246,7 +246,7 @@ onMounted(() => {
 					variant="elevated"
 					value="y"
 					color="orange-lighten-2"
-					:disabled="!isEmpty(errors)">Register
+					:disabled="!isEmpty(form.errors)">Register
 				</v-btn>
 				<v-btn
 					rounded
