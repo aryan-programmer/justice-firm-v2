@@ -2,7 +2,8 @@
 import {
 	ChatWSAPIClient,
 	computed,
-	definePageMeta, navigateTo,
+	definePageMeta,
+	navigateTo,
 	nextTick,
 	onBeforeUnmount,
 	reactive,
@@ -19,7 +20,7 @@ import {nn} from "../../common/utils/asserts";
 import {firstIfArray, isNullOrEmpty} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import {EstablishConnectionOutput, MessageData, PostMessageInput} from "../../common/ws-api-schema";
-import ChatMessageBox from "../components/ChatMessageBox.vue";
+import ChatMessagesList from "../components/ChatMessagesList.vue";
 import {useUserStore} from "../store/userStore";
 
 definePageMeta({
@@ -168,15 +169,13 @@ async function openConnection (value: LocationQuery) {
 		<v-card
 			v-if="chatClient!=null && chatData!=null"
 			color="gradient--wide-matrix"
-			class="elevation-3 chat-group-card pa-2 v-col v-col-12 v-col-sm-6"
+			class="elevation-3 chat-group-card pa-2 v-col v-col-12 v-col-sm-8"
 		>
 			<v-card-title class="py-2 border-b-sm text-white" style="border-block-end-color: white !important;">
 				<span class="h4">{{ chatData.name }}</span>
 			</v-card-title>
 			<v-card-text class="h-100 pb-0 pt-0 flex-grow-1 scroll-y" ref="scrollingBox">
-				<div class="d-flex flex-column">
-					<ChatMessageBox :message="message" v-for="message in messages.messages" />
-				</div>
+				<ChatMessagesList :messages="messages.messages" />
 			</v-card-text>
 			<v-card-actions
 				class="border-t-sm pa-0 d-flex flex-row"

@@ -51,6 +51,28 @@ export function dateFormat (d: Date | Nuly): string | Nuly {
 	});
 }
 
+export function timeFormat (d: Date | Nuly): string | Nuly {
+	return d?.toLocaleTimeString(undefined, {
+		hour:   "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+	});
+}
+
+export function getDateTimeHeader (d: Date) {
+	const res = d.toLocaleDateString(undefined, {
+		day:     "numeric",
+		weekday: "long",
+		month:   "long",
+		year:    "numeric",
+	});
+	if ((new Date(d)).setHours(0, 0, 0, 0) === new Date().setHours(0, 0, 0, 0)) {
+		return "(Today) " + res;
+	} else {
+		return res;
+	}
+}
+
 export function compareDates (a: Date | Nuly, b: Date | Nuly) {
 	if (a == null && b == null) return 0;
 	if (a == null) return -1;
@@ -113,4 +135,11 @@ export async function getCurrentPosition (options?: PositionOptions) {
 			reject(new GeolocationNotAvailableError());
 		}
 	})
+}
+
+export function getDayFromMs (ms: number) {
+	const seconds = (ms / 1000) | 0;
+	const minutes = (seconds / 60) | 0;
+	const hours   = (minutes / 60) | 0;
+	return (hours / 24) | 0;
 }

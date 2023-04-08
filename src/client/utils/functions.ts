@@ -9,9 +9,12 @@ import {
 	maxFileSize,
 	validImageMimeTypes
 } from "../../common/utils/constants";
+import {timeFormat} from "../../common/utils/functions";
 import {Nuly, Writeable} from "../../common/utils/types";
+import {MessageData} from "../../common/ws-api-schema";
 import {UserStore_T} from "../store/userStore";
 import {justiceFirmApi} from "./api-fetcher-impl";
+import {MessageDataDisplayable} from "./types";
 
 export class FileReaderEventError extends Error {
 	public readonly event: ProgressEvent<FileReader>;
@@ -128,4 +131,25 @@ export async function validateDataUrlAsPhotoBrowserSide (dataUrl: string) {
 		alert(invalidImageMimeTypeMessage)
 	}
 	return false;
+}
+
+export function messageDataToDisplayable (
+	messages: MessageData[],
+	userStore: UserStore_T
+): MessageDataDisplayable[] {
+	const myId = userStore.authToken?.id;
+	const res = messages.map((msg, i) => {
+		const prev = messages[i - 1];
+		const next = messages[i + 1];
+		return {
+			...msg,
+			tsInt: +msg.ts,
+			first:      prev == null || prev.from !== msg.from,
+			last:       next == null || next.from !== msg.from,
+			isMe:       msg.from === myId,
+			timeString: timeFormat(new Date(+msg.ts))!
+		}
+	});
+	res.sort((a, b) => a.tsInt - b.tsInt);
+	return res;
 }

@@ -1,3 +1,5 @@
+import {MessageData} from "../../common/ws-api-schema";
+
 export type SelectItemKey =
 	| boolean
 	| string
@@ -17,4 +19,11 @@ export type DataTableHeader<TObject> = {
 	maxWidth?: string
 	sortable?: boolean
 	sort?: (a: any, b: any) => number
+};
+
+export type MessageDataDisplayable = MessageData & {
+	isMe: boolean,
+	first: boolean,
+	last: boolean,
+	timeString: string,
 };

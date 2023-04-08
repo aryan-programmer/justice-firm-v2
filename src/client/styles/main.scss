@@ -53,3 +53,10 @@
 	overflow-y: scroll;
 	overflow-y: overlay;
 }
+
+.sticky-top {
+	z-index: 1000;
+	position: -webkit-sticky;
+	position: sticky;
+	top: 1px;
+}
