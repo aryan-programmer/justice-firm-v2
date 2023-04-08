@@ -1,7 +1,7 @@
 import {Ref} from "@vue/reactivity";
 import {isLeft} from "fp-ts/Either";
-import {AppointmentSparseData} from "../../common/api-schema";
 import {StatusEnum} from "../../common/db-types";
+import {AppointmentSparseData} from "../../common/rest-api-schema";
 import {assert, nn} from "../../common/utils/asserts";
 import {
 	invalidImageMimeTypeMessage,
@@ -84,6 +84,7 @@ export async function fetchCasesIntoRef (
 		alert(`Failed to get cases: ${res.right.body.message}`);
 		return;
 	}
+	console.log(res);
 	casesRef.value = res.right.body;
 }
 

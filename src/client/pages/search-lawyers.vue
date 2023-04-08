@@ -5,7 +5,7 @@ import {useField, useForm} from 'vee-validate';
 import {LocationQueryValue} from "vue-router";
 import {useDisplay} from "vuetify";
 import * as yup from "yup";
-import {LawyerSearchResult} from "../../common/api-schema";
+import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {closeToZero, firstIfArray, getCurrentPosition, toNumIfNotNull} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import {ModelResponseOrErr} from "../../singularity/model.client";

@@ -1,10 +1,13 @@
+import {AttributeValue} from "@aws-sdk/client-dynamodb/dist-types/models/models_0";
 import {PutObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {fileTypeFromBuffer} from "file-type";
+import {verify} from "jsonwebtoken";
+import mapValues from "lodash/mapValues";
 import {extension} from "mime-types";
 import fetch from 'node-fetch';
 import {Stream} from "stream";
 import {nn} from "../../common/utils/asserts";
-import {badFileNameChars} from "../../common/utils/constants";
+import {badFileNameChars, isIterable} from "../../common/utils/constants";
 import {uniqId} from "../../common/utils/uniq-id";
 
 export async function streamToBuffer (stream: Stream): Promise<Buffer> {
@@ -55,4 +58,63 @@ export async function uploadDataUrlToS3 (args: {
 		result: res,
 		url:    `https://${s3Bucket}.s3.${region}.amazonaws.com/${fileKey}`
 	};
+}
+
+export function verifyAndDecodeJwtToken<T> (data: string, jwtSecret: string) {
+	const decoded = verify(data, jwtSecret);
+	const obj: T  = typeof decoded === "string" ? JSON.parse(decoded) : decoded;
+	return obj;
+}
+
+export type ReallyBasicTypes = string | number | bigint | boolean | null | undefined;
+
+export type BasicData = ReallyBasicTypes | (BasicData)[] | {
+	[index: string]: BasicData
+};
+
+export function toDynamoDBAttributeValue (v: BasicData): AttributeValue {
+	if (v == null) {
+		return {NULL: true}
+	} else if (typeof v === "string") {
+		return {S: v}
+	} else if (typeof v === "number" || typeof v === "bigint") {
+		return {N: v.toString()};
+	} else if (typeof v === "boolean") {
+		return {BOOL: v};
+	} else if (Array.isArray(v)) {
+		return {L: v.map(toDynamoDBAttributeValue)}
+	} else if (isIterable(v)) {
+		return {L: Array.from(v, toDynamoDBAttributeValue)}
+	} else if (typeof v === "object") {
+		return {M: mapValues(v, toDynamoDBAttributeValue)}
+	}
+	return {S: "__JSON__:" + JSON.stringify(v)};
+}
+
+export function toDynamoDBItem (v: Record<string, BasicData>): Record<string, AttributeValue> {
+	return mapValues(v, toDynamoDBAttributeValue);
+}
+
+export function fromDynamoDBAttributeValue (v: AttributeValue): BasicData {
+	if ("NULL" in v) {
+		return null
+	} else if ("S" in v) {
+		if (v.S?.startsWith("__JSON__:") === true) {
+			return JSON.parse(v.S.substring("__JSON__:".length));
+		}
+		return v.S;
+	} else if ("N" in v) {
+		return BigInt(v.N ?? 0);
+	} else if ("BOOL" in v) {
+		return v.BOOL;
+	} else if ("L" in v) {
+		return v.L?.map(fromDynamoDBAttributeValue) ?? []
+	} else if ("M" in v) {
+		return mapValues(v.M, fromDynamoDBAttributeValue)
+	}
+	return null;
+}
+
+export function fromDynamoDBItem (v: Record<string, AttributeValue>): Record<string, BasicData> {
+	return mapValues(v, fromDynamoDBAttributeValue);
 }

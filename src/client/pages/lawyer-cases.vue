@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {definePageMeta, onMounted, ref} from "#imports";
-import {CaseSparseData} from "../../common/api-schema";
+import {CaseSparseData} from "../../common/rest-api-schema";
 import {Nuly} from "../../common/utils/types";
 import CasesTable from "../components/CasesTable.vue";
 import {useUserStore} from "../store/userStore";

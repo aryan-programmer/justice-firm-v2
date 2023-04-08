@@ -19,6 +19,7 @@ import {
 	faGavel,
 	faHome,
 	faImagePortrait,
+	faPaperPlane,
 	faQuestion,
 	faSearch,
 	faSignIn,
@@ -80,7 +81,8 @@ library.add(
 	faXmark,
 	faCircle,
 	faQuestion,
-	faBriefcase
+	faBriefcase,
+	faPaperPlane
 );
 // import * as components from 'vuetify/components'
 // import * as directives from 'vuetify/directives'

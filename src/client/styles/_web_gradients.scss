@@ -428,12 +428,12 @@
 			(linear-gradient(to top, #3f51b1 0%, #5a55ae 13%, #7b5fac 25%, #8f6aae 38%, #a86aa4 50%, #cc6b8e 62%, #f18271 75%, #f3a469 87%, #f7c978 100%)),
 );
 //
-//// 062 Wide Matrix
-//@include gradient_defs.define-gradient(
-//		gradient--wide-matrix,
-//		#bb769f,
-//			(linear-gradient(to top, #fcc5e4 0%, #fda34b 15%, #ff7882 35%, #c8699e 52%, #7046aa 71%, #0c1db8 87%, #020f75 100%)),
-//);
+// 062 Wide Matrix
+@include gradient_defs.define-gradient(
+		gradient--wide-matrix,
+		#bb769f,
+			(linear-gradient(to top, #fcc5e4 0%, #fda34b 15%, #ff7882 35%, #c8699e 52%, #7046aa 71%, #0c1db8 87%, #020f75 100%)),
+);
 //
 //// 063 Soft Cherish
 //@include gradient_defs.define-gradient(
@@ -701,12 +701,12 @@
 //			(linear-gradient(60deg, #29323c 0%, #485563 100%)),
 //);
 //
-//// 101 Palo Alto
-//@include gradient_defs.define-gradient(
-//		gradient--palo-alto,
-//		#adba68,
-//			(linear-gradient(-60deg, #16a085 0%, #f4d03f 100%)),
-//);
+// 101 Palo Alto
+@include gradient_defs.define-gradient(
+		gradient--palo-alto,
+		#adba68,
+			(linear-gradient(-60deg, #16a085 0%, #f4d03f 100%)),
+);
 //
 //// 102 Happy Memories
 //@include gradient_defs.define-gradient(
@@ -1079,12 +1079,12 @@
 //			(linear-gradient(-225deg, #DFFFCD 0%, #90F9C4 48%, #39F3BB 100%)),
 //);
 //
-//// 155 Landing Aircraft
-//@include gradient_defs.define-gradient(
-//		gradient--landing-aircraft,
-//		#86beff,
-//			(linear-gradient(-225deg, #5D9FFF 0%, #B8DCFF 48%, #6BBBFF 100%)),
-//);
+// 155 Landing Aircraft
+@include gradient_defs.define-gradient(
+		gradient--landing-aircraft,
+		#86beff,
+			(linear-gradient(-225deg, #5D9FFF 0%, #B8DCFF 48%, #6BBBFF 100%)),
+);
 //
 //// 156 Witch Dance
 //@include gradient_defs.define-gradient(

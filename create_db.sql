@@ -120,9 +120,10 @@ CREATE TABLE case_document (
 
 CREATE TABLE `group` (
 	id        INT PRIMARY KEY AUTO_INCREMENT,
-	case_id   INT NULL,
-	client_id INT NOT NULL,
-	lawyer_id INT NOT NULL,
+	name      VARCHAR(1024) NOT NULL DEFAULT '',
+	case_id   INT           NULL,
+	client_id INT           NOT NULL,
+	lawyer_id INT           NOT NULL,
 	FOREIGN KEY (case_id)
 		REFERENCES `case` (id),
 	FOREIGN KEY (client_id)
@@ -131,18 +132,19 @@ CREATE TABLE `group` (
 		REFERENCES lawyer (id)
 );
 
-CREATE TABLE message (
-	id              INT PRIMARY KEY AUTO_INCREMENT,
-	sender_id       INT           NOT NULL,
-	group_id        INT           NOT NULL,
-	text            TEXT          NOT NULL,
-	timestamp       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	attachment_link VARCHAR(1024) NULL,
-	FOREIGN KEY (sender_id)
-		REFERENCES user (id),
-	FOREIGN KEY (group_id)
-		REFERENCES `group` (id)
-);
+# Moved to a NoSQL DynamoDB database.
+# CREATE TABLE message (
+# 	id              INT PRIMARY KEY AUTO_INCREMENT,
+# 	sender_id       INT           NOT NULL,
+# 	group_id        INT           NOT NULL,
+# 	text            TEXT          NOT NULL,
+# 	timestamp       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+# 	attachment_link VARCHAR(1024) NULL,
+# 	FOREIGN KEY (sender_id)
+# 		REFERENCES user (id),
+# 	FOREIGN KEY (group_id)
+# 		REFERENCES `group` (id)
+# );
 
 ALTER TABLE appointment
 	ADD FOREIGN KEY (group_id)

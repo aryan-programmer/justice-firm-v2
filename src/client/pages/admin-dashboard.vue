@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import {definePageMeta, justiceFirmApi, onMounted, ref} from "#imports";
 import {isLeft} from "fp-ts/Either";
-import {LawyerSearchResult} from "../../common/api-schema";
 import {AdminAuthToken} from "../../common/api-types";
+import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {nn} from "../../common/utils/asserts";
 import {Nuly} from "../../common/utils/types";
 import AdminDashboardForm from "../components/AdminDashboardForm.vue";

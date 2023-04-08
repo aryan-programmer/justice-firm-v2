@@ -14,10 +14,13 @@ class NullOrUndefinedValueError extends Error {
 
 function assert (
 	expr: boolean,
-	message: string = "The value was expected to be truthy but wasn't."
+	message: string | (() => string) = "The value was expected to be truthy but wasn't."
 ): asserts expr {
 	if (!Boolean(expr)) {
-		throw new AssertionError(message);
+		if (typeof message == "function")
+			throw new AssertionError(message());
+		else
+			throw new AssertionError(message);
 	}
 }
 

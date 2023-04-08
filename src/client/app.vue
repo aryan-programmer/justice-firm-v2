@@ -103,7 +103,7 @@ function pathCompare (link: string) {
 </style>
 
 <template>
-<v-layout>
+<v-layout class="mh-100vh">
 	<v-app-bar
 		:color="userDeps.color"
 		:theme="userDeps.theme"
@@ -154,8 +154,8 @@ function pathCompare (link: string) {
 			@click="signOut" />
 		<div class="pt-2"></div>
 	</v-navigation-drawer>
-	<v-main>
-		<div class="w-100 pa-2">
+	<v-main class="mh-100">
+		<div class="w-100 mh-100 pa-2 d-flex flex-column">
 			<NuxtPage />
 		</div>
 	</v-main>

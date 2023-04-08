@@ -2,8 +2,8 @@
 import {justiceFirmApi, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {LocationQuery} from "vue-router";
-import {CaseFullData} from "../../common/api-schema";
 import {CaseStatusEnum} from "../../common/db-types";
+import {CaseFullData} from "../../common/rest-api-schema";
 import {nn} from "../../common/utils/asserts";
 import {dateStringFormat, firstIfArray} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
@@ -80,7 +80,7 @@ async function fetchCase (value: LocationQuery) {
 		<br />
 		<p>
 			Opened on: {{ dateStringFormat(caseData.openedOn) }}<br />
-			Case Type: {{ caseData.caseType.name }}
+			Case Type: {{ caseData.caseType.name }}<br />
 		</p>
 		<pre>
 Description:
@@ -98,5 +98,15 @@ Description:
 			<v-chip class="fw-bold" color="red-darken-2" variant="tonal">Closed</v-chip>
 		</p>
 	</v-card-text>
+	<v-card-actions>
+		<v-btn
+			:to="`/chat-group?id=${caseData.groupId}`"
+			color="teal-lighten-3"
+			density="default"
+			elevation="2"
+			rounded
+			variant="elevated">View Chat group
+		</v-btn>
+	</v-card-actions>
 </v-card>
 </template>

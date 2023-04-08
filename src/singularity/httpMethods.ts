@@ -30,5 +30,7 @@ export enum HttpMethods {
 	/**
 	 * The wildcard entry to allow all methods.
 	 */
-	ALL     = "*"
+	ALL     = "*",
+
+	WS_SEND = "__WS_SEND__",
 }

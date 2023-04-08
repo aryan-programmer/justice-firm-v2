@@ -12,12 +12,12 @@ import {GeolocationNotAvailableError} from "./errors";
 import {memoizeWeak} from "./memoizeWeak";
 import {Nuly} from "./types";
 
-export function nullOrEmpty (s: string | Nuly) {
+export function isNullOrEmpty (s: string | Nuly): s is (null | "") {
 	return s == null || s.length === 0;
 }
 
 export function nullOrEmptyCoalesce<T> (s: string | Nuly, s2: T) {
-	return nullOrEmpty(s) ? s2 : s;
+	return isNullOrEmpty(s) ? s2 : s;
 }
 
 export function trimStr (s: string, wordCount: number = 13): string {
@@ -78,7 +78,7 @@ export function toNumIfNotNull<T> (val: Nuly | any) {
 
 export const ArrayOf = memoizeWeak(function ArrayOf<TS extends TSchema> (schema: TS, options?: ArrayOptions) {
 	return Type.Array(schema, {
-		$id: `Array_Of${schema.$id}`,
+		$id: `ArrayOf${schema.$id}`,
 		...options
 	});
 });

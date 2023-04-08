@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed, useSlots} from "#imports";
 import {useDisplay} from "vuetify";
-import {LawyerSearchResult} from "../../common/api-schema";
+import {LawyerSearchResult} from "../../common/rest-api-schema";
 
 const props = defineProps<{
 	lawyer: LawyerSearchResult,
@@ -26,7 +26,7 @@ const sideImage = computed(() =>
 	<v-img v-if="!sideImage" :src="props.lawyer.photoPath" class="clamp-image-height" />
 	<v-card-text>
 		<v-row no-gutters class="justify-space-between">
-			<v-col cols="12" md="7" class="pt-0 mt-0">
+			<v-col cols="12" :md="sideImage?7:12" class="pt-0 mt-0">
 				<v-card-title class="ps-0 mt-0 pt-0">
 					{{ props.lawyer.name }}
 				</v-card-title>

@@ -1,5 +1,5 @@
 import {APIGatewayProxyEvent, APIGatewayProxyResult} from "aws-lambda";
-import {APIEndpoints, FnParams, EndpointSchema, PromiseOrEndpointResult} from "./endpoint";
+import {APIEndpoints, EndpointSchema, FnParams, PromiseOrEndpointResult} from "./endpoint";
 import {HttpMethods} from "./httpMethods";
 import {CheckerErrorsOrNully} from "./types";
 
@@ -19,13 +19,13 @@ export type APIModelValidators<TSchema> =
 	? {
 		[K in keyof T]: T[K] extends EndpointSchema<infer TReqBody, infer TResBody> ?
 		                (params: any, out: { errors: CheckerErrorsOrNully }) => params is FnParams<TReqBody>
-		                                         : never;
+		                                                                            : never;
 	} : never;
 
 export type APIAwsLambdaWrapper<TSchema> = TSchema extends APIModelSchema<infer T> ? {
 	[K in keyof T]: T[K] extends EndpointSchema<infer TReqBody, infer TResBody> ?
 	                (event: APIGatewayProxyEvent) => Promise<APIGatewayProxyResult>
-	                                         : never;
+	                                                                            : never;
 } : never;
 
 export type APIAwsFunnelWrapper = Record<string, Partial<Record<HttpMethods, (event: APIGatewayProxyEvent) => Promise<APIGatewayProxyResult>>>>;

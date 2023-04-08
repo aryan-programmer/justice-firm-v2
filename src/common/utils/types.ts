@@ -11,3 +11,5 @@ export const OptionalBoolean_T = Optional(Boolean_T);
 export type Nuly = null | undefined;
 export type Writeable<T> = { -readonly [P in keyof T]: T[P] };
 export type DeepWriteable<T> = { -readonly [P in keyof T]: DeepWriteable<T[P]> };
+
+export type PromiseOr<T> = Promise<T> | T;

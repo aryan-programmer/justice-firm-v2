@@ -1,34 +1,62 @@
 import {APIGatewayProxyEvent, APIGatewayProxyResult} from "aws-lambda";
-import {isLeft, isRight} from "fp-ts/lib/Either";
-import mapValues from "lodash/mapValues";
-import {assert} from "../common/utils/asserts";
+import {Nuly, PromiseOr} from "../common/utils/types";
 import {constants} from "./constants";
-import {APIEndpoints, Endpoint, FnParams,} from "./endpoint";
-import {APIAwsFunnelWrapper, APIAwsLambdaWrapper, APIImplementation, APIModelSchema} from "./schema";
+import {APIEndpoints, Endpoint, FnParams, PromiseOrEndpointResult,} from "./endpoint";
+import {APIAwsFunnelWrapper, APIImplementation, APIModelSchema} from "./schema";
 import {TypeCheckError} from "./types";
 
-function errorsToResponse (errors: TypeCheckError[]): APIGatewayProxyResult {
+export function errorsToResponse (errors: TypeCheckError[]) {
 	return {
 		statusCode: constants.HTTP_STATUS_BAD_REQUEST,
-		body:       JSON.stringify({errors}, null, 0)
+		body:       {errors}
 	}
 }
 
-// export class APIServerModel<TEndpoints extends APIEndpoints = APIEndpoints> {
-// 	constructor (private modelSchema: APIModelSchema<TEndpoints>) {
-// 	}
-//
-// }
+export class EarlyExitResponseError extends Error {
+	constructor (public readonly response: { statusCode: number; body: unknown }) {
+		super("Early Exit");
+	}
+}
 
-export function transformer (v: APIGatewayProxyResult): APIGatewayProxyResult {
-	return {
-		...v,
-		headers: {
-			"Access-Control-Allow-Headers": "*",
-			"Access-Control-Allow-Origin":  "*",
-			"Access-Control-Allow-Methods": "*",
-			...v.headers
-		},
+export async function baseWrapperFunction<TReqBody,
+	TResBody,
+	TEndpoints extends APIEndpoints,
+	TEvent,
+	TResult extends { statusCode: number, body: TResBody }> (
+	implFn: (params: FnParams<TReqBody>, event: TEvent) => PromiseOr<TResult>,
+	validateOutputs: boolean,
+	event: TEvent,
+	bodyStr: string | Nuly,
+	endpoint: Endpoint<TReqBody, TResBody>,
+	key: string
+) {
+	try {
+		let body   = bodyStr == null ? null : JSON.parse(bodyStr);
+		let errors = endpoint.checkBody(body);
+		if (errors != null && errors.length !== 0) {
+			return errorsToResponse(errors);
+		}
+		let params: FnParams<any> = {
+			body,
+		};
+
+		const origRes = await implFn(params, event);
+		if (validateOutputs) {
+			const errors = endpoint.checkResponse(origRes.body);
+			if (errors != null && errors.length !== 0) {
+				return errorsToResponse(errors);
+			}
+		}
+		return origRes;
+	} catch (e) {
+		console.error(e);
+		if (e instanceof EarlyExitResponseError) {
+			return e.response;
+		}
+		return {
+			statusCode: constants.HTTP_STATUS_INTERNAL_SERVER_ERROR,
+			body:       {error: e}
+		};
 	}
 }
 
@@ -38,50 +66,29 @@ function awsWrapGetter<TEndpoints extends APIEndpoints = APIEndpoints> (
 ) {
 	const {validateOutputs = true} = options ?? {};
 	return function awsWrap<TReqBody, TResBody> (endpoint: Endpoint<TReqBody, TResBody>, key: string) {
+		const implFn = (params: FnParams<TReqBody>, event: APIGatewayProxyEvent): PromiseOrEndpointResult<TResBody> => impl[key](
+			params,
+			event) as PromiseOrEndpointResult<TResBody>;
 		return async function transformerFunction (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
-			return transformer(await baseFunction(event));
-		}
-
-		async function baseFunction (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
-			try {
-				let body               = event.body == null ? null : JSON.parse(event.body);
-				let errors             = endpoint.checkBody(body);
-				if (errors != null && errors.length !== 0) {
-					return errorsToResponse(errors);
-				}
-				let params: FnParams<any> = {
-					body,
-				};
-
-				const origRes = await impl[key](params, event);
-				if (validateOutputs) {
-					const errors = endpoint.checkResponse(origRes.body);
-					if (errors != null && errors.length !== 0) {
-						return errorsToResponse(errors);
-					}
-				}
-				return {
-					...origRes,
-					body: JSON.stringify(origRes.body)
-				};
-			} catch (e) {
-				console.error(e);
-				return {
-					statusCode: constants.HTTP_STATUS_INTERNAL_SERVER_ERROR,
-					body:       JSON.stringify({error: e})
-				};
+			const res: { body: unknown; statusCode: number, headers?: Record<string, unknown> } = await baseWrapperFunction(
+				implFn,
+				validateOutputs,
+				event,
+				event.body,
+				endpoint,
+				key);
+			return {
+				...res,
+				headers: {
+					"Access-Control-Allow-Headers": "*",
+					"Access-Control-Allow-Origin":  "*",
+					"Access-Control-Allow-Methods": "*",
+					...res.headers
+				},
+				body:    JSON.stringify(res.body)
 			}
 		}
 	}
-}
-
-export function awsLambdaWrapper<TEndpoints extends APIEndpoints = APIEndpoints> (
-	modelSchema: APIModelSchema<TEndpoints>,
-	impl: APIImplementation<APIModelSchema<TEndpoints>>,
-	options?: { validateOutputs: boolean }
-): APIAwsLambdaWrapper<APIModelSchema<TEndpoints>> {
-	return mapValues(modelSchema.endpoints,
-		awsWrapGetter(impl, options)) as APIAwsLambdaWrapper<APIModelSchema<TEndpoints>>;
 }
 
 export function awsLambdaFunnelWrapper<TEndpoints extends APIEndpoints = APIEndpoints> (
@@ -96,4 +103,3 @@ export function awsLambdaFunnelWrapper<TEndpoints extends APIEndpoints = APIEndp
 	}
 	return res;
 }
-

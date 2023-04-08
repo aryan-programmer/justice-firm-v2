@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import {definePageMeta, justiceFirmApi, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
-import {LawyerSearchResult} from "../../common/api-schema";
 import {ClientAuthToken} from "../../common/api-types";
 import {UserAccessType} from "../../common/db-types";
+import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {assert} from "../../common/utils/asserts";
 import {Nuly} from "../../common/utils/types";
 import {ModelResponseOrErr} from "../../singularity/model.client";

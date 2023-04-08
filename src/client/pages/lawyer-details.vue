@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import {justiceFirmApi, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
-import {LawyerSearchResult} from "../../common/api-schema";
+import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {Nuly} from "../../common/utils/types";
 import {ModelResponseOrErr} from "../../singularity/model.client";
 import LawyerCard from "../components/LawyerCard.vue";

@@ -151,6 +151,7 @@ export const UpgradeAppointmentToCaseInput = Type.Object({
 	authToken:     LawyerAuthToken,
 	appointmentId: ID_T,
 	description:   OptionalString_T,
+	groupName:     OptionalString_T,
 	type:          ID_T,
 	status:        Optional(CaseStatusEnum_T),
 }, {$id: "UpgradeAppointmentToCaseInput"});

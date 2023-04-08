@@ -2,12 +2,12 @@
 import {computed, justiceFirmApi, ref, useRouter} from "#imports";
 import {watch} from "@vue/runtime-core";
 import {isLeft} from "fp-ts/Either";
-import {UpgradeAppointmentToCaseInput} from "../../common/api-schema";
 import {LawyerAuthToken} from "../../common/api-types";
 import {CaseType} from "../../common/db-types";
+import {UpgradeAppointmentToCaseInput} from "../../common/rest-api-schema";
 import {nn} from "../../common/utils/asserts";
 import {getCaseTypes} from "../../common/utils/constants";
-import {nullOrEmptyCoalesce} from "../../common/utils/functions";
+import {isNullOrEmpty, nullOrEmptyCoalesce, trimStr} from "../../common/utils/functions";
 import {useUserStore} from "../store/userStore";
 
 const props = defineProps<{
@@ -20,9 +20,14 @@ const userStore = useUserStore();
 const router    = useRouter();
 
 const upgradeToCaseDialogOpen = ref<boolean>(false);
+const chatGroupName           = ref<string>();
 const caseDescription         = ref<string>();
 const caseType                = ref<CaseType | null>(null);
-const dataValid               = computed(() => caseType.value != null);
+const dataValid               = computed(() =>
+	caseType.value != null &&
+	!isNullOrEmpty(caseDescription.value) &&
+	!isNullOrEmpty(chatGroupName.value)
+);
 
 async function upgradeAppointmentToCase () {
 	if (!dataValid.value) return;
@@ -31,7 +36,8 @@ async function upgradeAppointmentToCase () {
 		appointmentId: props.appointmentId,
 		description:   nullOrEmptyCoalesce(caseDescription.value, null),
 		type:          nn(caseType.value).id,
-		authToken:     nn(userStore.authToken) as LawyerAuthToken
+		authToken:     nn(userStore.authToken) as LawyerAuthToken,
+		groupName:     chatGroupName.value,
 	};
 	console.log(body);
 	// return;
@@ -46,6 +52,7 @@ async function upgradeAppointmentToCase () {
 }
 
 watch(() => props.defaultDescription, (value, oldValue, onCleanup) => {
+	chatGroupName.value   = trimStr(value ?? "");
 	caseDescription.value = value;
 }, {immediate: true});
 
@@ -58,6 +65,7 @@ watch(() => props.defaultDescription, (value, oldValue, onCleanup) => {
 >
 	<template v-slot:activator="{ props }">
 	<v-btn
+		class="ma-1"
 		variant="elevated"
 		elevation="3"
 		color="blue-lighten-2"
@@ -76,6 +84,12 @@ watch(() => props.defaultDescription, (value, oldValue, onCleanup) => {
 				v-model="caseDescription"
 				label="Case description"
 				density="comfortable"
+				required
+			/>
+			<v-text-field
+				v-model="chatGroupName"
+				label="Chat Group Name"
+				density="compact"
 				required
 			/>
 			<v-select

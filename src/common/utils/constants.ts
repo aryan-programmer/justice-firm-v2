@@ -40,3 +40,7 @@ export function getCaseTypes (): CaseType[] {
 		{id: "12", name: "Tax"}
 	]
 }
+
+export function isIterable (input: any): input is Iterable<any> {
+	return typeof (input?.[Symbol.iterator]) === "function";
+}

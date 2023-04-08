@@ -1,6 +1,4 @@
 import {APIGatewayProxyResult} from "aws-lambda/trigger/api-gateway-proxy";
-//import * as E from "fp-ts/lib/Either";
-import {memoizeWeak} from "../common/utils/memoizeWeak";
 import {HttpMethods} from "./httpMethods";
 import {CheckerErrorsOrNully, CheckerFunction, TypeCheckError} from "./types";
 
@@ -45,8 +43,7 @@ export type PromiseOrEndpointResult<TResponseBody> =
 	| EndpointResult<TResponseBody>
 	| Promise<EndpointResult<TResponseBody>>;
 
-export type EndpointFakeAsserter<TReqBody> =
-	(params: any) => params is FnParams<TReqBody>;
+export type EndpointFakeAsserter<TReqBody> = (params: any) => params is FnParams<TReqBody>;
 
 export function getErrorPathPrepender (name: string) {
 	return function (value: TypeCheckError) {
@@ -56,6 +53,9 @@ export function getErrorPathPrepender (name: string) {
 		});
 	};
 }
+
+export const bodyErrorPathPrepender     = getErrorPathPrepender("/body");
+export const responseErrorPathPrepender = getErrorPathPrepender("/response");
 
 export class Endpoint<TReqBody, TResBody>
 	implements EndpointSchema<TReqBody, TResBody> {
@@ -69,11 +69,11 @@ export class Endpoint<TReqBody, TResBody>
 	}
 
 	checkBody (body: any): CheckerErrorsOrNully {
-		return this.requestBodyChecker?.check(body)?.map(getErrorPathPrepender("/body"));
+		return this.requestBodyChecker?.check(body)?.map(bodyErrorPathPrepender);
 	}
 
 	checkResponse (responseBody: unknown): CheckerErrorsOrNully {
-		return this.responseBodyChecker?.check(responseBody)?.map(getErrorPathPrepender("/response"));
+		return this.responseBodyChecker?.check(responseBody)?.map(responseErrorPathPrepender);
 	}
 
 	fakeCheckParams (params: any): params is FnParams<TReqBody> {

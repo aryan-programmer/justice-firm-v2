@@ -3,7 +3,7 @@ import {lazyCheck} from "../singularity/helpers";
 import {ID_T, UserAccessType, UserAccessType_T} from "./db-types";
 import {OptionalString_T, String_T} from "./utils/types";
 
-export const JWTHashedData = Type.Object({
+export const PrivateAuthToken = Type.Object({
 	id: ID_T,
 	// TODO: Implement expiry date
 	expiryDate: Type.Any(),
@@ -51,4 +51,4 @@ export type LawyerAuthToken = Static<typeof LawyerAuthToken>;
 
 export const AuthTokenChecker = lazyCheck(AuthToken);
 
-export type JWTHashedData = Static<typeof JWTHashedData>;
+export type PrivateAuthToken = Static<typeof PrivateAuthToken>;

@@ -2,11 +2,11 @@
 import {computed, definePageMeta, justiceFirmApi, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {LocationQuery} from "vue-router";
-import {AppointmentFullData, SetAppointmentStatusInput} from "../../common/api-schema";
 import {LawyerAuthToken} from "../../common/api-types";
 import {StatusEnum, UserAccessType} from "../../common/db-types";
+import {AppointmentFullData, SetAppointmentStatusInput} from "../../common/rest-api-schema";
 import {nn} from "../../common/utils/asserts";
-import {dateStringFormat, firstIfArray, nullOrEmpty} from "../../common/utils/functions";
+import {dateStringFormat, firstIfArray, isNullOrEmpty} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import CaseUpgradeDialog from "../components/CaseUpgradeDialog.vue";
 import ClientCard from "../components/ClientCard.vue";
@@ -32,9 +32,9 @@ const showingAppointmentConfirmRejectButtons = computed(() =>
 const showingUpgradeAppointmentButton        = computed(() =>
 	userStore.authToken?.userType === UserAccessType.Lawyer &&
 	appointment.value?.status === StatusEnum.Confirmed &&
-	nullOrEmpty(appointment.value?.caseId)
+	isNullOrEmpty(appointment.value?.caseId)
 );
-const showViewCaseButton                     = computed(() => !nullOrEmpty(appointment.value?.caseId));
+const showViewCaseButton                     = computed(() => !isNullOrEmpty(appointment.value?.caseId));
 const shouldShowCardActions                  = computed(() =>
 	(showingAppointmentConfirmRejectButtons.value || showingUpgradeAppointmentButton.value || showViewCaseButton.value)
 );
@@ -142,7 +142,7 @@ async function commonSendRes (params: SetAppointmentStatusInput, mode: string) {
 		<br />
 		<p>
 			Opened on: {{ dateStringFormat(appointment.openedOn) }}<br />
-			Appointment time: {{ dateStringFormat(appointment.timestamp) ?? "Unset" }}
+			Appointment time: {{ dateStringFormat(appointment.timestamp) ?? "Unset" }}<br />
 		</p>
 		<pre>
 Description:
@@ -160,7 +160,7 @@ Description:
 			<v-chip class="fw-bold" color="red-darken-2" variant="tonal">Rejected</v-chip>
 		</p>
 	</v-card-text>
-	<v-card-actions v-if="shouldShowCardActions">
+	<v-card-actions>
 		<div v-if="showingAppointmentConfirmRejectButtons">
 			<v-dialog
 				v-model="confirmDialogOpen"
@@ -168,6 +168,7 @@ Description:
 			>
 				<template v-slot:activator="{ props }">
 				<v-btn
+					class="ma-1"
 					variant="elevated"
 					elevation="3"
 					color="green-lighten-2"
@@ -225,6 +226,7 @@ Description:
 			>
 				<template v-slot:activator="{ props }">
 				<v-btn
+					class="ma-1"
 					variant="tonal"
 					color="red-darken-2"
 					rounded="pill"
@@ -266,6 +268,7 @@ Description:
 				:default-description="appointment.description" />
 		</div>
 		<v-btn
+			class="ma-1"
 			v-if="showViewCaseButton"
 			:to="`/case-details?id=${appointment.caseId}`"
 			color="teal-lighten-3"
@@ -273,6 +276,15 @@ Description:
 			elevation="2"
 			rounded
 			variant="elevated">View Case
+		</v-btn>
+		<v-btn
+			class="ma-1"
+			:to="`/chat-group?id=${appointment.groupId}`"
+			color="teal-lighten-3"
+			density="default"
+			elevation="2"
+			rounded
+			variant="elevated">View Chat group
 		</v-btn>
 	</v-card-actions>
 </v-card>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed} from "#imports";
-import {AppointmentSparseData} from "../../common/api-schema";
+import {AppointmentSparseData} from "../../common/rest-api-schema";
 import {compareDates, dateFormat, trimStr} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import {DataTableHeader} from "../utils/types";

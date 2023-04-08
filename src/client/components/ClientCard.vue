@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed} from "#imports";
 import {useDisplay} from "vuetify";
-import {ClientDataResult} from "../../common/api-schema";
+import {ClientDataResult} from "../../common/rest-api-schema";
 
 const props = defineProps<{
 	client: ClientDataResult,

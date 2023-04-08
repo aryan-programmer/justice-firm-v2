@@ -2,19 +2,20 @@ import * as Types from "@sinclair/typebox";
 import {SchemaOptions, TSchema, Type} from "@sinclair/typebox";
 import {TypeCheck, TypeCompiler} from "@sinclair/typebox/compiler";
 import {ValueError} from "@sinclair/typebox/errors";
-import {chain as EitherChain, Either, left, right} from "fp-ts/lib/Either";
 // @ts-ignore
 import memoizeWeakOrig from "memoizee/weak";
 import {memoizeWeak} from "../common/utils/memoizeWeak";
-import {Nuly} from "../common/utils/types";
 import {constants} from "./constants";
 import {EndpointResult} from "./endpoint";
-import {CheckerErrors, CheckerErrorsOrNully, CheckerFunction, Parser, TypeCheckError} from "./types";
+import {CheckerErrorsOrNully, CheckerFunction, TypeCheckError} from "./types";
 
 // region ...CheckerFunction
 const fakeChecker: CheckerFunction<unknown> = {
 	check (val: unknown): ValueError[] | null {
 		return null;
+	},
+	get typeName (): string {
+		return "ANY"
 	}
 }
 
@@ -55,107 +56,17 @@ class LazyChecker<T extends Types.TSchema> implements CheckerFunction<Types.Stat
 		this.checker ??= memoizedCompiler(this.schema, this.references);
 		return typeCheckErrorsFromValueErrors(this.checker.Errors(val));
 	}
+
+	get typeName (): string {
+		return this.schema.$id ?? "Unknown";
+	}
 }
 
 export function lazyCheck<T extends Types.TSchema> (schema: T, references?: Types.TSchema[]): CheckerFunction<Types.Static<T>> {
 	return new LazyChecker(schema, references);
 }
 
-export function compiledChecker<T extends Types.TSchema> (checker: TypeCheck<T>): CheckerFunction<Types.Static<T>> {
-	return {
-		check (val: unknown): CheckerErrorsOrNully {
-			return typeCheckErrorsFromValueErrors(checker.Errors(val));
-		}
-	};
-}
-
 // endregion CheckerFunction
-
-// region ...Parser
-function getCheckerErrorsFromStatic (schemaId: string, val: any, message: string): Either<CheckerErrors, never> {
-	return left([{
-		path:    "",
-		schemaId,
-		value:   val,
-		message: message,
-	}]);
-}
-
-export const presenceParser: Parser<boolean> = {
-	parse (val: string | null | undefined): Either<CheckerErrors, boolean> {
-		return right(val != null);
-	},
-	stringify (val: boolean): string | Nuly {
-		return val ? "true" : null;
-	}
-};
-export const stringParser: Parser<string>    = {
-	parse (val: string | null | undefined): Either<CheckerErrors, string> {
-		if (val == null) {
-			return getCheckerErrorsFromStatic("String", val, "Must not be null");
-		}
-		return right(val);
-	},
-	stringify (val: string): string {
-		return val;
-	}
-};
-export const numberParser: Parser<number>    = {
-	parse (val: string | null | undefined): Either<CheckerErrors, number> {
-		if (val == null) {
-			return getCheckerErrorsFromStatic("Number", val, "Must not be null");
-		}
-		const res = Number(val);
-		if (isNaN(res) || res == null) {
-			return getCheckerErrorsFromStatic("Number", val, "Can't parse as number");
-		}
-		return right(res);
-	},
-	stringify (val: number): string {
-		return val.toString();
-	}
-};
-
-export function constrainedNumberParser (
-	minIncl      = Number.MIN_VALUE,
-	maxExcl      = Number.MAX_VALUE,
-	checkInteger = false,
-) {
-	return {
-		stringify: numberParser.stringify,
-		parse (val: string | null | undefined): Either<CheckerErrors, number> {
-			return EitherChain(chainFn)(numberParser.parse(val));
-		}
-	};
-
-	function chainFn (a: number) {
-		if (checkInteger && !Number.isInteger(a)) {
-			return getCheckerErrorsFromStatic("Number", a, "Is not an integer");
-		}
-		if (a >= maxExcl) {
-			return getCheckerErrorsFromStatic("Number", a, "Must be less than " + maxExcl);
-		}
-		if (a < minIncl) {
-			return getCheckerErrorsFromStatic("Number", a, "Must be greater than or equal to " + minIncl);
-		}
-		return right(a);
-	}
-}
-
-export function optionalParser<T> (parser: Parser<T>, nullString = "null"): Parser<T | Nuly> {
-	return {
-		parse (val: string | null | undefined): Either<CheckerErrors, Nuly | T> {
-			if (val == null) return right(val);
-			return parser.parse(val);
-		},
-		stringify (val: Nuly | T): string | Nuly {
-			if (val == null) return nullString;
-			return parser.stringify(val);
-		}
-	}
-}
-
-// endregion Parser
 
 export const Message = Type.Object({
 	message: Type.Any()
@@ -176,18 +87,6 @@ export function response<T> (
 	return {
 		statusCode,
 		body,
-	};
-}
-
-export function responseWithMore<T> (
-	statusCode: number,
-	body: T,
-	stuff: Omit<EndpointResult<T>, "statusCode" | "body">
-): EndpointResult<T> {
-	return {
-		statusCode,
-		body,
-		...stuff
 	};
 }
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {definePageMeta, onMounted, ref} from "#imports";
-import {AppointmentSparseData} from "../../common/api-schema";
+import {AppointmentSparseData} from "../../common/rest-api-schema";
 import {Nuly} from "../../common/utils/types";
 import AppointmentsTable from "../components/AppointmentsTable.vue";
 import {useUserStore} from "../store/userStore";

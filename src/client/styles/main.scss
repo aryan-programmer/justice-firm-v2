@@ -40,3 +40,16 @@
 		max-height: 200px;
 	}
 }
+
+.mh-100vh, body, body > div {
+	min-height: 100vh;
+}
+
+.mh-100 {
+	min-height: 100%;
+}
+
+.scroll-y {
+	overflow-y: scroll;
+	overflow-y: overlay;
+}
