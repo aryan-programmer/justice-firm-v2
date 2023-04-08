@@ -1,4 +1,4 @@
-import {AttributeValue} from "@aws-sdk/client-dynamodb/dist-types/models/models_0";
+import {AttributeValue, ConsumedCapacity} from "@aws-sdk/client-dynamodb";
 import {PutObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {fileTypeFromBuffer} from "file-type";
 import {verify} from "jsonwebtoken";
@@ -117,4 +117,8 @@ export function fromDynamoDBAttributeValue (v: AttributeValue): BasicData {
 
 export function fromDynamoDBItem (v: Record<string, AttributeValue>): Record<string, BasicData> {
 	return mapValues(v, fromDynamoDBAttributeValue);
+}
+
+export function printConsumedCapacity (text: string, queryResponse: { ConsumedCapacity?: ConsumedCapacity; }) {
+	console.log(`Consumed Capacity for ${text}: `, JSON.stringify(queryResponse.ConsumedCapacity, null, 4));
 }

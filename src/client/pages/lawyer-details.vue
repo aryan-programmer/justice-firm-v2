@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import {justiceFirmApi, ref, useRoute, useRouter, watch} from "#imports";
+import {justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {Nuly} from "../../common/utils/types";
@@ -14,7 +14,7 @@ watch(() => route.query.id, async value => {
 	const id = value?.toString();
 	if (id == null || id.length === 0 || id === "0") {
 		alert("Invalid id for a lawyer");
-		await router.push("/");
+		await navigateTo("/");
 		return;
 	}
 
@@ -27,7 +27,7 @@ watch(() => route.query.id, async value => {
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		console.log(res);
 		alert("Failed to find a lawyer with the id " + id);
-		await router.push("/");
+		await navigateTo("/");
 		return;
 	}
 

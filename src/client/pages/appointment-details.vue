@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, definePageMeta, justiceFirmApi, ref, useRoute, useRouter, watch} from "#imports";
+import {computed, definePageMeta, justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {LocationQuery} from "vue-router";
 import {LawyerAuthToken} from "../../common/api-types";
@@ -53,7 +53,7 @@ watch(() => route.query, value => {
 async function fetchAppointment (value: LocationQuery) {
 	const id = firstIfArray(value.id);
 	if (id == null) {
-		await router.push("/");
+		await navigateTo("/");
 		alert("Specify an appointment to view details for");
 		return;
 	}
@@ -64,7 +64,7 @@ async function fetchAppointment (value: LocationQuery) {
 	});
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
-		await router.push("/");
+		await navigateTo("/");
 		alert(`Failed to find the appointment with the ID ${id}`);
 		return;
 	}

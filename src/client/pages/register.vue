@@ -2,6 +2,7 @@
 import {navigateTo} from "#app";
 import {definePageMeta} from "#imports";
 import {isLeft} from "fp-ts/lib/Either";
+import isEmpty from "lodash/isEmpty";
 import {useField, useForm} from 'vee-validate';
 import * as yup from "yup";
 import {useUserStore} from "../store/userStore";
@@ -145,7 +146,8 @@ const onSubmit = handleSubmit(async values => {
 					name="submit"
 					variant="elevated"
 					value="y"
-					color="orange-lighten-2">Register
+					color="orange-lighten-2"
+					:disabled="!isEmpty(errors)">Register
 				</v-btn>
 			</div>
 		</v-card-text>

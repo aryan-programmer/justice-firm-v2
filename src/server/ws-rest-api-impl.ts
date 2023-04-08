@@ -35,7 +35,7 @@ import {WSAPIImplementation, WSEndpointResult, WSFnParams} from "../singularity/
 import {eventsSender} from "../singularity/websocket/ws-model.server";
 import {connectionsTableName, dynamoDbClient, messagesTableName, ssmClient} from "./environment-clients";
 import {JusticeFirmRestAPIImpl} from "./rest-api-impl";
-import {verifyAndDecodeJwtToken} from "./utils/functions";
+import {printConsumedCapacity, verifyAndDecodeJwtToken} from "./utils/functions";
 
 function generateChatAuthToken (
 	user: string,
@@ -124,7 +124,7 @@ export class JusticeFirmWsRestAPIImpl
 				`User ${jwt.id} is not authorized to access the chat group ${group}`);
 		}
 		const conn        = event.requestContext.connectionId;
-		const putResponse = await dynamoDbClient.send(new PutItemCommand({
+		const putResponse            = await dynamoDbClient.send(new PutItemCommand({
 			TableName:              connectionsTableName,
 			Item:                   {
 				group: {S: group},
@@ -132,7 +132,7 @@ export class JusticeFirmWsRestAPIImpl
 			},
 			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES
 		}));
-		this.printConsumedCapacity("establishConnection", putResponse);
+		printConsumedCapacity("establishConnection", putResponse)
 		return response(200, {
 			...groupData,
 			chatAuthToken: generateChatAuthToken(jwt.id, group, jwtSecret)
@@ -153,7 +153,7 @@ export class JusticeFirmWsRestAPIImpl
 			},
 			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES
 		}));
-		this.printConsumedCapacity("deleteConnection", deleteResponse);
+		printConsumedCapacity("deleteConnection", deleteResponse);
 	}
 
 	async postMessage (params: WSFnParams<PostMessageInput>, event: APIGatewayProxyWebsocketEventV2):
@@ -181,7 +181,7 @@ export class JusticeFirmWsRestAPIImpl
 			},
 			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES
 		}));
-		this.printConsumedCapacity("postMessage: message", putMessageResponse);
+		printConsumedCapacity("postMessage: message", putMessageResponse);
 
 		const queryResponse = await dynamoDbClient.send(new QueryCommand({
 			TableName:                 connectionsTableName,
@@ -198,7 +198,7 @@ export class JusticeFirmWsRestAPIImpl
 			Select:                    Select.SPECIFIC_ATTRIBUTES,
 			ReturnConsumedCapacity:    ReturnConsumedCapacity.INDEXES
 		}));
-		this.printConsumedCapacity("postMessage: Connections", queryResponse);
+		printConsumedCapacity("postMessage: Connections", queryResponse);
 		if (queryResponse.Items == null || queryResponse.Items.length === 0)
 			return message(200, "Message sent. No active connections");
 		await Promise.all(queryResponse.Items.map(async value => {
@@ -242,7 +242,7 @@ export class JusticeFirmWsRestAPIImpl
 			ReturnConsumedCapacity:    ReturnConsumedCapacity.INDEXES
 		}));
 
-		this.printConsumedCapacity("getMessages", queryResponse);
+		printConsumedCapacity("getMessages", queryResponse);
 
 		if (queryResponse.Items == null || queryResponse.Items.length === 0)
 			return response(200, []);
@@ -254,9 +254,5 @@ export class JusticeFirmWsRestAPIImpl
 			from:  value.from.S,
 			id:    value.id.S,
 		} as MessageData)));
-	}
-
-	private printConsumedCapacity (text: string, queryResponse: { ConsumedCapacity?: ConsumedCapacity; }) {
-		console.log(text + ": ", JSON.stringify(queryResponse.ConsumedCapacity, null, 4));
 	}
 }

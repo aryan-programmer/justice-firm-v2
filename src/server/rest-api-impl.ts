@@ -1,3 +1,5 @@
+import {DeleteItemCommand, PutItemCommand, ReturnConsumedCapacity, ReturnValue} from "@aws-sdk/client-dynamodb";
+import {SendEmailCommand} from "@aws-sdk/client-ses";
 import {GetParameterCommand} from "@aws-sdk/client-ssm";
 import {compareSync, hash} from "bcryptjs";
 import {sign} from "jsonwebtoken";
@@ -29,16 +31,31 @@ import {
 	UpgradeAppointmentToCaseInput
 } from "../common/rest-api-schema";
 import {nn} from "../common/utils/asserts";
-import {invalidImageMimeTypeMessage, validImageMimeTypes} from "../common/utils/constants";
+import {invalidImageMimeTypeMessage, otpMaxNum, otpMinNum, validImageMimeTypes} from "../common/utils/constants";
 import {isNullOrEmpty, nullOrEmptyCoalesce, toNumIfNotNull} from "../common/utils/functions";
 import {Nuly} from "../common/utils/types";
 import {constants} from "../singularity/constants";
 import {EndpointResult, FnParams} from "../singularity/endpoint";
 import {message, Message, noContent, response} from "../singularity/helpers";
 import {APIImplementation} from "../singularity/schema";
-import {region, s3Bucket, s3Client, ssmClient} from "./environment-clients";
-import {saltRounds} from "./utils/constants";
-import {getMimeTypeFromUrlServerSide, uploadDataUrlToS3, verifyAndDecodeJwtToken} from "./utils/functions";
+import {
+	dynamoDbClient,
+	passwordResetOtpTableName,
+	randomNumber,
+	region,
+	s3Bucket,
+	s3Client,
+	sesClient,
+	sesSourceEmailAddress,
+	ssmClient
+} from "./environment-clients";
+import {otpExpiryTimeMs, saltRounds} from "./utils/constants";
+import {
+	getMimeTypeFromUrlServerSide,
+	printConsumedCapacity,
+	uploadDataUrlToS3,
+	verifyAndDecodeJwtToken
+} from "./utils/functions";
 
 function generateAuthTokenResponse<T extends UserAccessType> (
 	userId: number | bigint,
@@ -136,14 +153,11 @@ export class JusticeFirmRestAPIImpl
 			);
 
 			if (data.specializationTypes.length > 0) {
-				let params = data.specializationTypes.map(value => ([userId, value]));
-				console.log(params);
+				let params    = data.specializationTypes.map(value => ([userId, value]));
 				const specRes = await conn.batch(
 					"INSERT INTO lawyer_specialization(lawyer_id, case_type_id) VALUES (?, ?);",
 					params
 				);
-
-				console.log(specRes);
 			}
 
 			await conn.commit();
@@ -206,26 +220,12 @@ export class JusticeFirmRestAPIImpl
 		}
 	}
 
-	async sessionLogin (params: FnParams<SessionLoginInput>):
-		Promise<EndpointResult<AuthToken | Message>> {
-		const data: SessionLoginInput = params.body;
-
-		const jwtSecret = await this.getJwtSecret();
-
-		const resSet: { id: number | bigint, password_hash: string, type: UserAccessType, name: string }[] = await (await this.getPool()).execute(
-			"SELECT id, name, password_hash, type FROM user WHERE user.email = ?;",
-			[data.email]
-		);
-
-		if (resSet.length === 0) {
-			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Email not used to sign up a user");
+	async sessionLogin (params: FnParams<SessionLoginInput>): Promise<EndpointResult<AuthToken | Message>> {
+		const res = await this.getLoginResponse(params.body.email, params.body.password);
+		if (res === false) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid password")
 		}
-		const {password_hash: passwordHash, id, type, name} = resSet[0];
-		console.log(resSet);
-		if (!compareSync(data.password, passwordHash.toString())) {
-			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid password");
-		}
-		return generateAuthTokenResponse(id, type, jwtSecret, name.toString());
+		return res;
 	}
 
 	async searchLawyers (params: FnParams<SearchLawyersInput>):
@@ -362,34 +362,24 @@ export class JusticeFirmRestAPIImpl
 		}
 
 		const timestamp = data.timestamp == null ? null : new Date(data.timestamp);
-
-		console.log("Now: ", new Date().toString());
-
-		const conn = await this.getConnection();
+		const conn      = await this.getConnection();
 
 		try {
 			await conn.beginTransaction();
 
-			let lawyerId                       = data.lawyerId;
-			let clientId                       = data.authToken.id;
-			const groupInsertRes: UpsertResult = await conn.execute(
+			let lawyerId                             = data.lawyerId;
+			let clientId                             = data.authToken.id;
+			const groupInsertRes: UpsertResult       = await conn.execute(
 				"INSERT INTO `group`(client_id, lawyer_id) VALUES (?, ?);",
 				[clientId, lawyerId]
 			);
-
-			console.log({groupInsertRes});
-
-			const groupId = nn(groupInsertRes.insertId);
-
+			const groupId                            = nn(groupInsertRes.insertId);
 			const appointmentInsertRes: UpsertResult = await conn.execute(
 				"INSERT INTO appointment(client_id, lawyer_id, group_id, description, timestamp) VALUES (?, ?, ?, ?, ?);",
 				[clientId, lawyerId, groupId, data.description, timestamp]
 			);
 
-			console.log({appointmentInsertRes});
-
 			await conn.commit();
-
 			return noContent;
 		} catch (e) {
 			await conn.rollback();
@@ -628,82 +618,102 @@ export class JusticeFirmRestAPIImpl
 
 	async sendPasswordResetOTP (params: FnParams<SendPasswordResetOTPInput>):
 		Promise<EndpointResult<Message | Nuly>> {
-		return message(constants.HTTP_STATUS_NOT_IMPLEMENTED, "");
-// 		const email                         = params.body.email;
-// 		const result: Record<string, any>[] = await (await this.getPool()).execute(
-// 			"SELECT name FROM user WHERE email = ? LIMIT 1;",
-// 			[email]
-// 		);
-// 		if (result.length === 0) {
-// 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "That email has not been used to sign up a user");
-// 		}
-// 		const name = result[0].name;
-//
-// 		const now        = Date.now();
-// 		const otp        = await randomNumber(otpMinNum, otpMaxNum);
-// 		const putItemRes = await dynamoDbClient.send(new PutItemCommand({
-// 			TableName:              passwordResetOtpTableName,
-// 			Item:                   {
-// 				email:     {S: email}, // Primary
-// 				otp:       {S: otp.toString(10)}, // Sort
-// 				timestamp: {S: now.toString(10)},
-// 			},
-// 			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES
-// 		}));
-// 		console.log({ConsumedCapacity: putItemRes.ConsumedCapacity});
-// 		const emailContent     = `Hello ${name},
-// There was a request to change your password.
-// If you did not make this request then please ignore this email.
-// The OTP to reset the password is ${otp.toString(10)}
-//
-// Sincerely,
-// The Justice Firm Foundation`;
-// 		const emailContentHtml = emailContent.replace(/[\n\r]+/g, "<br/>");
-// 		const sendEmailRes     = await sesClient.send(new SendEmailCommand({
-// 			Source:      sesSourceEmailAddress,
-// 			Destination: {
-// 				ToAddresses: [email]
-// 			},
-// 			Message:     {
-// 				Subject: {
-// 					Charset: "UTF-8",
-// 					Data:    "Password Reset OTP"
-// 				},
-// 				Body:    {
-// 					Text: {
-// 						Charset: "UTF-8",
-// 						Data:    emailContent
-// 					},
-// 					Html: {
-// 						Charset: "UTF-8",
-// 						Data:    emailContentHtml
-// 					}
-// 				}
-// 			}
-// 		}));
-// 		console.log({sendEmailRes});
-// 		return noContent;
+		const email                         = params.body.email;
+		const result: Record<string, any>[] = await (await this.getPool()).execute(
+			"SELECT name FROM user WHERE email = ? LIMIT 1;",
+			[email]
+		);
+		if (result.length === 0) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED, "That email has not been used to sign up a user");
+		}
+		const name = result[0].name;
+
+		const now        = Date.now();
+		const otp        = await randomNumber(otpMinNum, otpMaxNum);
+		const putItemRes = await dynamoDbClient.send(new PutItemCommand({
+			TableName:              passwordResetOtpTableName,
+			Item:                   {
+				email: {S: email}, // Primary
+				otp:   {S: otp.toString(10)}, // Sort
+				ts:    {S: now.toString(10)},
+			},
+			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES
+		}));
+		printConsumedCapacity("Put OTP", putItemRes);
+		const emailContent     = `Hello ${name},
+There was a request to change your password.
+If you did not make this request then please ignore this email.
+The OTP to reset the password is ${otp.toString(10)}
+
+Sincerely,
+The Justice Firm Foundation`;
+		const emailContentHtml = emailContent.replace(/[\n\r]+/g, "<br/>");
+		const sendEmailRes     = await sesClient.send(new SendEmailCommand({
+			Source:      sesSourceEmailAddress,
+			Destination: {
+				ToAddresses: [email]
+			},
+			Message:     {
+				Subject: {
+					Charset: "UTF-8",
+					Data:    "Password Reset OTP"
+				},
+				Body:    {
+					Text: {
+						Charset: "UTF-8",
+						Data:    emailContent
+					},
+					Html: {
+						Charset: "UTF-8",
+						Data:    emailContentHtml
+					}
+				}
+			}
+		}));
+		return noContent;
 	}
 
 	async resetPassword (params: FnParams<ResetPasswordInput>):
 		Promise<EndpointResult<AuthToken | Message>> {
-		return message(constants.HTTP_STATUS_NOT_IMPLEMENTED, "");
-		// const data         = params.body;
-		// const res          = await dynamoDbClient.send(new DeleteItemCommand({
-		// 	TableName:              passwordResetOtpTableName,
-		// 	Key:                    {
-		// 		email: {S: data.email}, // Primary
-		// 		otp:   {S: data.otp}, // Sort
-		// 	},
-		// 	ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES,
-		// 	ReturnValues:           ReturnValue.ALL_OLD
-		// }));
-		// const timestampStr = res.Attributes?.timestamp.S;
-		// if (timestampStr == null) {
-		// 	return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid timestamp");
-		// }
-		// const timestamp = new Date(+timestampStr);
-		// return message(200, "");
+		const {email, otp, password} = params.body;
+		const deleteRes              = await dynamoDbClient.send(new DeleteItemCommand({
+			TableName:              passwordResetOtpTableName,
+			Key:                    {
+				email: {S: email}, // Primary
+				otp:   {S: otp}, // Sort
+			},
+			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES,
+			ReturnValues:           ReturnValue.ALL_OLD
+		}));
+		printConsumedCapacity("Delete & get OTP", deleteRes);
+		if (deleteRes.Attributes == null) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid OTP");
+		}
+		const timestampStr = deleteRes.Attributes.ts.S;
+		if (timestampStr == null) {
+			return message(constants.HTTP_STATUS_INTERNAL_SERVER_ERROR, "Invalid timestamp");
+		}
+		const timestamp = +timestampStr;
+		const now       = Date.now();
+		const diff      = now - timestamp;
+		if (diff < 0 || diff > otpExpiryTimeMs) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED, "OTP expired");
+		}
+
+		const passwordHash            = await hash(password, saltRounds);
+		const updateRes: UpsertResult = await (await this.getPool()).execute(
+			"UPDATE user u SET password_hash = ? WHERE email = ? LIMIT 1", [passwordHash, email]);
+
+		if (updateRes.affectedRows < 1) {
+			console.error("SHOULD NEVER GET HERE: OTP was sent to an email address not used to sign up a user.");
+			return message(constants.HTTP_STATUS_NOT_FOUND, "No such email address has been used to sign up a user.");
+		}
+
+		const res = await this.getLoginResponse(email, password);
+		if (res === false) {
+			return message(constants.HTTP_STATUS_ACCEPTED, "Password set successfully but failed to login.");
+		}
+		return res;
 	}
 
 	async upgradeAppointmentToCase (params: FnParams<UpgradeAppointmentToCaseInput>):
@@ -757,8 +767,6 @@ export class JusticeFirmRestAPIImpl
 		const caseDesc = nullOrEmptyCoalesce(data.description, appointmentData.description);
 		const status   = data.status ?? CaseStatusEnum.Open;
 
-		console.log("Now: ", new Date().toString());
-
 		const conn = await this.getConnection();
 
 		try {
@@ -768,27 +776,18 @@ export class JusticeFirmRestAPIImpl
 				"INSERT INTO `case` (client_id, lawyer_id, type_id, group_id, description, status) VALUES (?,?,?,?,?,?);",
 				[clientId, lawyerId, data.type, appointmentData.groupId, caseDesc, status]
 			);
-
-			console.log({clientId, lawyerId, type: data.type, groupId: appointmentData.groupId, caseDesc, status});
-
-			console.log({caseInsertRes});
-
 			const caseId = nn(caseInsertRes.insertId);
 
 			if (isNullOrEmpty(data.groupName)) {
-				const groupUpdateRes = await conn.execute(
+				await conn.execute(
 					"UPDATE `group` SET case_id = ? WHERE id = ?",
 					[caseId, appointmentData.groupId]
 				);
-
-				console.log({groupUpdateRes});
 			} else {
-				const groupUpdateRes = await conn.execute(
+				await conn.execute(
 					"UPDATE `group` SET case_id = ?, name = ? WHERE id = ?",
 					[caseId, data.groupName, appointmentData.groupId]
 				);
-
-				console.log({groupUpdateRes});
 			}
 
 			const appointmentUpdateRes = await conn.execute(
@@ -796,10 +795,7 @@ export class JusticeFirmRestAPIImpl
 				[caseId, appointmentData.id]
 			);
 
-			console.log({appointmentUpdateRes});
-
 			await conn.commit();
-
 			return response(200, caseId.toString());
 		} catch (e) {
 			await conn.rollback();
@@ -960,6 +956,24 @@ export class JusticeFirmRestAPIImpl
 		return {lawyer, client};
 	}
 
+	private async getLoginResponse (email: string, password: string) {
+		const jwtSecret = await this.getJwtSecret();
+
+		const resSet: { id: number | bigint, password_hash: string, type: UserAccessType, name: string }[] = await (await this.getPool()).execute(
+			"SELECT id, name, password_hash, type FROM user WHERE user.email = ?;",
+			[email]
+		);
+
+		if (resSet.length === 0) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Email not used to sign up a user");
+		}
+		const {password_hash: passwordHash, id, type, name} = resSet[0];
+		if (!compareSync(password, passwordHash.toString())) {
+			return false;
+		}
+		return generateAuthTokenResponse(id, type, jwtSecret, name.toString());
+	}
+
 // async test (params: FnParams<UnknownBody>): Promise<EndpointResult<Message>> {
 	// 	return message(200, {
 	// 		msg: "Test successful"
@@ -1008,4 +1022,3 @@ export class JusticeFirmRestAPIImpl
 		return this.pool;
 	}
 }
-

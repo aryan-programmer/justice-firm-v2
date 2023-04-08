@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import {definePageMeta, navigateTo} from "#imports";
+import {definePageMeta, justiceFirmApi, navigateTo} from "#imports";
+import {isLeft} from "fp-ts/Either";
 import {useField, useForm} from 'vee-validate';
 import * as yup from "yup";
 import {useUserStore} from "../../store/userStore";
+import isEmpty from "lodash/isEmpty";
 
 definePageMeta({
 	middleware: "no-user-page"
@@ -24,21 +26,19 @@ const onSubmit = handleSubmit(async values => {
 		alert("Invalid data");
 		return;
 	}
-	// const res = await justiceFirmApi.sendPasswordResetOTP({
-	// 	body: {
-	// 		email:    values.email,
-	// 	},
-	// });
-	// console.log(res);
-	// if (isLeft(res) || !res.right.ok) {
-	// 	alert("Failed to send password reset OTP")
-	// 	return;
-	// }
+	const res = await justiceFirmApi.sendPasswordResetOTP({
+			email:    values.email,
+	});
+	console.log(res);
+	if (isLeft(res) || !res.right.ok) {
+		alert("Failed to send password reset OTP")
+		return;
+	}
 	alert(`Sent password reset OTP successfully`);
 	await navigateTo({
 		path:  "/password-reset/set-new-password",
 		query: {
-			email: email.value.value?.toString(),
+			email: (email.value.value as any)?.toString(),
 		}
 	});
 });
@@ -48,7 +48,7 @@ const onSubmit = handleSubmit(async values => {
 <v-row>
 	<v-col cols="12" md="6" class="mx-auto">
 		<v-form @submit.prevent="onSubmit" novalidate>
-			<v-card color="gradient--lemon-gate">
+			<v-card color="gradient--confident-cloud">
 				<v-card-title>
 					<p class="text-h4 mb-4">Send password reset OTP</p>
 				</v-card-title>
@@ -69,7 +69,8 @@ const onSubmit = handleSubmit(async values => {
 							name="submit"
 							variant="elevated"
 							value="y"
-							color="orange-lighten-2">Send OTP
+							color="orange-lighten-2"
+							:disabled="!isEmpty(errors)">Send OTP
 						</v-btn>
 					</div>
 				</v-card-text>

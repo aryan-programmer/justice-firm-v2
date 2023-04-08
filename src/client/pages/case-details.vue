@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {justiceFirmApi, ref, useRoute, useRouter, watch} from "#imports";
+import {justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {LocationQuery} from "vue-router";
 import {CaseStatusEnum} from "../../common/db-types";
@@ -24,7 +24,7 @@ watch(() => route.query, value => {
 async function fetchCase (value: LocationQuery) {
 	const id = firstIfArray(value.id);
 	if (id == null) {
-		await router.push("/");
+		await navigateTo("/");
 		alert("Specify a case to view details for");
 		return;
 	}
@@ -35,7 +35,7 @@ async function fetchCase (value: LocationQuery) {
 	});
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
-		await router.push("/");
+		await navigateTo("/");
 		alert(`Failed to find the case with the ID ${id}`);
 		return;
 	}

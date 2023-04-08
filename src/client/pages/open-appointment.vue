@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import {definePageMeta, justiceFirmApi, ref, useRoute, useRouter, watch} from "#imports";
+import {computed, definePageMeta, justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {ClientAuthToken} from "../../common/api-types";
 import {UserAccessType} from "../../common/db-types";
 import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {assert} from "../../common/utils/asserts";
+import {isNullOrEmpty} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import {ModelResponseOrErr} from "../../singularity/model.client";
 import {useUserStore} from "../store/userStore";
@@ -21,12 +22,16 @@ const lawyer    = ref<LawyerSearchResult | Nuly>();
 const description            = ref("");
 const appointmentDateTime    = ref("");
 const fixAppointmentDateTime = ref(false);
+const dataValid              = computed(() =>
+	(fixAppointmentDateTime.value !== true || appointmentDateTime.value.length !== 0) &&
+	!isNullOrEmpty(description.value)
+);
 
 watch(() => route.query.id, async value => {
 	const id = value?.toString();
 	if (id == null || id.length === 0 || id === "0") {
 		alert("Invalid id for a lawyer");
-		await router.push("/");
+		await navigateTo("/");
 		return;
 	}
 
@@ -36,7 +41,7 @@ watch(() => route.query.id, async value => {
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		console.log(res);
 		alert("Failed to find a lawyer with the id " + id);
-		await router.push("/");
+		await navigateTo("/");
 		return;
 	}
 
@@ -48,6 +53,10 @@ async function handleSubmit () {
 	if (authToken == null || authToken.userType !== UserAccessType.Client) {
 		// Should never reach here
 		alert("Must be signed in as a client");
+		return;
+	}
+	if (!dataValid.value) {
+		alert("Invalid data");
 		return;
 	}
 	const lawyerVal = lawyer.value;
@@ -69,7 +78,7 @@ async function handleSubmit () {
 		return;
 	}
 	alert("Opened appointment request successfully.");
-	await router.push("/search-lawyers");
+	await navigateTo("/search-lawyers");
 }
 </script>
 
@@ -128,7 +137,8 @@ async function handleSubmit () {
 					type="submit"
 					variant="elevated"
 					value="y"
-					color="brown-lighten-2">Open appointment request
+					color="brown-lighten-2"
+					:disabled="!dataValid">Open appointment request
 				</v-btn>
 			</div>
 		</v-card-text>

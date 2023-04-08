@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {useRouter} from "#app";
-import {computed} from "#imports";
+import {computed, navigateTo} from "#imports";
 import {ref} from "vue";
 import {useDisplay} from "vuetify";
 import {UserAccessType} from "../common/db-types";
@@ -81,9 +81,9 @@ const userDeps    = computed(() => {
 	}
 });
 
-function signOut () {
+async function signOut () {
 	userStore.signOut();
-	router.push("/");
+	await navigateTo("/");
 }
 
 function pathCompare (link: string) {

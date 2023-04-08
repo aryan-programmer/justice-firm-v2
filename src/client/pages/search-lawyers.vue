@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {justiceFirmApi, ref, useRoute, useRouter, watch} from "#imports";
+import {justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {useField, useForm} from 'vee-validate';
 import {LocationQueryValue} from "vue-router";
@@ -79,7 +79,7 @@ const onSubmit = handleSubmit(async values => {
 	const latitude  = values.latitude == null ? 0 : +values.latitude;
 	const longitude = values.longitude == null ? 0 : +values.longitude;
 
-	await router.push({
+	await navigateTo({
 		...router.currentRoute.value,
 		query: {name, address, latitude, longitude}
 	});

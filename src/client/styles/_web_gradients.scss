@@ -743,12 +743,12 @@
 //			(linear-gradient(to top, #4481eb 0%, #04befe 100%)),
 //);
 //
-//// 107 Confident Cloud
-//@include gradient_defs.define-gradient(
-//		gradient--confident-cloud,
-//		#e7deeb,
-//			(linear-gradient(to top, #dad4ec 0%, #dad4ec 1%, #f3e7e9 100%)),
-//);
+// 107 Confident Cloud
+@include gradient_defs.define-gradient(
+		gradient--confident-cloud,
+		#e7deeb,
+			(linear-gradient(to top, #dad4ec 0%, #dad4ec 1%, #f3e7e9 100%)),
+);
 //
 //// 108 Le Cocktail
 //@include gradient_defs.define-gradient(
@@ -1149,12 +1149,12 @@
 //			(linear-gradient(-225deg, #CBBACC 0%, #2580B3 100%)),
 //);
 //
-//// 165 Morning Salad
-//@include gradient_defs.define-gradient(
-//		gradient--morning-salad,
-//		#8dd3cf,
-//			(linear-gradient(-225deg, #B7F8DB 0%, #50A7C2 100%)),
-//);
+// 165 Morning Salad
+@include gradient_defs.define-gradient(
+		gradient--morning-salad,
+		#8dd3cf,
+			(linear-gradient(-225deg, #B7F8DB 0%, #50A7C2 100%)),
+);
 //
 //// 166 Deep Relief
 //@include gradient_defs.define-gradient(

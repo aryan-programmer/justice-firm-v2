@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, justiceFirmApi, ref, useRouter} from "#imports";
+import {computed, justiceFirmApi, navigateTo, ref, useRouter} from "#imports";
 import {watch} from "@vue/runtime-core";
 import {isLeft} from "fp-ts/Either";
 import {LawyerAuthToken} from "../../common/api-types";
@@ -48,7 +48,7 @@ async function upgradeAppointmentToCase () {
 		return;
 	}
 	alert(`Successfully upgraded appointment to a case`);
-	await router.push("/case-details?id=" + res.right.body)
+	await navigateTo("/case-details?id=" + res.right.body)
 }
 
 watch(() => props.defaultDescription, (value, oldValue, onCleanup) => {

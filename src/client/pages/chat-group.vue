@@ -2,7 +2,7 @@
 import {
 	ChatWSAPIClient,
 	computed,
-	definePageMeta,
+	definePageMeta, navigateTo,
 	nextTick,
 	onBeforeUnmount,
 	reactive,
@@ -96,7 +96,7 @@ async function postMessage () {
 async function openConnection (value: LocationQuery) {
 	const id = firstIfArray(value.id);
 	if (id == null) {
-		await router.push("/");
+		await navigateTo("/");
 		alert("Specify an chat group to connect to for");
 		return;
 	}
@@ -107,7 +107,7 @@ async function openConnection (value: LocationQuery) {
 	const res = await cl.establishConnection({group: id, authToken: nn(userStore.authToken)});
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
-		await router.push("/");
+		await navigateTo("/");
 		alert(`Failed to open a connection with the ID ${id}`);
 		await cl.close();
 		return;

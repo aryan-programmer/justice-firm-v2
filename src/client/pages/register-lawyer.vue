@@ -9,6 +9,7 @@ import {getCurrentPosition} from "~~/src/common/utils/functions";
 import {useUserStore} from "../store/userStore";
 import {validateDataUrlAsPhotoBrowserSide} from "../utils/functions";
 import {getRegistrationSchemaForLawyer} from "../utils/validation-schemas";
+import isEmpty from "lodash/isEmpty";
 
 definePageMeta({
 	middleware: "no-user-page"
@@ -244,7 +245,8 @@ onMounted(() => {
 					type="submit"
 					variant="elevated"
 					value="y"
-					color="orange-lighten-2">Register
+					color="orange-lighten-2"
+					:disabled="!isEmpty(errors)">Register
 				</v-btn>
 				<v-btn
 					rounded

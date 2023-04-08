@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import {definePageMeta, ref, useRoute, useRouter, watch} from "#imports";
+import {definePageMeta, justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
+import {isLeft} from "fp-ts/Either";
+import isEmpty from "lodash/isEmpty";
 import {useField, useForm} from 'vee-validate';
 import * as yup from "yup";
+import {AuthToken} from "../../../common/api-types";
 import {otpLength, validOtpRegex} from "../../../common/utils/constants";
 import {Nuly} from "../../../common/utils/types";
 import {useUserStore} from "../../store/userStore";
@@ -45,33 +48,31 @@ const onSubmit = handleSubmit(async values => {
 		return;
 	}
 	if (email.value == null) return;
-	alert("Unimplemented");
-	// const res = await justiceFirmApi.sessionLogin({
-	// 	body: {
-	// 		email:    email.value,
-	// 		password: values.password,
-	// 	},
-	// });
-	// console.log(res);
-	// if (isLeft(res) || res.right.body == null) {
-	// 	alert("Failed to set a new password")
-	// 	return;
-	// }
-	// if ("message" in res.right.body) {
-	// 	alert("Failed to set a new password: " + res.right.body.message)
-	// 	return;
-	// }
-	// const authToken: AuthToken = res.right.body;
-	// alert(`Set a new password successfully`);
-	// userStore.signIn(authToken);
-	// await navigateTo("/");
+	const res = await justiceFirmApi.resetPassword({
+		email:    email.value,
+		password: values.password,
+		otp:      values.otp,
+	});
+	console.log(res);
+	if (isLeft(res) || res.right.body == null) {
+		alert("Failed to set a new password")
+		return;
+	}
+	if ("message" in res.right.body) {
+		alert("Failed to set a new password: " + res.right.body.message)
+		return;
+	}
+	const authToken: AuthToken = res.right.body;
+	alert(`Set a new password successfully`);
+	userStore.signIn(authToken);
+	await navigateTo("/");
 });
 
 watch(() => route.query.email, async value => {
 	const emailQuery = value?.toString();
 	if (emailQuery == null || emailQuery.length === 0) {
 		alert("Invalid E-mail ID");
-		await router.push("/");
+		await navigateTo("/");
 		return;
 	}
 
@@ -83,9 +84,9 @@ watch(() => route.query.email, async value => {
 <v-row>
 	<v-col cols="12" md="6" class="mx-auto">
 		<v-form @submit.prevent="onSubmit" novalidate>
-			<v-card color="gradient--lemon-gate">
+			<v-card color="gradient--morning-salad">
 				<v-card-title>
-					<p class="text-h2 mb-4">Sign in</p>
+					<p class="text-h2 mb-4">Reset Password</p>
 				</v-card-title>
 				<v-card-text>
 					<v-text-field
@@ -112,7 +113,8 @@ watch(() => route.query.email, async value => {
 							name="submit"
 							variant="elevated"
 							value="y"
-							color="orange-lighten-2">Confirm new password
+							color="orange-lighten-2"
+							:disabled="!isEmpty(errors)">Confirm new password
 						</v-btn>
 					</div>
 				</v-card-text>

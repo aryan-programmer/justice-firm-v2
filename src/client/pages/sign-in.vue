@@ -7,6 +7,7 @@ import {AuthToken} from "../../common/api-types";
 import {useUserStore} from "../store/userStore";
 import {justiceFirmApi} from "../utils/api-fetcher-impl";
 import {getSignInSchema} from "../utils/validation-schemas";
+import isEmpty from "lodash/isEmpty";
 
 definePageMeta({
 	middleware: "no-user-page"
@@ -78,7 +79,8 @@ const onSubmit = handleSubmit(async values => {
 							name="submit"
 							variant="elevated"
 							value="y"
-							color="orange-lighten-2">Sign in
+							color="orange-lighten-2"
+							:disabled="!isEmpty(errors)">Sign in
 						</v-btn>
 						<NuxtLink
 							class="d-block"
