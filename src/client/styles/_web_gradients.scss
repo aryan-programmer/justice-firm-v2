@@ -43,12 +43,12 @@
 //			(linear-gradient(to top, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)),
 //);
 //
-//// 007 Sunny Morning
-//@include gradient_defs.define-gradient(
-//		gradient--sunny-morning,
-//		#fabb76,
-//			(linear-gradient(120deg, #f6d365 0%, #fda085 100%)),
-//);
+// 007 Sunny Morning
+@include gradient_defs.define-gradient(
+		gradient--sunny-morning,
+		#fabb76,
+			(linear-gradient(120deg, #f6d365 0%, #fda085 100%)),
+);
 //
 //// 008 Rainy Ashville
 //@include gradient_defs.define-gradient(

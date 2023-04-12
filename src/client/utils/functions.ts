@@ -14,6 +14,7 @@ import {Nuly, Writeable} from "../../common/utils/types";
 import {MessageData} from "../../common/ws-api-schema";
 import {UserStore_T} from "../store/userStore";
 import {justiceFirmApi} from "./api-fetcher-impl";
+import {confirmedColor, rejectedColor, waitingColor} from "./constants";
 import {MessageDataDisplayable} from "./types";
 
 export class FileReaderEventError extends Error {
@@ -138,12 +139,12 @@ export function messageDataToDisplayable (
 	userStore: UserStore_T
 ): MessageDataDisplayable[] {
 	const myId = userStore.authToken?.id;
-	const res = messages.map((msg, i) => {
+	const res  = messages.map((msg, i) => {
 		const prev = messages[i - 1];
 		const next = messages[i + 1];
 		return {
 			...msg,
-			tsInt: +msg.ts,
+			tsInt:      +msg.ts,
 			first:      prev == null || prev.from !== msg.from,
 			last:       next == null || next.from !== msg.from,
 			isMe:       msg.from === myId,
@@ -152,4 +153,15 @@ export function messageDataToDisplayable (
 	});
 	res.sort((a, b) => a.tsInt - b.tsInt);
 	return res;
+}
+
+export function getColorFromStatus (status: StatusEnum | Nuly) {
+	switch (status) {
+	case StatusEnum.Rejected:
+		return rejectedColor;
+	case StatusEnum.Confirmed:
+		return confirmedColor;
+	default:
+		return waitingColor;
+	}
 }

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import {definePageMeta, navigateTo} from "#imports";
 import {isLeft} from "fp-ts/Either";
+import isEmpty from "lodash/isEmpty";
 import {useField, useForm} from 'vee-validate';
 import * as yup from "yup";
 import {AuthToken} from "../../common/api-types";
 import {useUserStore} from "../store/userStore";
 import {justiceFirmApi} from "../utils/api-fetcher-impl";
 import {getSignInSchema} from "../utils/validation-schemas";
-import isEmpty from "lodash/isEmpty";
 
 definePageMeta({
 	middleware: "no-user-page"

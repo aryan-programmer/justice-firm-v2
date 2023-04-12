@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {definePageMeta, justiceFirmApi, navigateTo, onMounted, readFileAsDataUrl} from "#imports";
 import {isLeft} from "fp-ts/Either";
+import isEmpty from "lodash/isEmpty";
 import {useField, useForm} from 'vee-validate';
 import * as yup from "yup";
 import {ISchema} from "yup";
@@ -9,7 +10,6 @@ import {getCurrentPosition} from "~~/src/common/utils/functions";
 import {useUserStore} from "../store/userStore";
 import {validateDataUrlAsPhotoBrowserSide} from "../utils/functions";
 import {getRegistrationSchemaForLawyer} from "../utils/validation-schemas";
-import isEmpty from "lodash/isEmpty";
 
 definePageMeta({
 	middleware: "no-user-page"

@@ -71,7 +71,7 @@ const userDeps    = computed(() => {
 		return {
 			links: [
 				{icon: "fa-bug-slash", title: "Home", link: "/"},
-				...commonLinks,
+				{icon: "fa-search", title: "Search Lawyers", link: "/admin-search-lawyers"},
 				{icon: "fa-table", title: "Admin Dashboard", link: "/admin-dashboard"},
 				// {icon: "fa-sign-out", title: "Sign out", link: "/sign-out"},
 			],

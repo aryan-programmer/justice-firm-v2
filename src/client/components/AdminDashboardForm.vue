@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import {computed, justiceFirmApi, reactive} from "#imports";
+import {computed, justiceFirmApi, reactive, StatusSelectionOptions} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {AdminAuthToken} from "../../common/api-types";
+import {StatusEnum} from "../../common/db-types";
 import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {nn} from "../../common/utils/asserts";
 import {useUserStore} from "../store/userStore";
 import {DataTableHeader} from "../utils/types";
+import AdminDashboardStatusSelectionCell from "./AdminDashboardStatusSelectionCell.vue";
 
 const userStore = useUserStore();
 const props     = defineProps<{
-	waitingLawyers: LawyerSearchResult[]
+	waitingLawyers: LawyerSearchResult[],
+	displayCurrentStatus?: boolean
 }>();
 const emit      = defineEmits<{
 	(type: 'applySuccess'): void
@@ -28,33 +31,43 @@ const dataTableHeaders = computed((args): DataTableHeader<LawyerSearchResult>[] 
 });
 
 const formFields = reactive<{
-	statuses: Record<string | number, string>
+	statuses: Record<string | number, StatusSelectionOptions>
 }>({
 	statuses: {}
 });
 
+
 async function onApply () {
 	const confirmed = [] as string[];
 	const rejected  = [] as string[];
+	const waiting   = [] as string[];
 	for (const vId of Object.keys(formFields.statuses)) {
 		const id = vId.substring(2);
-		if (formFields.statuses[vId] === "yes") {
-			confirmed.push(id);
-		} else if (formFields.statuses[vId] === "no") {
+		switch (formFields.statuses[vId]) {
+		case StatusEnum.Waiting:
+			waiting.push(id);
+			break;
+		case StatusEnum.Rejected:
 			rejected.push(id);
+			break;
+		case StatusEnum.Confirmed:
+			confirmed.push(id);
+			break;
 		}
 	}
 	console.log({confirmed, rejected});
 	const res = await justiceFirmApi.setLawyerStatuses({
 		authToken: nn(userStore.authToken) as AdminAuthToken,
 		rejected,
-		confirmed
+		confirmed,
+		waiting,
 	});
 	if (isLeft(res) || !res.right.ok || (res.right.body != null && "message" in res.right.body)) {
 		console.log(res);
 		alert(`Failed to set lawyers' statuses`);
 		return;
 	}
+	formFields.statuses = {};
 	emit("applySuccess");
 	alert(`Successfully applied lawyers' statuses`);
 }
@@ -76,35 +89,10 @@ async function onApply () {
 	density="compact"
 	class="elevation-3 bg-gradient--gagarin-view">
 	<template v-slot:item.id="{ item }">
-	<v-btn-toggle
+	<AdminDashboardStatusSelectionCell
 		v-model="formFields.statuses['id'+item.raw.id]"
-		density="compact"
-		rounded="2"
-		mandatory
-		group
-	>
-		<v-btn
-			class="no-min-w-btn"
-			density="compact"
-			color="green-accent-4"
-			value="yes">
-			<v-icon icon="fa-check" />
-		</v-btn>
-		<v-btn
-			class="no-min-w-btn"
-			density="compact"
-			color="deep-purple-accent-3"
-			value="unk">
-			<v-icon icon="fa-question" />
-		</v-btn>
-		<v-btn
-			class="no-min-w-btn"
-			density="compact"
-			color="red-accent-3"
-			value="no">
-			<v-icon icon="fa-xmark" />
-		</v-btn>
-	</v-btn-toggle>
+		:display-current-status="props.displayCurrentStatus"
+		:orig-val="item.raw.status" />
 	</template>
 	<template v-slot:item.address="{ item }">
 	<pre>{{ item.raw.address }}</pre>

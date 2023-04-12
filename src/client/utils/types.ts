@@ -1,3 +1,4 @@
+import {StatusEnum} from "../../common/db-types";
 import {MessageData} from "../../common/ws-api-schema";
 
 export type SelectItemKey =
@@ -27,3 +28,13 @@ export type MessageDataDisplayable = MessageData & {
 	last: boolean,
 	timeString: string,
 };
+
+export enum KeepAsIsEnum {
+	KeepAsIs = "KeepAsIs"
+}
+
+export const StatusSelectionOptions = {
+	...StatusEnum,
+	...KeepAsIsEnum
+};
+export type StatusSelectionOptions = StatusEnum | KeepAsIsEnum;

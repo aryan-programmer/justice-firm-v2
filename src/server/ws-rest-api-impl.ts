@@ -1,6 +1,5 @@
 import {GoneException} from "@aws-sdk/client-apigatewaymanagementapi";
 import {
-	ConsumedCapacity,
 	DeleteItemCommand,
 	PutItemCommand,
 	QueryCommand,
@@ -124,7 +123,7 @@ export class JusticeFirmWsRestAPIImpl
 				`User ${jwt.id} is not authorized to access the chat group ${group}`);
 		}
 		const conn        = event.requestContext.connectionId;
-		const putResponse            = await dynamoDbClient.send(new PutItemCommand({
+		const putResponse = await dynamoDbClient.send(new PutItemCommand({
 			TableName:              connectionsTableName,
 			Item:                   {
 				group: {S: group},

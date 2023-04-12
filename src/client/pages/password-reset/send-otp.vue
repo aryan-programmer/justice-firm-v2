@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import {definePageMeta, justiceFirmApi, navigateTo} from "#imports";
 import {isLeft} from "fp-ts/Either";
+import isEmpty from "lodash/isEmpty";
 import {useField, useForm} from 'vee-validate';
 import * as yup from "yup";
 import {useUserStore} from "../../store/userStore";
-import isEmpty from "lodash/isEmpty";
 
 definePageMeta({
 	middleware: "no-user-page"
@@ -27,7 +27,7 @@ const onSubmit = handleSubmit(async values => {
 		return;
 	}
 	const res = await justiceFirmApi.sendPasswordResetOTP({
-			email:    values.email,
+		email: values.email,
 	});
 	console.log(res);
 	if (isLeft(res) || !res.right.ok) {

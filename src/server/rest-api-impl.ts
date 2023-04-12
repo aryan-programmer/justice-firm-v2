@@ -23,6 +23,7 @@ import {
 	RegisterClientInput,
 	RegisterLawyerInput,
 	ResetPasswordInput,
+	SearchAllLawyersInput,
 	SearchLawyersInput,
 	SendPasswordResetOTPInput,
 	SessionLoginInput,
@@ -89,7 +90,7 @@ function recordToLawyerSearchResult (value: Record<string, any>) {
 		latitude:          Number(value.latitude),
 		longitude:         Number(value.longitude),
 		certificationLink: value.certification_link.toString(),
-		status:            StatusEnum.Confirmed,
+		status:            nullOrEmptyCoalesce(value.status?.toString(), StatusEnum.Confirmed),
 		distance:          toNumIfNotNull(value.distance)
 	} as LawyerSearchResult;
 }
@@ -271,6 +272,64 @@ export class JusticeFirmRestAPIImpl
 				      ON u.id = l.id
 				 WHERE l.status = 'confirmed'
 				   AND u.name LIKE ?
+				   AND u.address LIKE ?
+				 ORDER BY name ASC
+				 LIMIT 25;`, [name, address]);
+		}
+
+		const lawyers: LawyerSearchResult[] = res.map(recordToLawyerSearchResult);
+		return response(200, lawyers);
+	}
+
+	async searchAllLawyers (params: FnParams<SearchAllLawyersInput>):
+		Promise<EndpointResult<LawyerSearchResult[] | Message>> {
+		const data      = params.body;
+		const jwtSecret = await this.getJwtSecret();
+		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
+		const name      = `%${data.name ?? ""}%`;
+		const address   = `%${data.address ?? ""}%`;
+		if (obj.userType !== UserAccessType.Admin) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED,
+				"To get the list of waiting lawyers the user must be authenticated as an administrator.");
+		}
+
+		let res: Record<string, any>[];
+		if ("latitude" in data && "longitude" in data && data.latitude != null && data.longitude != null) {
+			res = await (await this.getPool()).execute(
+				`SELECT u.id,
+				        u.name,
+				        u.email,
+				        u.phone,
+				        u.address,
+				        u.photo_path,
+				        l.status,
+				        l.latitude,
+				        l.longitude,
+				        l.certification_link,
+				        ST_DISTANCE_SPHERE(POINT(l.latitude, l.longitude), POINT(?, ?)) AS distance
+				 FROM lawyer l
+				 JOIN user   u
+				      ON u.id = l.id
+				 WHERE u.name LIKE ?
+				   AND u.address LIKE ?
+				 ORDER BY distance ASC
+				 LIMIT 25;`, [data.latitude, data.longitude, name, address]);
+		} else {
+			res = await (await this.getPool()).execute(
+				`SELECT u.id,
+				        u.name,
+				        u.email,
+				        u.phone,
+				        u.address,
+				        u.photo_path,
+				        l.status,
+				        l.latitude,
+				        l.longitude,
+				        l.certification_link
+				 FROM lawyer l
+				 JOIN user   u
+				      ON u.id = l.id
+				 WHERE u.name LIKE ?
 				   AND u.address LIKE ?
 				 ORDER BY name ASC
 				 LIMIT 25;`, [name, address]);
@@ -486,6 +545,18 @@ export class JusticeFirmRestAPIImpl
 					 SET status = 'rejected'
 					 WHERE id IN (${sqlRejectTuple});`,
 					data.rejected.map(BigInt)
+				);
+			}
+
+
+			if (data.waiting.length > 0) {
+				const sqlRejectTuple = "?" + ",?".repeat(data.waiting.length - 1);
+
+				const rejectRes: UpsertResult = await conn.execute(
+					`UPDATE lawyer
+					 SET status = 'waiting'
+					 WHERE id IN (${sqlRejectTuple});`,
+					data.waiting.map(BigInt)
 				);
 			}
 
@@ -776,7 +847,7 @@ The Justice Firm Foundation`;
 				"INSERT INTO `case` (client_id, lawyer_id, type_id, group_id, description, status) VALUES (?,?,?,?,?,?);",
 				[clientId, lawyerId, data.type, appointmentData.groupId, caseDesc, status]
 			);
-			const caseId = nn(caseInsertRes.insertId);
+			const caseId                      = nn(caseInsertRes.insertId);
 
 			if (isNullOrEmpty(data.groupName)) {
 				await conn.execute(

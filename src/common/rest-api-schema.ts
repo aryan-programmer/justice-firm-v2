@@ -47,7 +47,8 @@ const LawyerSearchResult = Type.Intersect([
 	Type.Omit(Lawyer, ["type", "passwordHash", "status"]),
 	Type.Object({
 		distance:            Optional(Number_T),
-		caseSpecializations: Optional(ArrayOf(CaseType))
+		caseSpecializations: Optional(ArrayOf(CaseType)),
+		status:              Optional(StatusEnum_T),
 	})
 ], {$id: "LawyerSearchResult"});
 export type LawyerSearchResult = Static<typeof LawyerSearchResult>;
@@ -103,10 +104,20 @@ export const GetWaitingLawyersInput = Type.Object({
 }, {$id: "GetWaitingLawyersInput"});
 export type GetWaitingLawyersInput = Static<typeof GetWaitingLawyersInput>;
 
+export const SearchAllLawyersInput = Type.Union([
+		Type.Intersect([SearchLawyersBaseInput, GetWaitingLawyersInput]),
+		Type.Intersect([SearchAndSortLawyersInput, GetWaitingLawyersInput]),
+	],
+	{$id: "SearchAllLawyersInput"});
+export type SearchAllLawyersInput =
+	(SearchLawyersBaseInput & GetWaitingLawyersInput)
+	| (SearchAndSortLawyersInput & GetWaitingLawyersInput);
+
 export const SetLawyerStatusesInput = Type.Object({
 	authToken: AdminAuthToken,
 	confirmed: ArrayOf(ID_T),
 	rejected:  ArrayOf(ID_T),
+	waiting:   ArrayOf(ID_T),
 }, {$id: "SetLawyerStatusesInput"});
 export type SetLawyerStatusesInput = Static<typeof SetLawyerStatusesInput>;
 
@@ -224,6 +235,12 @@ export const justiceFirmApiSchema = modelSchema({
 			path:                "/user/lawyer/search",
 			requestBodyChecker:  lazyCheck(SearchLawyersInput),
 			responseBodyChecker: lazyCheck(LawyerSearchResults),
+		}),
+		searchAllLawyers:         endpoint({
+			method:              HttpMethods.POST,
+			path:                "/user/lawyer/search-all",
+			requestBodyChecker:  lazyCheck(SearchAllLawyersInput),
+			responseBodyChecker: lazyCheck(MessageOr(LawyerSearchResults)),
 		}),
 		getWaitingLawyers:        endpoint({
 			method:              HttpMethods.POST,
