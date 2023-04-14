@@ -2,6 +2,7 @@
 import {computed} from "#imports";
 import {useDisplay} from "vuetify";
 import {ClientDataResult} from "../../common/rest-api-schema";
+import {genderDBToHuman, isNullOrEmpty} from "../../common/utils/functions";
 
 const props = defineProps<{
 	client: ClientDataResult,
@@ -31,6 +32,7 @@ const sideImage = computed(() =>
 				</v-card-title>
 				Email: {{ props.client.email }}<br />
 				Phone: {{ props.client.phone }}<br />
+				<span v-if="!isNullOrEmpty(props.client.gender)">Gender: {{ genderDBToHuman(props.client.gender) }}<br /></span>
 				<pre>
 Address:
 {{ props.client.address }}</pre>

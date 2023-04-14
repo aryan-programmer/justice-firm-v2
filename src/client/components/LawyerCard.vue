@@ -2,6 +2,7 @@
 import {computed, useSlots} from "#imports";
 import {useDisplay} from "vuetify";
 import {LawyerSearchResult} from "../../common/rest-api-schema";
+import {genderDBToHuman, isNullOrEmpty} from "../../common/utils/functions";
 
 const props = defineProps<{
 	lawyer: LawyerSearchResult,
@@ -32,6 +33,7 @@ const sideImage = computed(() =>
 				</v-card-title>
 				Email: {{ props.lawyer.email }}<br />
 				Phone: {{ props.lawyer.phone }}<br />
+				<span v-if="!isNullOrEmpty(props.lawyer.gender)">Gender: {{ genderDBToHuman(props.lawyer.gender) }}<br /></span>
 				Latitude & Longitude: ({{ props.lawyer.latitude }}, {{ props.lawyer.longitude }})<br />
 				<span v-if="typeof props.lawyer.distance == 'number'">Spherical distance from current location: {{ props.lawyer.distance.toPrecision(2) }} km<br /></span>
 				<pre>

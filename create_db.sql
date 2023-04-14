@@ -26,7 +26,8 @@ CREATE TABLE user (
 	address       TEXT,
 	password_hash VARCHAR(2048)                      NOT NULL,
 	photo_path    VARCHAR(1024),
-	type          ENUM ('client', 'lawyer', 'admin') NOT NULL DEFAULT 'client'
+	type          ENUM ('client', 'lawyer', 'admin') NOT NULL DEFAULT 'client',
+	gender        VARCHAR(16)                        NOT NULL
 );
 
 CREATE TABLE client (

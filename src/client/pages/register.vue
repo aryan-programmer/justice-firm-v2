@@ -5,9 +5,13 @@ import {isLeft} from "fp-ts/lib/Either";
 import isEmpty from "lodash/isEmpty";
 import {useField, useForm} from 'vee-validate';
 import * as yup from "yup";
+import {genderHumanVals} from "../../common/utils/constants";
+import {genderHumanToDB} from "../../common/utils/functions";
+import FormTextFieldInCol from "../components/FormTextFieldInCol.vue";
 import {useUserStore} from "../store/userStore";
 import {justiceFirmApi} from "../utils/api-fetcher-impl";
 import {readFileAsDataUrl, validateDataUrlAsPhotoBrowserSide} from "../utils/functions";
+import {FormTextFieldData} from "../utils/types";
 import {getRegistrationSchemaForClient} from "../utils/validation-schemas";
 
 definePageMeta({
@@ -28,6 +32,7 @@ const rePassword = useField('rePassword');
 const phone      = useField('phone');
 const address    = useField('address');
 const photo      = useField('photo');
+const gender     = useField('gender');
 
 // const photoInputRef = ref();
 
@@ -35,12 +40,15 @@ const userStore = useUserStore();
 
 let photoData: string | null | undefined = null;
 
-const textFields = [
+const textFields1: FormTextFieldData[] = [
 	{field: name, label: "Name", cols: 12, lg: 4, type: "text"},
-	{field: email, label: "Email", cols: 12, lg: 4, type: "text"},
+];
+const genderFieldLg                    = 4;
+const textFields2: FormTextFieldData[] = [
 	{field: phone, label: "Phone", cols: 12, lg: 4, type: "text"},
-	{field: password, label: "Password", cols: 12, lg: 6, type: "password"},
-	{field: rePassword, label: "Retype Password", cols: 12, lg: 6, type: "password"},
+	{field: email, label: "Email", cols: 12, lg: 4, type: "text"},
+	{field: password, label: "Password", cols: 12, lg: 4, type: "password"},
+	{field: rePassword, label: "Retype Password", cols: 12, lg: 4, type: "password"},
 ];
 
 function photoClear (event: unknown) {
@@ -77,6 +85,7 @@ const onSubmit = handleSubmit(async values => {
 		photoData,
 		address:  values.address,
 		phone:    values.phone,
+		gender:   genderHumanToDB(values.gender),
 	});
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
@@ -101,21 +110,23 @@ const onSubmit = handleSubmit(async values => {
 		</v-card-title>
 		<v-card-text>
 			<v-row>
+				<FormTextFieldInCol v-for="field in textFields1" :field="field" />
 				<v-col
 					class="py-0"
-					v-for="field in textFields"
-					:cols="field.cols"
-					:lg="field.lg"
+					:cols="12"
+					:lg="genderFieldLg"
 				>
-					<v-text-field
-						@blur="field.field.handleBlur"
-						v-model="field.field.value.value"
-						:error-messages="field.field.errorMessage.value"
-						:label="field.label"
+					<v-select
+						@blur="gender.handleBlur"
+						v-model="gender.value.value"
+						:error-messages="gender.errorMessage.value"
+						label="Gender"
 						density="comfortable"
-						:type="field.type"
-					/>
+						:items="genderHumanVals"
+					>
+					</v-select>
 				</v-col>
+				<FormTextFieldInCol v-for="field in textFields2" :field="field" />
 				<v-col class="py-0" cols="12">
 					<v-textarea
 						v-model="address.value.value"

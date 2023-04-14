@@ -45,12 +45,11 @@ const showForm = ref<boolean>(false);
 
 async function fetchFromQuery () {
 	const query: Record<string, LocationQueryValue | LocationQueryValue[]> = route.query;
-	const name_                                                            = name.value.value = firstIfArray(query.name);
-	const address_                                                         = address.value.value = firstIfArray(query.address);
-	const latitude_                                                        = latitude.value.value = toNumIfNotNull(
-		firstIfArray(query.latitude)) ?? 0;
-	const longitude_                                                       = longitude.value.value = toNumIfNotNull(
-		firstIfArray(query.longitude)) ?? 0;
+
+	const name_      = name.value.value = firstIfArray(query.name);
+	const address_   = address.value.value = firstIfArray(query.address);
+	const latitude_  = latitude.value.value = toNumIfNotNull(firstIfArray(query.latitude)) ?? 0;
+	const longitude_ = longitude.value.value = toNumIfNotNull(firstIfArray(query.longitude)) ?? 0;
 	if (name_ == null || address_ == null) return;
 
 	let body = closeToZero(latitude_) || closeToZero(longitude_) ? {

@@ -5,6 +5,7 @@ import {AdminAuthToken} from "../../common/api-types";
 import {StatusEnum} from "../../common/db-types";
 import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {nn} from "../../common/utils/asserts";
+import {genderDBToHuman} from "../../common/utils/functions";
 import {useUserStore} from "../store/userStore";
 import {DataTableHeader} from "../utils/types";
 import AdminDashboardStatusSelectionCell from "./AdminDashboardStatusSelectionCell.vue";
@@ -20,13 +21,13 @@ const emit      = defineEmits<{
 
 const dataTableHeaders = computed((args): DataTableHeader<LawyerSearchResult>[] => {
 	return [
-		{title: "Action", align: 'start', key: 'id', sortable: false},
+		{title: "Action", align: 'start', key: 'status', sortable: true},
 		{title: 'Photo', align: 'start', key: 'photoPath', sortable: false},
 		{title: 'Name', align: 'start', key: 'name', sortable: true},
 		{title: 'Email', align: 'start', key: 'email', sortable: true},
 		{title: 'Phone', align: 'start', key: 'phone', sortable: true},
 		{title: 'Address', align: 'start', key: 'address', sortable: true},
-		{title: 'Certification', align: 'start', key: 'certificationLink', sortable: false},
+		{title: 'Gender', align: 'start', key: 'gender', sortable: false},
 	]
 });
 
@@ -88,11 +89,14 @@ async function onApply () {
 	items-per-page="15"
 	density="compact"
 	class="elevation-3 bg-gradient--gagarin-view">
-	<template v-slot:item.id="{ item }">
+	<template v-slot:item.status="{ item }">
 	<AdminDashboardStatusSelectionCell
 		v-model="formFields.statuses['id'+item.raw.id]"
 		:display-current-status="props.displayCurrentStatus"
 		:orig-val="item.raw.status" />
+	</template>
+	<template v-slot:item.gender="{ item }">
+	{{ genderDBToHuman(item.raw.gender) }}
 	</template>
 	<template v-slot:item.address="{ item }">
 	<pre>{{ item.raw.address }}</pre>
@@ -100,8 +104,9 @@ async function onApply () {
 	<template v-slot:item.photoPath="{ item }">
 	<img :src="item.raw.photoPath" alt="Photo" width="150">
 	</template>
-	<template v-slot:item.certificationLink="{ item }">
-	<a :href="item.raw.certificationLink" class="text-light-green-lighten-4 font-weight-bold">View certification</a>
+	<template v-slot:item.name="{ item }">
+	{{ item.raw.name }}<br />
+	<a :href="item.raw.certificationLink" class="text-light-green-darken-4 font-weight-bold">View certification</a>
 	</template>
 </v-data-table>
 <v-btn

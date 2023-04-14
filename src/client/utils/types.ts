@@ -1,3 +1,4 @@
+import {FieldContext} from "vee-validate";
 import {StatusEnum} from "../../common/db-types";
 import {MessageData} from "../../common/ws-api-schema";
 
@@ -29,6 +30,14 @@ export type MessageDataDisplayable = MessageData & {
 	timeString: string,
 };
 
+export type FormTextFieldData = {
+	field: FieldContext,
+	label: string,
+	cols: number,
+	lg: number,
+	type: string,
+};
+
 export enum KeepAsIsEnum {
 	KeepAsIs = "KeepAsIs"
 }
@@ -38,3 +47,5 @@ export const StatusSelectionOptions = {
 	...KeepAsIsEnum
 };
 export type StatusSelectionOptions = StatusEnum | KeepAsIsEnum;
+
+export type BtnVariants = "flat" | "text" | "elevated" | "tonal" | "outlined" | "plain";

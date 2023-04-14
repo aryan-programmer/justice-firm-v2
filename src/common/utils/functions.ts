@@ -8,6 +8,7 @@ import {
 	TSchema,
 	Type
 } from "@sinclair/typebox";
+import {genderDbValsToHuman, genderHumanValsToDb} from "./constants";
 import {GeolocationNotAvailableError} from "./errors";
 import {memoizeWeak} from "./memoizeWeak";
 import {Nuly} from "./types";
@@ -142,4 +143,12 @@ export function getDayFromMs (ms: number) {
 	const minutes = (seconds / 60) | 0;
 	const hours   = (minutes / 60) | 0;
 	return (hours / 24) | 0;
+}
+
+export function genderHumanToDB (h: string | Nuly) {
+	return genderHumanValsToDb[h as keyof typeof genderHumanValsToDb] ?? genderHumanValsToDb.Unknown
+}
+
+export function genderDBToHuman (h: string | Nuly) {
+	return genderDbValsToHuman[h as keyof typeof genderDbValsToHuman] ?? genderDbValsToHuman.unknown
 }

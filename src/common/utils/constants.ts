@@ -3,7 +3,7 @@ import {CaseType} from "../db-types";
 
 export const badFileNameChars = /[^a-zA-Z0-9.]/g;
 export const emailRegex       = /^(([^<>()[\]\.,;:\s@\"]+(\.[^<>()[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$/i;
-export const phoneRegex       = /^[0-9]{3}([-\s]?)[0-9]{3}([-\s]?)[0-9]{4}$/;
+export const phoneRegex       = /^(\+[1-9][0-9]{0,2}([-\s]?))?[0-9]{3}([-\s]?)[0-9]{3}([-\s]?)[0-9]{4}$/;
 export const validOtpRegex    = /^[0-9]{6}$/g;
 export const otpLength        = 6;
 export const maxFileSize      = "2 MB";
@@ -23,6 +23,20 @@ export const validImageMimeTypes: string[] = [
 	'image/gif',
 ];
 export const invalidImageMimeTypeMessage   = "Error: File must be a JPEG/JPG, PNG of GIF image";
+
+export const genderDbValsToHuman = {
+	"male":          "Male",
+	"female":        "Female",
+	"unknown":       "Unknown",
+	"not-specified": "Prefer to not specify",
+};
+export const genderHumanValsToDb = {
+	"Male":                  "male",
+	"Female":                "female",
+	"Unknown":               "unknown",
+	"Prefer to not specify": "not-specified",
+};
+export const genderHumanVals     = Object.keys(genderHumanValsToDb);
 
 export function getCaseTypes (): CaseType[] {
 	return [

@@ -87,6 +87,7 @@ function recordToLawyerSearchResult (value: Record<string, any>) {
 		phone:             value.phone.toString(),
 		address:           value.address.toString(),
 		photoPath:         value.photo_path.toString(),
+		gender:            value.gender?.toString(),
 		latitude:          Number(value.latitude),
 		longitude:         Number(value.longitude),
 		certificationLink: value.certification_link.toString(),
@@ -142,8 +143,8 @@ export class JusticeFirmRestAPIImpl
 			await conn.beginTransaction();
 
 			const userInsertRes: UpsertResult = await conn.execute(
-				"INSERT INTO user(name, email, phone, address, password_hash, photo_path, type) VALUES (?, ?, ?, ?, ?, ?, 'lawyer');",
-				[data.name, data.email, data.phone, data.address, passwordHash, photoRes.url]
+				"INSERT INTO user(name, email, phone, address, password_hash, photo_path, gender, type) VALUES (?, ?, ?, ?, ?, ?, ?, 'lawyer');",
+				[data.name, data.email, data.phone, data.address, passwordHash, photoRes.url, data.gender]
 			);
 
 			const userId = nn(userInsertRes.insertId);
@@ -199,8 +200,8 @@ export class JusticeFirmRestAPIImpl
 			await conn.beginTransaction();
 
 			const userInsertRes: UpsertResult = await conn.execute(
-				"INSERT INTO user(name, email, phone, address, password_hash, photo_path, type) VALUES (?, ?, ?, ?, ?, ?, 'client');",
-				[data.name, data.email, data.phone, data.address, passwordHash, photoRes.url]
+				"INSERT INTO user(name, email, phone, address, password_hash, photo_path, gender, type) VALUES (?, ?, ?, ?, ?, ?, ?, 'client');",
+				[data.name, data.email, data.phone, data.address, passwordHash, photoRes.url, data.gender]
 			);
 
 			const userId = nn(userInsertRes.insertId);
@@ -244,6 +245,7 @@ export class JusticeFirmRestAPIImpl
 				        u.phone,
 				        u.address,
 				        u.photo_path,
+				        u.gender,
 				        l.latitude,
 				        l.longitude,
 				        l.certification_link,
@@ -264,6 +266,7 @@ export class JusticeFirmRestAPIImpl
 				        u.phone,
 				        u.address,
 				        u.photo_path,
+				        u.gender,
 				        l.latitude,
 				        l.longitude,
 				        l.certification_link
@@ -302,6 +305,7 @@ export class JusticeFirmRestAPIImpl
 				        u.phone,
 				        u.address,
 				        u.photo_path,
+				        u.gender,
 				        l.status,
 				        l.latitude,
 				        l.longitude,
@@ -322,6 +326,7 @@ export class JusticeFirmRestAPIImpl
 				        u.phone,
 				        u.address,
 				        u.photo_path,
+				        u.gender,
 				        l.status,
 				        l.latitude,
 				        l.longitude,
@@ -356,6 +361,7 @@ export class JusticeFirmRestAPIImpl
 			        u.phone,
 			        u.address,
 			        u.photo_path,
+			        u.gender,
 			        l.latitude,
 			        l.longitude,
 			        l.certification_link
@@ -380,6 +386,7 @@ export class JusticeFirmRestAPIImpl
 			        u.phone,
 			        u.address,
 			        u.photo_path,
+			        u.gender,
 			        l.latitude,
 			        l.longitude,
 			        l.certification_link
@@ -552,7 +559,7 @@ export class JusticeFirmRestAPIImpl
 			if (data.waiting.length > 0) {
 				const sqlRejectTuple = "?" + ",?".repeat(data.waiting.length - 1);
 
-				const rejectRes: UpsertResult = await conn.execute(
+				const waitingRes: UpsertResult = await conn.execute(
 					`UPDATE lawyer
 					 SET status = 'waiting'
 					 WHERE id IN (${sqlRejectTuple});`,
@@ -595,12 +602,14 @@ export class JusticeFirmRestAPIImpl
 				       c.phone               AS c_phone,
 				       c.address             AS c_address,
 				       c.photo_path          AS c_photo_path,
+				       c.gender              AS c_gender,
 				       lu.id                 AS l_id,
 				       lu.name               AS l_name,
 				       lu.email              AS l_email,
 				       lu.phone              AS l_phone,
 				       lu.address            AS l_address,
 				       lu.photo_path         AS l_photo_path,
+				       lu.gender             AS l_gender,
 				       ll.latitude           AS l_latitude,
 				       ll.longitude          AS l_longitude,
 				       ll.certification_link AS l_certification_link
@@ -960,12 +969,14 @@ The Justice Firm Foundation`;
 				       c.phone               AS c_phone,
 				       c.address             AS c_address,
 				       c.photo_path          AS c_photo_path,
+				       c.gender              AS c_gender,
 				       lu.id                 AS l_id,
 				       lu.name               AS l_name,
 				       lu.email              AS l_email,
 				       lu.phone              AS l_phone,
 				       lu.address            AS l_address,
 				       lu.photo_path         AS l_photo_path,
+				       lu.gender             AS l_gender,
 				       ll.latitude           AS l_latitude,
 				       ll.longitude          AS l_longitude,
 				       ll.certification_link AS l_certification_link
@@ -1010,6 +1021,7 @@ The Justice Firm Foundation`;
 			phone:             value.l_phone.toString(),
 			address:           value.l_address.toString(),
 			photoPath:         value.l_photo_path.toString(),
+			gender:            value.l_gender?.toString(),
 			latitude:          Number(value.l_latitude),
 			longitude:         Number(value.l_longitude),
 			certificationLink: value.l_certification_link.toString(),
@@ -1023,6 +1035,7 @@ The Justice Firm Foundation`;
 			phone:     value.c_phone.toString(),
 			address:   value.c_address.toString(),
 			photoPath: value.c_photo_path.toString(),
+			gender:    value.c_gender?.toString(),
 		} as ClientDataResult;
 		return {lawyer, client};
 	}

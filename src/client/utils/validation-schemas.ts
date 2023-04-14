@@ -60,6 +60,10 @@ export function getRegistrationSchemaForClient (address: string = "Address") {
 			            .mixed()
 			            .required()
 			            .label("Photo"),
+		gender:     yup
+			            .string()
+			            .required()
+			            .label("Gender"),
 	};
 }
 

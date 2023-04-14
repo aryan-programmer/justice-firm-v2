@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import {definePageMeta, justiceFirmApi, navigateTo, onMounted, readFileAsDataUrl} from "#imports";
+import {definePageMeta, justiceFirmApi, navigateTo, onMounted, readFileAsDataUrl, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import isEmpty from "lodash/isEmpty";
 import {useField, useForm} from 'vee-validate';
 import * as yup from "yup";
 import {ISchema} from "yup";
-import {getCaseTypes, maxDataUrlLen, maxFileSize} from "~~/src/common/utils/constants";
-import {getCurrentPosition} from "~~/src/common/utils/functions";
+import {genderHumanVals, getCaseTypes, maxDataUrlLen, maxFileSize} from "../../common/utils/constants";
+import {genderHumanToDB, getCurrentPosition} from "../../common/utils/functions";
+import FormTextFieldInCol from "../components/FormTextFieldInCol.vue";
 import {useUserStore} from "../store/userStore";
 import {validateDataUrlAsPhotoBrowserSide} from "../utils/functions";
+import {FormTextFieldData} from "../utils/types";
 import {getRegistrationSchemaForLawyer} from "../utils/validation-schemas";
 
 definePageMeta({
@@ -21,13 +23,16 @@ let caseSpecializationsValidationSchema = yup.object(caseTypes.reduce((previousV
 	return previousValue;
 }, {} as Record<string, ISchema<any>>));
 
-let validationSchema = yup.object({
+let validationSchema         = yup.object({
 	...getRegistrationSchemaForLawyer(),
 	caseSpecializations: caseSpecializationsValidationSchema,
 });
-const form           = useForm({
+const {handleSubmit, errors} = useForm({
 	validationSchema: validationSchema,
 });
+watch(() => errors, value => {
+	console.log({...errors});
+}, {immediate: true});
 
 const name        = useField('name');
 const email       = useField('email');
@@ -39,6 +44,7 @@ const photo       = useField('photo');
 const certificate = useField('certificate');
 const latitude    = useField('latitude');
 const longitude   = useField('longitude');
+const gender      = useField('gender');
 
 const userStore = useUserStore();
 
@@ -47,12 +53,15 @@ let certificateData: string | null | undefined = null;
 
 const caseSpecializationsFields = caseTypes.map((value, i) => useField(`caseSpecializations.id${i + 1}`));
 
-const textFields = [
+const textFields1: FormTextFieldData[] = [
 	{field: name, label: "Name", cols: 12, lg: 4, type: "text"},
-	{field: email, label: "Email", cols: 12, lg: 4, type: "text"},
+];
+const genderFieldLg                    = 4;
+const textFields2: FormTextFieldData[] = [
 	{field: phone, label: "Phone", cols: 12, lg: 4, type: "text"},
-	{field: password, label: "Password", cols: 12, lg: 6, type: "password"},
-	{field: rePassword, label: "Retype Password", cols: 12, lg: 6, type: "password"},
+	{field: email, label: "Email", cols: 12, lg: 4, type: "text"},
+	{field: password, label: "Password", cols: 12, lg: 4, type: "password"},
+	{field: rePassword, label: "Retype Password", cols: 12, lg: 4, type: "password"},
 	{field: latitude, label: "Office address latitude", cols: 12, lg: 6, type: "number"},
 	{field: longitude, label: "Office address longitude", cols: 12, lg: 6, type: "number"},
 ];
@@ -96,7 +105,7 @@ async function certificateChange (event: Event) {
 	}
 }
 
-const onSubmit = form.handleSubmit(async values => {
+const onSubmit = handleSubmit(async values => {
 	if (photoData == null || !photoData.startsWith("data:")) {
 		alert("Upload a photo file first");
 		return;
@@ -110,24 +119,28 @@ const onSubmit = form.handleSubmit(async values => {
 		return;
 	}
 	const specializationTypes: string[] = [];
-	const specs                         = form.values.caseSpecializations;
+	const specs                         = values.caseSpecializations;
+	console.log(specs);
 	for (const key of Object.keys(specs)) {
 		if (specs[key] != null) {
 			specializationTypes.push(key.substring(2));
 		}
 	}
-	const res = await justiceFirmApi.registerLawyer({
+	const body = {
 		name:              values.name,
 		email:             values.email,
 		password:          values.password,
 		photoData,
+		gender:            genderHumanToDB(values.gender),
 		address:           values.address,
 		phone:             values.phone,
 		certificationData: certificateData,
 		latitude:          +values.latitude,
 		longitude:         +values.longitude,
 		specializationTypes,
-	});
+	};
+	console.log(body);
+	const res = await justiceFirmApi.registerLawyer(body);
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
 		alert("Failed to sign up.")
@@ -158,21 +171,24 @@ onMounted(() => {
 		</v-card-title>
 		<v-card-text>
 			<v-row>
+
+				<FormTextFieldInCol v-for="field in textFields1" :field="field" />
 				<v-col
 					class="py-0"
-					v-for="field in textFields"
-					:cols="field.cols"
-					:lg="field.lg"
+					:cols="12"
+					:lg="genderFieldLg"
 				>
-					<v-text-field
-						@blur="field.field.handleBlur"
-						v-model="field.field.value.value"
-						:error-messages="field.field.errorMessage.value"
-						:label="field.label"
+					<v-select
+						@blur="gender.handleBlur"
+						v-model="gender.value.value"
+						:error-messages="gender.errorMessage.value"
+						label="Gender"
 						density="comfortable"
-						:type="field.type"
-					/>
+						:items="genderHumanVals"
+					>
+					</v-select>
 				</v-col>
+				<FormTextFieldInCol v-for="field in textFields2" :field="field" />
 				<v-col class="py-0" cols="12">
 					<v-textarea
 						v-model="address.value.value"
@@ -246,7 +262,7 @@ onMounted(() => {
 					variant="elevated"
 					value="y"
 					color="orange-lighten-2"
-					:disabled="!isEmpty(form.errors)">Register
+					:disabled="!isEmpty(errors)">Register
 				</v-btn>
 				<v-btn
 					rounded

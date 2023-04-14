@@ -1,12 +1,14 @@
 import {Static, Type} from "@sinclair/typebox";
 import {ValidEmail, ValidPhone} from "./utils/constants";
+import {Optional} from "./utils/functions";
+import {String_T} from "./utils/types";
 
 export const ID_T = Type.String({$id: "ID_T"});
 export type ID_T = string;
 
 export const CaseType = Type.Object({
 	id:   ID_T,
-	name: Type.String(),
+	name: String_T,
 }, {$id: "CaseType"});
 
 export enum UserAccessType {
@@ -35,19 +37,20 @@ export const CaseStatusEnum_T = Type.Enum(CaseStatusEnum, {$id: "CaseStatusEnum"
 
 export const User = Type.Object({
 	id:           ID_T,
-	name:         Type.String(),
+	name:         String_T,
 	email:        ValidEmail,
 	phone:        ValidPhone,
-	address:      Type.String(),
-	passwordHash: Type.String(),
-	photoPath:    Type.String(),
+	address:      String_T,
+	passwordHash: String_T,
+	photoPath:    String_T,
 	type:         UserAccessType_T,
+	gender:       Optional(String_T)
 }, {$id: "User"});
 
 export const Administrator = Type.Intersect([
 		User,
 		Type.Object({
-			jobPost: Type.String(),
+			jobPost: String_T,
 		})
 	],
 	{$id: "Administrator"});
@@ -57,7 +60,7 @@ export const Lawyer = Type.Intersect([
 	Type.Object({
 		latitude:          Type.Number(),
 		longitude:         Type.Number(),
-		certificationLink: Type.String(),
+		certificationLink: String_T,
 		status:            StatusEnum_T,
 	})
 ], {$id: "Lawyer"});
