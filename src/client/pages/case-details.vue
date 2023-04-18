@@ -9,11 +9,13 @@ import {dateStringFormat, firstIfArray} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import ClientCard from "../components/ClientCard.vue";
 import LawyerCard from "../components/LawyerCard.vue";
+import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 
-const route     = useRoute();
-const userStore = useUserStore();
-const router    = useRouter();
+const {message, error} = useModals();
+const route            = useRoute();
+const userStore        = useUserStore();
+const router           = useRouter();
 
 const caseData = ref<CaseFullData | Nuly>(null);
 
@@ -25,7 +27,7 @@ async function fetchCase (value: LocationQuery) {
 	const id = firstIfArray(value.id);
 	if (id == null) {
 		await navigateTo("/");
-		alert("Specify a case to view details for");
+		await error("Specify a case to view details for");
 		return;
 	}
 	console.log({id});
@@ -36,7 +38,7 @@ async function fetchCase (value: LocationQuery) {
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
 		await navigateTo("/");
-		alert(`Failed to find the case with the ID ${id}`);
+		await error(`Failed to find the case with the ID ${id}`);
 		return;
 	}
 	const a = res.right.body;

@@ -5,15 +5,17 @@ import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {Nuly} from "../../common/utils/types";
 import {ModelResponseOrErr} from "../../singularity/model.client";
 import LawyerCard from "../components/LawyerCard.vue";
+import {useModals} from "../store/modalsStore";
 
-const router = useRouter();
-const route  = useRoute();
-const lawyer = ref<LawyerSearchResult | Nuly>();
+const {message, error} = useModals();
+const router           = useRouter();
+const route            = useRoute();
+const lawyer           = ref<LawyerSearchResult | Nuly>();
 
 watch(() => route.query.id, async value => {
 	const id = value?.toString();
 	if (id == null || id.length === 0 || id === "0") {
-		alert("Invalid id for a lawyer");
+		await error("Invalid id for a lawyer");
 		await navigateTo("/");
 		return;
 	}
@@ -26,7 +28,7 @@ watch(() => route.query.id, async value => {
 	const res = await resP;
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		console.log(res);
-		alert("Failed to find a lawyer with the id " + id);
+		await error("Failed to find a lawyer with the id " + id);
 		await navigateTo("/");
 		return;
 	}

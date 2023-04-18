@@ -6,16 +6,18 @@ import {StatusEnum} from "../../common/db-types";
 import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {nn} from "../../common/utils/asserts";
 import {genderDBToHuman} from "../../common/utils/functions";
+import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 import {DataTableHeader} from "../utils/types";
 import AdminDashboardStatusSelectionCell from "./AdminDashboardStatusSelectionCell.vue";
 
-const userStore = useUserStore();
-const props     = defineProps<{
+const userStore        = useUserStore();
+const {message, error} = useModals();
+const props            = defineProps<{
 	waitingLawyers: LawyerSearchResult[],
 	displayCurrentStatus?: boolean
 }>();
-const emit      = defineEmits<{
+const emit             = defineEmits<{
 	(type: 'applySuccess'): void
 }>();
 
@@ -65,12 +67,12 @@ async function onApply () {
 	});
 	if (isLeft(res) || !res.right.ok || (res.right.body != null && "message" in res.right.body)) {
 		console.log(res);
-		alert(`Failed to set lawyers' statuses`);
+		await error(`Failed to set lawyers' statuses`);
 		return;
 	}
 	formFields.statuses = {};
 	emit("applySuccess");
-	alert(`Successfully applied lawyers' statuses`);
+	await message(`Successfully applied lawyers' statuses`);
 }
 </script>
 

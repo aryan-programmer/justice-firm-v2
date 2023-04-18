@@ -21,24 +21,26 @@ import {firstIfArray, isNullOrEmpty} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import {EstablishConnectionOutput, MessageData, PostMessageInput} from "../../common/ws-api-schema";
 import ChatMessagesList from "../components/ChatMessagesList.vue";
+import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 
 definePageMeta({
 	middleware: "yes-user-page"
 });
 
-const userStore    = useUserStore();
-const route        = useRoute();
-const router       = useRouter();
-const chatClient   = ref<ChatWSAPIClient | Nuly>();
-const chatData     = ref<EstablishConnectionOutput | Nuly>();
-const messageText  = ref<string>("");
-const scrollingBox = ref<VTextarea | Nuly>();
-const canPost      = computed(() =>
+const {message, error} = useModals();
+const userStore        = useUserStore();
+const route            = useRoute();
+const router           = useRouter();
+const chatClient       = ref<ChatWSAPIClient | Nuly>();
+const chatData         = ref<EstablishConnectionOutput | Nuly>();
+const messageText      = ref<string>("");
+const scrollingBox     = ref<VTextarea | Nuly>();
+const canPost          = computed(() =>
 	!isNullOrEmpty(messageText.value)
 );
-const messages     = reactive({messages: [] as MessageData[]});
-const pastMessages = new Set<ID_T>();
+const messages         = reactive({messages: [] as MessageData[]});
+const pastMessages     = new Set<ID_T>();
 
 watch(() => route.query, value => {
 	openConnection(value);
@@ -87,7 +89,7 @@ async function postMessage () {
 	};
 	const res                    = await cl.postMessage(body);
 	if (isLeft(res) || !res.right.ok) {
-		alert("Failed to post message");
+		await error("Failed to post message");
 		return;
 	}
 	messageText.value = "";
@@ -98,7 +100,7 @@ async function openConnection (value: LocationQuery) {
 	const id = firstIfArray(value.id);
 	if (id == null) {
 		await navigateTo("/");
-		alert("Specify an chat group to connect to for");
+		await error("Specify an chat group to connect to for");
 		return;
 	}
 	await chatClient.value?.close();
@@ -109,8 +111,8 @@ async function openConnection (value: LocationQuery) {
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
 		await navigateTo("/");
-		alert(`Failed to open a connection with the ID ${id}`);
 		await cl.close();
+		await error(`Failed to open a connection with the ID ${id}`);
 		return;
 	}
 	const establishConnBody = res.right.body;
@@ -119,7 +121,7 @@ async function openConnection (value: LocationQuery) {
 	chatClient.value  = cl;
 	const messagesRes = await cl.getMessages({chatAuthToken: establishConnBody.chatAuthToken});
 	if (isLeft(messagesRes) || !messagesRes.right.ok || messagesRes.right.body == null || "message" in messagesRes.right.body) {
-		alert(`Failed to get messages`);
+		await error(`Failed to get messages`);
 		return;
 	}
 	const msgs: MessageData[] = messagesRes.right.body;

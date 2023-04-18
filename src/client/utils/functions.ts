@@ -12,6 +12,7 @@ import {
 import {timeFormat} from "../../common/utils/functions";
 import {Nuly, Writeable} from "../../common/utils/types";
 import {MessageData} from "../../common/ws-api-schema";
+import {ModalStoreWrapper} from "../store/modalsStore";
 import {UserStore_T} from "../store/userStore";
 import {justiceFirmApi} from "./api-fetcher-impl";
 import {confirmedColor, rejectedColor, waitingColor} from "./constants";
@@ -51,6 +52,7 @@ export async function fetchAppointmentsIntoRefByUserType (
 	orderByOpenedOn: boolean,
 	appointmentsRef: Ref<AppointmentSparseData[] | Nuly>,
 	userStore: UserStore_T,
+	modals: ModalStoreWrapper,
 ) {
 	const res = await justiceFirmApi.getAppointments({
 		withStatus: status,
@@ -59,12 +61,12 @@ export async function fetchAppointmentsIntoRefByUserType (
 	});
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		console.log(res);
-		alert(`Failed to get ${status} appointment requests`);
+		await modals.error(`Failed to get ${status} appointment requests`);
 		return;
 	}
 	if ("message" in res.right.body) {
 		console.log(res);
-		alert(`Failed to get ${status} appointment requests: ${res.right.body.message}`);
+		await modals.error(`Failed to get ${status} appointment requests: ${res.right.body.message}`);
 		return;
 	}
 	appointmentsRef.value = res.right.body;
@@ -74,18 +76,19 @@ export async function fetchAppointmentsIntoRefByUserType (
 export async function fetchCasesIntoRef (
 	casesRef: Ref<AppointmentSparseData[] | Nuly>,
 	userStore: UserStore_T,
+	modals: ModalStoreWrapper,
 ) {
 	const res = await justiceFirmApi.getCasesData({
 		authToken: nn(userStore.authToken)
 	});
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		console.log(res);
-		alert(`Failed to get cases`);
+		await modals.error(`Failed to get cases`);
 		return;
 	}
 	if ("message" in res.right.body) {
 		console.log(res);
-		alert(`Failed to get cases: ${res.right.body.message}`);
+		await modals.error(`Failed to get cases: ${res.right.body.message}`);
 		return;
 	}
 	console.log(res);
@@ -97,12 +100,13 @@ export async function fetchAppointmentsByCategory (
 	rejectedAppointments: Ref<AppointmentSparseData[] | Nuly>,
 	confirmedAppointments: Ref<AppointmentSparseData[] | Nuly>,
 	userStore: UserStore_T,
+	modals: ModalStoreWrapper,
 ) {
 	await Promise.all([
-		fetchAppointmentsIntoRefByUserType(StatusEnum.Waiting, true, waitingAppointments, userStore),
-		fetchAppointmentsIntoRefByUserType(StatusEnum.Confirmed, false, confirmedAppointments, userStore),
+		fetchAppointmentsIntoRefByUserType(StatusEnum.Waiting, true, waitingAppointments, userStore, modals),
+		fetchAppointmentsIntoRefByUserType(StatusEnum.Confirmed, false, confirmedAppointments, userStore, modals),
 	]);
-	await fetchAppointmentsIntoRefByUserType(StatusEnum.Rejected, true, rejectedAppointments, userStore);
+	await fetchAppointmentsIntoRefByUserType(StatusEnum.Rejected, true, rejectedAppointments, userStore, modals);
 }
 
 export function forceRipple ($el: HTMLElement) {
@@ -120,16 +124,16 @@ export function forceRipple ($el: HTMLElement) {
 	})
 }
 
-export async function validateDataUrlAsPhotoBrowserSide (dataUrl: string) {
+export async function validateDataUrlAsPhotoBrowserSide (dataUrl: string, modals: ModalStoreWrapper) {
 	if (dataUrl.length > maxDataUrlLen) {
-		alert(`The file must be less than ${maxFileSize} in size.`)
+		await modals.error(`The file must be less than ${maxFileSize} in size.`)
 	}
 	const response = await fetch(dataUrl);
 	const fileType = response.headers.get("Content-Type") ?? "text/plain";
 	if (fileType != null && validImageMimeTypes.includes(fileType)) {
 		return true;
 	} else {
-		alert(invalidImageMimeTypeMessage)
+		await modals.error(invalidImageMimeTypeMessage)
 	}
 	return false;
 }

@@ -3,6 +3,7 @@ import {definePageMeta, onMounted, ref} from "#imports";
 import {AppointmentSparseData} from "../../common/rest-api-schema";
 import {Nuly} from "../../common/utils/types";
 import AppointmentsTable from "../components/AppointmentsTable.vue";
+import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 import {fetchAppointmentsByCategory} from "../utils/functions";
 
@@ -10,13 +11,18 @@ definePageMeta({
 	middleware: "client-only-page"
 });
 
+const modals                = useModals();
 const userStore             = useUserStore();
 const waitingAppointments   = ref<AppointmentSparseData[] | Nuly>(null);
 const confirmedAppointments = ref<AppointmentSparseData[] | Nuly>(null);
 const rejectedAppointments  = ref<AppointmentSparseData[] | Nuly>(null);
 
 onMounted(async () => {
-	await fetchAppointmentsByCategory(waitingAppointments, rejectedAppointments, confirmedAppointments, userStore);
+	await fetchAppointmentsByCategory(waitingAppointments,
+		rejectedAppointments,
+		confirmedAppointments,
+		userStore,
+		modals);
 });
 </script>
 

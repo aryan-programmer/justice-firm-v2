@@ -3,6 +3,7 @@ import {definePageMeta, onMounted, ref} from "#imports";
 import {CaseSparseData} from "../../common/rest-api-schema";
 import {Nuly} from "../../common/utils/types";
 import CasesTable from "../components/CasesTable.vue";
+import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 import {fetchCasesIntoRef} from "../utils/functions";
 
@@ -10,11 +11,12 @@ definePageMeta({
 	middleware: "lawyer-only-page"
 });
 
+const modals    = useModals();
 const userStore = useUserStore();
 const cases     = ref<CaseSparseData[] | Nuly>(null);
 
 onMounted(async () => {
-	await fetchCasesIntoRef(cases, userStore);
+	await fetchCasesIntoRef(cases, userStore, modals);
 });
 </script>
 

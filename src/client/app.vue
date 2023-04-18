@@ -5,6 +5,7 @@ import {ref} from "vue";
 import {useDisplay} from "vuetify";
 import {UserAccessType} from "../common/db-types";
 import {capitalizeFirstLetter} from "../common/utils/functions";
+import ModalDisplayer from "./components/ModalDisplayer.vue";
 import NavItem from "./components/NavItem.vue";
 import {useUserStore} from "./store/userStore";
 
@@ -103,6 +104,7 @@ function pathCompare (link: string) {
 </style>
 
 <template>
+<ModalDisplayer />
 <v-layout class="mh-100vh">
 	<v-app-bar
 		:color="userDeps.color"

@@ -6,14 +6,16 @@ import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {nn} from "../../common/utils/asserts";
 import {Nuly} from "../../common/utils/types";
 import AdminDashboardForm from "../components/AdminDashboardForm.vue";
+import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 
 definePageMeta({
 	middleware: "admin-only-page"
 });
 
-const userStore      = useUserStore();
-const waitingLawyers = ref<LawyerSearchResult[] | Nuly>(null);
+const {message, error} = useModals();
+const userStore        = useUserStore();
+const waitingLawyers   = ref<LawyerSearchResult[] | Nuly>(null);
 
 onMounted(fetchLawyers);
 
@@ -23,12 +25,12 @@ async function fetchLawyers () {
 	});
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		console.log(res);
-		alert(`Failed to get waiting lawyers`);
+		await error(`Failed to get waiting lawyers`);
 		return;
 	}
 	if ("message" in res.right.body) {
 		console.log(res);
-		alert(`Failed to get waiting lawyers`);
+		await error(`Failed to get waiting lawyers`);
 		return;
 	}
 	waitingLawyers.value = res.right.body;

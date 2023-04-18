@@ -417,7 +417,7 @@ export class JusticeFirmRestAPIImpl
 	}
 
 	async openAppointmentRequest (params: FnParams<OpenAppointmentRequestInput>):
-		Promise<EndpointResult<Nuly | Message>> {
+		Promise<EndpointResult<ID_T | Message>> {
 		const data: OpenAppointmentRequestInput = params.body;
 
 		const jwtSecret = await this.getJwtSecret();
@@ -446,7 +446,7 @@ export class JusticeFirmRestAPIImpl
 			);
 
 			await conn.commit();
-			return noContent;
+			return response(200, appointmentInsertRes.insertId.toString());
 		} catch (e) {
 			await conn.rollback();
 			throw e;

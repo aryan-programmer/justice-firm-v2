@@ -4,6 +4,7 @@ import {isLeft} from "fp-ts/Either";
 import isEmpty from "lodash/isEmpty";
 import {useField, useForm} from 'vee-validate';
 import * as yup from "yup";
+import {useModals} from "../../store/modalsStore";
 import {useUserStore} from "../../store/userStore";
 
 definePageMeta({
@@ -19,11 +20,12 @@ const {handleSubmit, errors} = useForm({
 
 const email = useField('email');
 
-const userStore = useUserStore();
+const {message, error} = useModals();
+const userStore        = useUserStore();
 
 const onSubmit = handleSubmit(async values => {
 	if (!validationSchema.isType(values)) {
-		alert("Invalid data");
+		await error("Invalid data");
 		return;
 	}
 	const res = await justiceFirmApi.sendPasswordResetOTP({
@@ -31,10 +33,10 @@ const onSubmit = handleSubmit(async values => {
 	});
 	console.log(res);
 	if (isLeft(res) || !res.right.ok) {
-		alert("Failed to send password reset OTP")
+		await error("Failed to send password reset OTP")
 		return;
 	}
-	alert(`Sent password reset OTP successfully`);
+	message /*not-awaiting*/(`Sent password reset OTP successfully`);
 	await navigateTo({
 		path:  "/password-reset/set-new-password",
 		query: {

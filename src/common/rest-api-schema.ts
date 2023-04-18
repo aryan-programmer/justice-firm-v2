@@ -264,7 +264,7 @@ export const justiceFirmApiSchema = modelSchema({
 			method:              HttpMethods.POST,
 			path:                "/appointment/new",
 			requestBodyChecker:  lazyCheck(OpenAppointmentRequestInput),
-			responseBodyChecker: lazyCheck(MessageOr(Nuly)),
+			responseBodyChecker: lazyCheck(MessageOr(ID_T)),
 		}),
 		getAppointments:          endpoint({
 			method:              HttpMethods.POST,

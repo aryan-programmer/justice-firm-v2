@@ -12,6 +12,7 @@ import {Nuly} from "../../common/utils/types";
 import {Message} from "../../singularity/helpers";
 import {ModelResponseOrErr} from "../../singularity/model.client";
 import AdminDashboardForm from "../components/AdminDashboardForm.vue";
+import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 import {optionalNumber} from "../utils/validation-schemas";
 
@@ -34,6 +35,7 @@ const address   = useField('address');
 const latitude  = useField('latitude');
 const longitude = useField('longitude');
 
+const {message, error}                    = useModals();
 const userStore                           = useUserStore();
 const router                              = useRouter();
 const route                               = useRoute();
@@ -70,7 +72,7 @@ async function fetchFromQuery () {
 	const res = await resP;
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
-		alert("Failed to search lawyers");
+		await error("Failed to search lawyers");
 		return;
 	}
 

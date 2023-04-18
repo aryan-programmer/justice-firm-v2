@@ -7,6 +7,7 @@ import * as yup from "yup";
 import {AuthToken} from "../../../common/api-types";
 import {otpLength, validOtpRegex} from "../../../common/utils/constants";
 import {Nuly} from "../../../common/utils/types";
+import {useModals} from "../../store/modalsStore";
 import {useUserStore} from "../../store/userStore";
 
 definePageMeta({
@@ -32,9 +33,10 @@ const otp        = useField('otp');
 const password   = useField('password');
 const rePassword = useField('rePassword');
 
-const route     = useRoute();
-const router    = useRouter();
-const userStore = useUserStore();
+const {message, error} = useModals();
+const route            = useRoute();
+const router           = useRouter();
+const userStore        = useUserStore();
 
 const textFields = [
 	{field: otp, label: "OTP", type: "password"},
@@ -44,7 +46,7 @@ const textFields = [
 
 const onSubmit = handleSubmit(async values => {
 	if (!validationSchema.isType(values)) {
-		alert("Invalid data");
+		await error("Invalid data");
 		return;
 	}
 	if (email.value == null) return;
@@ -55,15 +57,15 @@ const onSubmit = handleSubmit(async values => {
 	});
 	console.log(res);
 	if (isLeft(res) || res.right.body == null) {
-		alert("Failed to set a new password")
+		await error("Failed to set a new password")
 		return;
 	}
 	if ("message" in res.right.body) {
-		alert("Failed to set a new password: " + res.right.body.message)
+		await error("Failed to set a new password: " + res.right.body.message)
 		return;
 	}
 	const authToken: AuthToken = res.right.body;
-	alert(`Set a new password successfully`);
+	message /*not-awaiting*/(`Set a new password successfully`);
 	userStore.signIn(authToken);
 	await navigateTo("/");
 });
@@ -71,7 +73,7 @@ const onSubmit = handleSubmit(async values => {
 watch(() => route.query.email, async value => {
 	const emailQuery = value?.toString();
 	if (emailQuery == null || emailQuery.length === 0) {
-		alert("Invalid E-mail ID");
+		await error("Invalid E-mail ID");
 		await navigateTo("/");
 		return;
 	}

@@ -8,16 +8,18 @@ import {assert} from "../../common/utils/asserts";
 import {isNullOrEmpty} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import {ModelResponseOrErr} from "../../singularity/model.client";
+import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 
 definePageMeta({
 	middleware: "client-only-page"
 });
 
-const userStore = useUserStore();
-const router    = useRouter();
-const route     = useRoute();
-const lawyer    = ref<LawyerSearchResult | Nuly>();
+const {message, error} = useModals();
+const userStore        = useUserStore();
+const router           = useRouter();
+const route            = useRoute();
+const lawyer           = ref<LawyerSearchResult | Nuly>();
 
 const description            = ref("");
 const appointmentDateTime    = ref("");
@@ -30,7 +32,7 @@ const dataValid              = computed(() =>
 watch(() => route.query.id, async value => {
 	const id = value?.toString();
 	if (id == null || id.length === 0 || id === "0") {
-		alert("Invalid id for a lawyer");
+		await error("Invalid id for a lawyer");
 		await navigateTo("/");
 		return;
 	}
@@ -40,7 +42,7 @@ watch(() => route.query.id, async value => {
 	const res = await resP;
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		console.log(res);
-		alert("Failed to find a lawyer with the id " + id);
+		await error("Failed to find a lawyer with the id " + id);
 		await navigateTo("/");
 		return;
 	}
@@ -52,11 +54,11 @@ async function handleSubmit () {
 	const authToken = userStore.authToken;
 	if (authToken == null || authToken.userType !== UserAccessType.Client) {
 		// Should never reach here
-		alert("Must be signed in as a client");
+		await error("Must be signed in as a client");
 		return;
 	}
 	if (!dataValid.value) {
-		alert("Invalid data");
+		await error("Invalid data");
 		return;
 	}
 	const lawyerVal = lawyer.value;
@@ -72,13 +74,13 @@ async function handleSubmit () {
 		description: description.value,
 		timestamp
 	});
-	if (isLeft(res) || !res.right.ok) {
+	if (isLeft(res) || !res.right.ok || typeof res.right.body != "string") {
 		console.log(res);
-		alert("Failed to open appointment request");
+		await error("Failed to open appointment request");
 		return;
 	}
-	alert("Opened appointment request successfully.");
-	await navigateTo("/search-lawyers");
+	message /*not-awaiting*/("Opened appointment request successfully.");
+	await navigateTo(`/appointment-details?id=${res.right.body}`);
 }
 </script>
 

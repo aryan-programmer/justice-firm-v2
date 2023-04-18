@@ -8,12 +8,14 @@ import {UpgradeAppointmentToCaseInput} from "../../common/rest-api-schema";
 import {nn} from "../../common/utils/asserts";
 import {getCaseTypes} from "../../common/utils/constants";
 import {isNullOrEmpty, nullOrEmptyCoalesce, trimStr} from "../../common/utils/functions";
+import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 
-const props = defineProps<{
+const props            = defineProps<{
 	appointmentId: string
 	defaultDescription?: string
 }>();
+const {message, error} = useModals();
 
 const caseTypes = getCaseTypes();
 const userStore = useUserStore();
@@ -44,11 +46,11 @@ async function upgradeAppointmentToCase () {
 	const res = await justiceFirmApi.upgradeAppointmentToCase(body);
 	if (isLeft(res) || !res.right.ok || (res.right.body == null || typeof res.right.body != "string")) {
 		console.log(res);
-		alert(`Failed to upgrade appointment to a case`);
+		await error(`Failed to upgrade appointment to a case`);
 		return;
 	}
-	alert(`Successfully upgraded appointment to a case`);
 	await navigateTo("/case-details?id=" + res.right.body)
+	await message(`Successfully upgraded appointment to a case`);
 }
 
 watch(() => props.defaultDescription, (value, oldValue, onCleanup) => {

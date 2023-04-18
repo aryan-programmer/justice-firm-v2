@@ -11,12 +11,14 @@ import {Nuly} from "../../common/utils/types";
 import CaseUpgradeDialog from "../components/CaseUpgradeDialog.vue";
 import ClientCard from "../components/ClientCard.vue";
 import LawyerCard from "../components/LawyerCard.vue";
+import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 
 definePageMeta({
 	middleware: "yes-user-page"
 });
 
+const {message, error}    = useModals();
 const userStore           = useUserStore();
 const route               = useRoute();
 const router              = useRouter();
@@ -54,7 +56,7 @@ async function fetchAppointment (value: LocationQuery) {
 	const id = firstIfArray(value.id);
 	if (id == null) {
 		await navigateTo("/");
-		alert("Specify an appointment to view details for");
+		await error("Specify an appointment to view details for");
 		return;
 	}
 	console.log({id});
@@ -65,7 +67,7 @@ async function fetchAppointment (value: LocationQuery) {
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
 		await navigateTo("/");
-		alert(`Failed to find the appointment with the ID ${id}`);
+		await error(`Failed to find the appointment with the ID ${id}`);
 		return;
 	}
 	const a = res.right.body;
@@ -99,10 +101,10 @@ async function commonSendRes (params: SetAppointmentStatusInput, mode: string) {
 	const res = await justiceFirmApi.setAppointmentStatus(params);
 	if (isLeft(res) || !res.right.ok || (res.right.body != null && "message" in res.right.body)) {
 		console.log(res);
-		alert(`Failed to ${mode} appointment`);
+		await error(`Failed to ${mode} appointment`);
 		return;
 	}
-	alert(`Successfully ${mode}ed appointment`);
+	message /*not-await*/(`Successfully ${mode}ed appointment`);
 	await fetchAppointment(route.query);
 }
 </script>

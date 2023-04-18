@@ -10,6 +10,7 @@ import {closeToZero, firstIfArray, getCurrentPosition, toNumIfNotNull} from "../
 import {Nuly} from "../../common/utils/types";
 import {ModelResponseOrErr} from "../../singularity/model.client";
 import LawyerCard from "../components/LawyerCard.vue";
+import {useModals} from "../store/modalsStore";
 import {optionalNumber} from "../utils/validation-schemas";
 
 let validationSchema         = yup.object({
@@ -27,6 +28,7 @@ const address   = useField('address');
 const latitude  = useField('latitude');
 const longitude = useField('longitude');
 
+const {message, error}                    = useModals();
 const router                              = useRouter();
 const route                               = useRoute();
 const display                             = useDisplay();
@@ -57,7 +59,7 @@ async function setFromQuery (query: Record<string, LocationQueryValue | Location
 	const res = await resP;
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		console.log(res);
-		alert("Failed to search lawyers");
+		await error("Failed to search lawyers");
 		return;
 	}
 

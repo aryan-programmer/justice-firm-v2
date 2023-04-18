@@ -8,6 +8,7 @@ import {ISchema} from "yup";
 import {genderHumanVals, getCaseTypes, maxDataUrlLen, maxFileSize} from "../../common/utils/constants";
 import {genderHumanToDB, getCurrentPosition} from "../../common/utils/functions";
 import FormTextFieldInCol from "../components/FormTextFieldInCol.vue";
+import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 import {validateDataUrlAsPhotoBrowserSide} from "../utils/functions";
 import {FormTextFieldData} from "../utils/types";
@@ -46,7 +47,9 @@ const latitude    = useField('latitude');
 const longitude   = useField('longitude');
 const gender      = useField('gender');
 
-const userStore = useUserStore();
+const modals           = useModals();
+const userStore        = useUserStore();
+const {message, error} = modals;
 
 let photoData: string | null | undefined       = null;
 let certificateData: string | null | undefined = null;
@@ -84,7 +87,7 @@ async function photoChange (event: Event) {
 	const file = (event.target as HTMLInputElement)?.files?.[0];
 	if (file == null) return;
 	const dataUrl = await readFileAsDataUrl(file);
-	if (await validateDataUrlAsPhotoBrowserSide(dataUrl)) {
+	if (await validateDataUrlAsPhotoBrowserSide(dataUrl, modals)) {
 		photoData = dataUrl;
 	} else {
 		photoClear(null);
@@ -101,21 +104,21 @@ async function certificateChange (event: Event) {
 	if (file == null) return;
 	certificateData = await readFileAsDataUrl(file);
 	if (certificateData.length > maxDataUrlLen) {
-		alert(`The file must be less than ${maxFileSize} in size.`)
+		await error(`The file must be less than ${maxFileSize} in size.`)
 	}
 }
 
 const onSubmit = handleSubmit(async values => {
 	if (photoData == null || !photoData.startsWith("data:")) {
-		alert("Upload a photo file first");
+		await error("Upload a photo file first");
 		return;
 	}
 	if (certificateData == null || !certificateData.startsWith("data:")) {
-		alert("Upload a certification file first");
+		await error("Upload a certification file first");
 		return;
 	}
 	if (!validationSchema.isType(values)) {
-		alert("Invalid data");
+		await error("Invalid data");
 		return;
 	}
 	const specializationTypes: string[] = [];
@@ -143,12 +146,12 @@ const onSubmit = handleSubmit(async values => {
 	const res = await justiceFirmApi.registerLawyer(body);
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
-		alert("Failed to sign up.")
+		await error("Failed to sign up.")
 		return;
 	}
 	console.log(res.right.body);
-	alert("Registered as a lawyer successfully");
 	userStore.signIn(res.right.body);
+	message /*not-awaiting*/("Registered as a lawyer successfully");
 	await navigateTo("/");
 });
 

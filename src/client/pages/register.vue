@@ -8,6 +8,7 @@ import * as yup from "yup";
 import {genderHumanVals} from "../../common/utils/constants";
 import {genderHumanToDB} from "../../common/utils/functions";
 import FormTextFieldInCol from "../components/FormTextFieldInCol.vue";
+import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 import {justiceFirmApi} from "../utils/api-fetcher-impl";
 import {readFileAsDataUrl, validateDataUrlAsPhotoBrowserSide} from "../utils/functions";
@@ -36,7 +37,9 @@ const gender     = useField('gender');
 
 // const photoInputRef = ref();
 
-const userStore = useUserStore();
+const modals           = useModals();
+const userStore        = useUserStore();
+const {message, error} = modals;
 
 let photoData: string | null | undefined = null;
 
@@ -62,7 +65,7 @@ async function photoChange (event: Event) {
 	const file = (event.target as HTMLInputElement)?.files?.[0];
 	if (file == null) return;
 	const dataUrl = await readFileAsDataUrl(file);
-	if (await validateDataUrlAsPhotoBrowserSide(dataUrl)) {
+	if (await validateDataUrlAsPhotoBrowserSide(dataUrl, modals)) {
 		photoData = dataUrl;
 	} else {
 		photoClear(null);
@@ -71,11 +74,11 @@ async function photoChange (event: Event) {
 
 const onSubmit = handleSubmit(async values => {
 	if (photoData == null || !photoData.startsWith("data:")) {
-		alert("Upload a photo file first");
+		await error("Upload a photo file first");
 		return;
 	}
 	if (!validationSchema.isType(values)) {
-		alert("Invalid data");
+		await error("Invalid data");
 		return;
 	}
 	const res = await justiceFirmApi.registerClient({
@@ -89,12 +92,12 @@ const onSubmit = handleSubmit(async values => {
 	});
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
-		alert("Failed to sign up.")
+		await error("Failed to sign up.")
 		return;
 	}
 	console.log(res.right.body);
-	alert("Registered as a client successfully");
 	userStore.signIn(res.right.body);
+	message /*not-awaiting*/("Registered as a client successfully");
 	await navigateTo("/");
 });
 </script>

@@ -5,6 +5,7 @@ import isEmpty from "lodash/isEmpty";
 import {useField, useForm} from 'vee-validate';
 import * as yup from "yup";
 import {AuthToken} from "../../common/api-types";
+import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 import {justiceFirmApi} from "../utils/api-fetcher-impl";
 import {getSignInSchema} from "../utils/validation-schemas";
@@ -21,7 +22,8 @@ const {handleSubmit, errors} = useForm({
 const email    = useField('email');
 const password = useField('password');
 
-const userStore = useUserStore();
+const {message, error} = useModals();
+const userStore        = useUserStore();
 
 const textFields = [
 	{field: email, label: "Email", type: "email"},
@@ -30,7 +32,7 @@ const textFields = [
 
 const onSubmit = handleSubmit(async values => {
 	if (!validationSchema.isType(values)) {
-		alert("Invalid data");
+		await error("Invalid data");
 		return;
 	}
 	const res = await justiceFirmApi.sessionLogin({
@@ -39,16 +41,16 @@ const onSubmit = handleSubmit(async values => {
 	});
 	console.log(res);
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
-		alert("Failed to sign in")
+		await error("Failed to sign in")
 		return;
 	}
 	if ("message" in res.right.body) {
-		alert("Failed to sign in: " + res.right.body.message)
+		await error("Failed to sign in: " + res.right.body.message)
 		return;
 	}
 	const authToken: AuthToken = res.right.body;
-	alert(`Signed in as a ${authToken.userType} successfully`);
 	userStore.signIn(authToken);
+	message /*not-awaiting*/(`Signed in as a ${authToken.userType} successfully`);
 	await navigateTo("/");
 });
 </script>

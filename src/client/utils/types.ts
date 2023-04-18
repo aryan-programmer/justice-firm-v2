@@ -48,4 +48,11 @@ export const StatusSelectionOptions = {
 };
 export type StatusSelectionOptions = StatusEnum | KeepAsIsEnum;
 
-export type BtnVariants = "flat" | "text" | "elevated" | "tonal" | "outlined" | "plain";
+export enum BtnVariants {
+	Flat     = "flat",
+	Text     = "text",
+	Elevated = "elevated",
+	Tonal    = "tonal",
+	Outlined = "outlined",
+	Plain    = "plain",
+}
