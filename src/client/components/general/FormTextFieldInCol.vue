@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {FormTextFieldData} from "../utils/types";
+import {FormTextFieldData} from "../../utils/types";
 
 const props = defineProps<{ field: FormTextFieldData }>();
 </script>

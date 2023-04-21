@@ -2,7 +2,7 @@
 import {computed} from "#imports";
 import {ComputedRef} from "@vue/reactivity";
 import {storeToRefs} from "pinia";
-import {CloseType, ModalData, ModalStore_T, useModalStore} from "../store/modalsStore";
+import {CloseType, ModalData, ModalStore_T, useModalStore} from "../../store/modalsStore";
 
 const modalStore: ModalStore_T = useModalStore();
 

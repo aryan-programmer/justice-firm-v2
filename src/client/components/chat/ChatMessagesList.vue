@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import {computed} from "#imports";
 import _ from "lodash";
-import {getDateTimeHeader, getDayFromMs} from "../../common/utils/functions";
-import {MessageData} from "../../common/ws-api-schema";
-import {useUserStore} from "../store/userStore";
-import {messageDataToDisplayable} from "../utils/functions";
+import {getDateTimeHeader, getDayFromMs} from "../../../common/utils/functions";
+import {MessageData} from "../../../common/ws-api-schema";
+import {useUserStore} from "../../store/userStore";
+import {messageDataToDisplayable} from "../../utils/functions";
 import ChatMessageBox from "./ChatMessageBox.vue";
 
 const props         = defineProps<{
 	messages: MessageData[]
 }>();
+const emit          = defineEmits<{
+	(on: 'anyImageLoaded'): void
+}>()
 const messageGroups = computed(() => {
 	return _
 		.chain(props.messages)
@@ -27,6 +30,9 @@ const messageGroups = computed(() => {
 
 const userStore = useUserStore();
 
+function onLoad () {
+	emit('anyImageLoaded')
+}
 </script>
 
 <template>
@@ -44,6 +50,7 @@ const userStore = useUserStore();
 		<ChatMessageBox
 			v-for="message in messageGroup.messages"
 			:message="message"
+			@imageLoad="onLoad"
 		/>
 	</div>
 </div>

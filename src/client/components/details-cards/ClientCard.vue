@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import {computed} from "#imports";
 import {useDisplay} from "vuetify";
-import {ClientDataResult} from "../../common/rest-api-schema";
-import {genderDBToHuman, isNullOrEmpty} from "../../common/utils/functions";
+import {ClientDataResult} from "../../../common/rest-api-schema";
+import {genderDBToHuman, isNullOrEmpty} from "../../../common/utils/functions";
 
 const props = defineProps<{
 	client: ClientDataResult,

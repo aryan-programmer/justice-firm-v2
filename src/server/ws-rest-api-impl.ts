@@ -7,12 +7,14 @@ import {
 	ReturnConsumedCapacity,
 	Select
 } from "@aws-sdk/client-dynamodb";
+import {AttributeValue} from "@aws-sdk/client-dynamodb/dist-types/models/models_0";
 import {GetParameterCommand} from "@aws-sdk/client-ssm";
 import {APIGatewayProxyWebsocketEventV2} from "aws-lambda/trigger/api-gateway-proxy";
 import {sign} from "jsonwebtoken";
 import {PrivateAuthToken} from "../common/api-types";
 import {UserAccessType} from "../common/db-types";
 import {nn} from "../common/utils/asserts";
+import {isNullOrEmpty} from "../common/utils/functions";
 import {Nuly} from "../common/utils/types";
 import {uniqId} from "../common/utils/uniq-id";
 import {
@@ -24,6 +26,7 @@ import {
 	jfChatterBoxApiSchema,
 	MessageData,
 	PostMessageInput,
+	PostMessageWithAttachmentInput,
 	PrivateChatAuthToken
 } from "../common/ws-api-schema";
 import {connectionsByGroupIndex} from "../infrastructure/constants";
@@ -34,7 +37,8 @@ import {WSAPIImplementation, WSEndpointResult, WSFnParams} from "../singularity/
 import {eventsSender} from "../singularity/websocket/ws-model.server";
 import {connectionsTableName, dynamoDbClient, messagesTableName, ssmClient} from "./environment-clients";
 import {JusticeFirmRestAPIImpl} from "./rest-api-impl";
-import {printConsumedCapacity, verifyAndDecodeJwtToken} from "./utils/functions";
+import {printConsumedCapacity, shortenS3Url, unShortenS3Url, verifyAndDecodeJwtToken} from "./utils/functions";
+import {FileUploadData} from "./utils/types";
 
 function generateChatAuthToken (
 	user: string,
@@ -53,6 +57,31 @@ function generateChatAuthToken (
 
 const verifyAuthJwtToken = verifyAndDecodeJwtToken<PrivateAuthToken>;
 const verifyChatJwtToken = verifyAndDecodeJwtToken<PrivateChatAuthToken>;
+const verifyFileJwtToken = verifyAndDecodeJwtToken<FileUploadData>;
+
+const ATTACHMENT_PATH   = "apath";
+const ATTACHMENT_MIME   = "amime";
+const ATTACHMENT_NAME   = "aname";
+const MESSAGE_GROUP     = "group";
+const MESSAGE_TIMESTAMP = "ts";
+const MESSAGE_TEXT      = "text";
+const MESSAGE_SENDER_ID = "from";
+const MESSAGE_ID        = "id";
+
+const GetMessages_ProjectionExpression     = [
+	MESSAGE_TIMESTAMP, MESSAGE_TEXT, MESSAGE_SENDER_ID, MESSAGE_ID,
+	ATTACHMENT_PATH, ATTACHMENT_NAME, ATTACHMENT_MIME
+].map(v => "#" + v).join(",");
+const GetMessages_EAV_CNeedGroup           = ":needGroup";
+const GetMessages_KeyConditionExpression   = `#${MESSAGE_GROUP} = ${GetMessages_EAV_CNeedGroup}`;
+const GetMessages_ExpressionAttributeNames = [
+	MESSAGE_GROUP,
+	MESSAGE_TIMESTAMP, MESSAGE_TEXT, MESSAGE_SENDER_ID, MESSAGE_ID,
+	ATTACHMENT_PATH, ATTACHMENT_NAME, ATTACHMENT_MIME
+].reduce((prev, curr) => {
+	prev["#" + curr] = curr;
+	return prev;
+}, {} as Record<string, string>);
 
 let fakeOn = true ? undefined as never : eventsSender(jfChatterBoxApiSchema, {validateEventsBody: true, endpoint: ""});
 
@@ -160,10 +189,10 @@ export class JusticeFirmWsRestAPIImpl
 		const {chatAuthToken, text}     = params.body;
 		const jwtSecret                 = await this.getJwtSecret();
 		const jwt: PrivateChatAuthToken = await verifyChatJwtToken(chatAuthToken.jwt, jwtSecret);
-		const {group, user}             = jwt;
+		const {group: groupId, user}    = jwt;
 		const now                       = Date.now();
 		const messageData: MessageData  = {
-			group: group,
+			group: groupId,
 			ts:    now.toString(10),
 			text,
 			from:  user,
@@ -172,16 +201,104 @@ export class JusticeFirmWsRestAPIImpl
 		const putMessageResponse        = await dynamoDbClient.send(new PutItemCommand({
 			TableName:              messagesTableName,
 			Item:                   {
-				group: {S: messageData.group},
-				ts:    {S: messageData.ts},
-				text:  {S: messageData.text},
-				from:  {S: messageData.from},
-				id:    {S: messageData.id},
+				[MESSAGE_GROUP]:     {S: messageData.group},
+				[MESSAGE_TIMESTAMP]: {S: messageData.ts},
+				[MESSAGE_TEXT]:      {S: messageData.text},
+				[MESSAGE_SENDER_ID]: {S: messageData.from},
+				[MESSAGE_ID]:        {S: messageData.id},
 			},
 			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES
 		}));
 		printConsumedCapacity("postMessage: message", putMessageResponse);
 
+		return await this.sendMessageEventToGroup(groupId, messageData);
+	}
+
+	async postMessageWithAttachment (params: WSFnParams<PostMessageWithAttachmentInput>, event: APIGatewayProxyWebsocketEventV2):
+		Promise<EndpointResult<Nuly | Message>> {
+		const {chatAuthToken, text, uploadedFile}  = params.body;
+		const jwtSecret                            = await this.getJwtSecret();
+		const jwt: PrivateChatAuthToken            = await verifyChatJwtToken(chatAuthToken.jwt, jwtSecret);
+		const file: FileUploadData                 = await verifyFileJwtToken(uploadedFile.jwt, jwtSecret);
+		const {group: groupId, user}               = jwt;
+		const now                                  = Date.now();
+		const messageData: MessageData             = {
+			group:      groupId,
+			ts:         now.toString(10),
+			text,
+			from:       user,
+			id:         uniqId(),
+			attachment: file,
+		};
+		const item: Record<string, AttributeValue> = {
+			[MESSAGE_GROUP]:     {S: messageData.group},
+			[MESSAGE_TIMESTAMP]: {S: messageData.ts},
+			[MESSAGE_TEXT]:      {S: messageData.text},
+			[MESSAGE_SENDER_ID]: {S: messageData.from},
+			[MESSAGE_ID]:        {S: messageData.id},
+			[ATTACHMENT_MIME]:   {S: file.mime},
+			[ATTACHMENT_PATH]:   {S: shortenS3Url(file.path)},
+		};
+		if (!isNullOrEmpty(file.name)) {
+			item[ATTACHMENT_NAME] = {S: file.name};
+		}
+		const putMessageResponse = await dynamoDbClient.send(new PutItemCommand({
+			TableName:              messagesTableName,
+			Item:                   item,
+			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES
+		}));
+		printConsumedCapacity("postMessage: message", putMessageResponse);
+
+		return await this.sendMessageEventToGroup(groupId, messageData);
+	}
+
+	async getMessages (params: WSFnParams<GetMessagesInput>, event: APIGatewayProxyWebsocketEventV2):
+		Promise<EndpointResult<Message | MessageData[]>> {
+		const jwtSecret                 = await this.getJwtSecret();
+		const jwt: PrivateChatAuthToken = await verifyChatJwtToken(params.body.chatAuthToken.jwt, jwtSecret);
+		const {group, user}             = jwt;
+
+		const queryResponse: QueryCommandOutput = await dynamoDbClient.send(new QueryCommand({
+			TableName:                 messagesTableName,
+			ProjectionExpression:      GetMessages_ProjectionExpression,
+			KeyConditionExpression:    GetMessages_KeyConditionExpression,
+			ExpressionAttributeNames:  GetMessages_ExpressionAttributeNames,
+			ExpressionAttributeValues: {
+				[GetMessages_EAV_CNeedGroup]: {S: group}
+			},
+			Select:                    Select.SPECIFIC_ATTRIBUTES,
+			ReturnConsumedCapacity:    ReturnConsumedCapacity.INDEXES
+		}));
+
+		printConsumedCapacity("getMessages", queryResponse);
+
+		if (queryResponse.Items == null || queryResponse.Items.length === 0)
+			return response(200, []);
+		console.log(queryResponse.Items);
+		return response(200, queryResponse.Items.map(value => {
+			const fileName = value[ATTACHMENT_NAME]?.S;
+			const fileMime = value[ATTACHMENT_MIME]?.S;
+			const filePath = value[ATTACHMENT_PATH]?.S;
+			let fileData: FileUploadData | Nuly;
+			if (/*fileName != null &&*/ fileMime != null && filePath != null) {
+				fileData = {
+					name: fileName,
+					mime: fileMime,
+					path: unShortenS3Url(filePath)
+				};
+			}
+			return ({
+				group:      group,
+				ts:         value[MESSAGE_TIMESTAMP].S,
+				text:       value[MESSAGE_TEXT].S,
+				from:       value[MESSAGE_SENDER_ID].S,
+				id:         value[MESSAGE_ID].S,
+				attachment: fileData
+			} as MessageData);
+		}));
+	}
+
+	private async sendMessageEventToGroup (group: string, messageData: MessageData) {
 		const queryResponse = await dynamoDbClient.send(new QueryCommand({
 			TableName:                 connectionsTableName,
 			IndexName:                 connectionsByGroupIndex,
@@ -215,43 +332,5 @@ export class JusticeFirmWsRestAPIImpl
 			}
 		}));
 		return message(200, "Message sent");
-	}
-
-	async getMessages (params: WSFnParams<GetMessagesInput>, event: APIGatewayProxyWebsocketEventV2):
-		Promise<EndpointResult<Message | MessageData[]>> {
-		const jwtSecret                 = await this.getJwtSecret();
-		const jwt: PrivateChatAuthToken = await verifyChatJwtToken(params.body.chatAuthToken.jwt, jwtSecret);
-		const {group, user}             = jwt;
-
-		const queryResponse: QueryCommandOutput = await dynamoDbClient.send(new QueryCommand({
-			TableName:                 messagesTableName,
-			ProjectionExpression:      "#ts,#text,#from,#id",
-			KeyConditionExpression:    "#group = :needGroup",
-			ExpressionAttributeNames:  {
-				"#group": "group",
-				"#ts":    "ts",
-				"#text":  "text",
-				"#from":  "from",
-				"#id":    "id",
-			},
-			ExpressionAttributeValues: {
-				":needGroup": {S: group}
-			},
-			Select:                    Select.SPECIFIC_ATTRIBUTES,
-			ReturnConsumedCapacity:    ReturnConsumedCapacity.INDEXES
-		}));
-
-		printConsumedCapacity("getMessages", queryResponse);
-
-		if (queryResponse.Items == null || queryResponse.Items.length === 0)
-			return response(200, []);
-		console.log(queryResponse.Items);
-		return response(200, queryResponse.Items.map(value => ({
-			group: group,
-			ts:    value.ts.S,
-			text:  value.text.S,
-			from:  value.from.S,
-			id:    value.id.S,
-		} as MessageData)));
 	}
 }

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import {computed, ref} from "#imports";
 import {VBtn} from "vuetify/components";
-import {Nuly} from "../../common/utils/types";
-import {uniqId} from "../../common/utils/uniq-id";
-import {forceRipple} from "../utils/functions";
+import {Nuly} from "../../../common/utils/types";
+import {uniqId} from "../../../common/utils/uniq-id";
+import {forceRipple} from "../../utils/functions";
 
 const props         = defineProps<{
 	link?: string,

@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import {computed} from "#imports";
-import {MessageDataDisplayable} from "../utils/types";
+import {nn} from "../../../common/utils/asserts";
+import {MessageDataDisplayable} from "../../utils/types";
+import FilePreview from "../uploaded-files/FilePreview.vue";
 
-const props     = defineProps<{
+const props = defineProps<{
 	message: MessageDataDisplayable
 }>();
+const emit  = defineEmits<{
+	(on: 'imageLoad'): void
+}>()
+
 const isMeDeps  = computed(() => props.message.isMe ? {
 	bgColor: "gradient--landing-aircraft",
 	class:   "is-me",
@@ -13,6 +19,10 @@ const isMeDeps  = computed(() => props.message.isMe ? {
 	class:   "is-other",
 });
 const lrClasses = computed(() => `${props.message.first ? "first" : ""} ${props.message.last ? "last" : ""}`)
+
+function onLoad () {
+	emit('imageLoad')
+}
 </script>
 
 <style lang="scss">
@@ -36,6 +46,10 @@ $top-half-margin: 2px;
 	border-bottom-right-radius: 0;
 	border-top-left-radius: $border-radius;
 	border-bottom-left-radius: $border-radius;
+
+	.time-string {
+		text-align: right;
+	}
 }
 
 .message.is-other {
@@ -63,10 +77,13 @@ $top-half-margin: 2px;
 
 <template>
 <v-card density="compact" :class="`message ${isMeDeps.class} ${lrClasses}`" :color="isMeDeps.bgColor">
-	<v-card-text class="py-1 px-2">
+	<v-card-text class="py-1 px-2 d-flex flex-column">
+		<div v-if="message.attachment!=null" class="mb-1 w-100">
+			<FilePreview :file="nn(message.attachment)" @imageLoad="onLoad" />
+		</div>
 		<p>{{ message.text }}</p>
 	</v-card-text>
-	<v-card-subtitle class="px-2">
+	<v-card-subtitle class="px-2 time-string">
 		{{ message.timeString }}
 	</v-card-subtitle>
 </v-card>

@@ -1,4 +1,5 @@
 import {Type} from "@sinclair/typebox";
+import {maxDataUrlLen} from "./constants";
 import {Optional} from "./functions";
 
 export const Nuly              = Type.Union([Type.Null(), Type.Undefined()], {$id: "NullOrUndef"});
@@ -7,6 +8,7 @@ export const Boolean_T         = Type.Boolean({$id: "Boolean"});
 export const Number_T          = Type.Number({$id: "Number"});
 export const OptionalString_T  = Optional(String_T);
 export const OptionalBoolean_T = Optional(Boolean_T);
+export const DataUrl_T         = Type.String({maxLength: maxDataUrlLen, $id: "DataUrl"});
 
 export type Nuly = null | undefined;
 export type Writeable<T> = { -readonly [P in keyof T]: T[P] };

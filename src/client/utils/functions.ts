@@ -169,3 +169,44 @@ export function getColorFromStatus (status: StatusEnum | Nuly) {
 		return waitingColor;
 	}
 }
+
+// List of official MIME Types: http://www.iana.org/assignments/media-types/media-types.xhtml
+const iconClasses      = {
+	// Media
+	image: "fa-file-image",
+	audio: "fa-file-audio",
+	video: "fa-file-video",
+	// Documents
+	"application/pdf":                                 "fa-file-pdf",
+	"application/msword":                              "fa-file-word",
+	"application/vnd.ms-word":                         "fa-file-word",
+	"application/vnd.oasis.opendocument.text":         "fa-file-word",
+	"application/vnd.openxmlformats-officedocument.wordprocessingml":
+	                                                   "fa-file-word",
+	"application/vnd.ms-excel":                        "fa-file-excel",
+	"application/vnd.openxmlformats-officedocument.spreadsheetml":
+	                                                   "fa-file-excel",
+	"application/vnd.oasis.opendocument.spreadsheet":  "fa-file-excel",
+	"application/vnd.ms-powerpoint":                   "fa-file-powerpoint",
+	"application/vnd.openxmlformats-officedocument.presentationml":
+	                                                   "fa-file-powerpoint",
+	"application/vnd.oasis.opendocument.presentation": "fa-file-powerpoint",
+	"text/plain":                                      "fa-file-text",
+	"text/html":                                       "fa-file-code",
+	"application/json":                                "fa-file-code",
+	// Archives
+	"application/gzip": "fa-file-archive",
+	"application/zip":  "fa-file-archive"
+};
+const iconClassesArray = Object.entries(iconClasses);
+
+export function getFontAwesomeIconFromMIME (mimeType: string) {
+	console.log(mimeType);
+	for (const keyVal of iconClassesArray) {
+		console.log(keyVal, mimeType.startsWith(keyVal[0]));
+		if (mimeType.startsWith(keyVal[0])) {
+			return keyVal[1];
+		}
+	}
+	return "fa-file";
+}

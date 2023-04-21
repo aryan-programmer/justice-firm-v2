@@ -5,7 +5,7 @@ import {AdminAuthToken} from "../../common/api-types";
 import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {nn} from "../../common/utils/asserts";
 import {Nuly} from "../../common/utils/types";
-import AdminDashboardForm from "../components/AdminDashboardForm.vue";
+import AdminDashboardForm from "../components/admin-dashboard/AdminDashboardForm.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 

@@ -9,7 +9,7 @@ import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {closeToZero, firstIfArray, getCurrentPosition, toNumIfNotNull} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import {ModelResponseOrErr} from "../../singularity/model.client";
-import LawyerCard from "../components/LawyerCard.vue";
+import LawyerCard from "../components/details-cards/LawyerCard.vue";
 import {useModals} from "../store/modalsStore";
 import {optionalNumber} from "../utils/validation-schemas";
 

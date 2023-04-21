@@ -3,6 +3,7 @@ import {
 	ChatWSAPIClient,
 	computed,
 	definePageMeta,
+	justiceFirmApi,
 	navigateTo,
 	nextTick,
 	onBeforeUnmount,
@@ -17,12 +18,24 @@ import {LocationQuery} from "vue-router";
 import {VTextarea} from "vuetify/components/VTextarea";
 import {ID_T} from "../../common/db-types";
 import {nn} from "../../common/utils/asserts";
-import {firstIfArray, isNullOrEmpty} from "../../common/utils/functions";
+import {
+	chatGroupAttachmentPathPrefix,
+	firstIfArray,
+	isNullOrEmpty,
+	nullOrEmptyCoalesce
+} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
-import {EstablishConnectionOutput, MessageData, PostMessageInput} from "../../common/ws-api-schema";
-import ChatMessagesList from "../components/ChatMessagesList.vue";
+import {
+	EstablishConnectionOutput,
+	MessageData,
+	PostMessageInput,
+	PostMessageWithAttachmentInput
+} from "../../common/ws-api-schema";
+import ChatMessagesList from "../components/chat/ChatMessagesList.vue";
+import UploadFileWithDescriptionDialog from "../components/uploaded-files/UploadFileWithDescriptionDialog.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
+import {UploadFileWithDescriptionDialogEventData} from "../utils/types";
 
 definePageMeta({
 	middleware: "yes-user-page"
@@ -41,6 +54,7 @@ const canPost          = computed(() =>
 );
 const messages         = reactive({messages: [] as MessageData[]});
 const pastMessages     = new Set<ID_T>();
+let chatGroupId: string | Nuly;
 
 watch(() => route.query, value => {
 	openConnection(value);
@@ -96,6 +110,37 @@ async function postMessage () {
 	await scrollToBottom();
 }
 
+async function postMessageWithAttachment (data: UploadFileWithDescriptionDialogEventData) {
+	const cl = chatClient.value;
+	if (cl == null || chatGroupId == null || userStore.authToken == null) return;
+	console.log(data);
+	const uploadRes = await justiceFirmApi.uploadFile({
+		fileName:   data.attachmentName,
+		fileData:   data.attachmentDataUrl,
+		pathPrefix: chatGroupAttachmentPathPrefix(chatGroupId, userStore.authToken.id),
+		authToken:  userStore.authToken,
+	});
+	console.log(uploadRes);
+	if (isLeft(uploadRes) || !uploadRes.right.ok || uploadRes.right.body == null || "message" in uploadRes.right.body) {
+		await error("Failed to upload attachment");
+		return;
+	}
+	const body: PostMessageWithAttachmentInput = {
+		chatAuthToken: nn(chatData.value?.chatAuthToken),
+		text:          nullOrEmptyCoalesce(data.description, data.attachmentName),
+		uploadedFile:  uploadRes.right.body,
+	};
+
+	const res = await cl.postMessageWithAttachment(body);
+	console.log(res);
+	if (isLeft(res) || !res.right.ok) {
+		await error("Failed to post message");
+		return;
+	}
+	messageText.value = "";
+	await scrollToBottom();
+}
+
 async function openConnection (value: LocationQuery) {
 	const id = firstIfArray(value.id);
 	if (id == null) {
@@ -119,6 +164,7 @@ async function openConnection (value: LocationQuery) {
 	console.log(establishConnBody);
 	chatData.value    = establishConnBody;
 	chatClient.value  = cl;
+	chatGroupId       = id;
 	const messagesRes = await cl.getMessages({chatAuthToken: establishConnBody.chatAuthToken});
 	if (isLeft(messagesRes) || !messagesRes.right.ok || messagesRes.right.body == null || "message" in messagesRes.right.body) {
 		await error(`Failed to get messages`);
@@ -171,17 +217,28 @@ async function openConnection (value: LocationQuery) {
 		<v-card
 			v-if="chatClient!=null && chatData!=null"
 			color="gradient--wide-matrix"
-			class="elevation-3 chat-group-card pa-2 v-col v-col-12 v-col-sm-8"
+			class="elevation-3 chat-group-card pa-2 v-col v-col-12 v-col-lg-11"
 		>
 			<v-card-title class="py-2 border-b-sm text-white" style="border-block-end-color: white !important;">
 				<span class="h4">{{ chatData.name }}</span>
 			</v-card-title>
 			<v-card-text class="h-100 pb-0 pt-0 flex-grow-1 scroll-y" ref="scrollingBox">
-				<ChatMessagesList :messages="messages.messages" />
+				<ChatMessagesList :messages="messages.messages" @anyImageLoaded="scrollToBottom" />
 			</v-card-text>
 			<v-card-actions
 				class="border-t-sm pa-0 d-flex flex-row"
 				style="border-block-start-color: white !important;">
+				<UploadFileWithDescriptionDialog
+					@upload-file="postMessageWithAttachment"
+					title="Post message with attachment"
+					description-field-name="Message Text"
+					button-text="Post message"
+					button-icon="fas fa-paper-plane"
+					bg-color="gradient--new-york">
+					<template v-slot:activator="{activatorProps}">
+					<v-btn icon="fa-paperclip" v-bind="activatorProps"></v-btn>
+					</template>
+				</UploadFileWithDescriptionDialog>
 				<v-textarea
 					hide-details
 					v-model="messageText"

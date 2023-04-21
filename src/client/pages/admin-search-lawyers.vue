@@ -11,7 +11,7 @@ import {closeToZero, firstIfArray, getCurrentPosition, toNumIfNotNull} from "../
 import {Nuly} from "../../common/utils/types";
 import {Message} from "../../singularity/helpers";
 import {ModelResponseOrErr} from "../../singularity/model.client";
-import AdminDashboardForm from "../components/AdminDashboardForm.vue";
+import AdminDashboardForm from "../components/admin-dashboard/AdminDashboardForm.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 import {optionalNumber} from "../utils/validation-schemas";

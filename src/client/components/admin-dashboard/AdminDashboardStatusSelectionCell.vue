@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import {computed, StatusSelectionOptions} from "#imports";
-import {StatusEnum} from "../../common/db-types";
-import {Nuly} from "../../common/utils/types";
-import {useUserStore} from "../store/userStore";
-import {confirmedColor, rejectedColor, waitingColor} from "../utils/constants";
-import {getColorFromStatus} from "../utils/functions";
-import {KeepAsIsEnum} from "../utils/types";
+import {StatusEnum} from "../../../common/db-types";
+import {Nuly} from "../../../common/utils/types";
+import {useUserStore} from "../../store/userStore";
+import {confirmedColor, rejectedColor, waitingColor} from "../../utils/constants";
+import {getColorFromStatus} from "../../utils/functions";
+import {KeepAsIsEnum} from "../../utils/types";
 
 const userStore = useUserStore();
 const props     = defineProps<{

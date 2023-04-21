@@ -1,20 +1,21 @@
 import {Static, Type} from "@sinclair/typebox";
+import {FileUploadToken} from "../server/utils/types";
 import {endpoint} from "../singularity/endpoint";
 import {lazyCheck, MessageOr} from "../singularity/helpers";
 import {HttpMethods} from "../singularity/httpMethods";
 import {modelSchema} from "../singularity/schema";
 import {AdminAuthToken, AuthToken, ClientAuthToken, LawyerAuthToken} from "./api-types";
 import {CaseStatusEnum_T, CaseType, Client, ID_T, Lawyer, StatusEnum, StatusEnum_T} from "./db-types";
-import {maxDataUrlLen, ValidEmail, ValidOTP, ValidPassword} from "./utils/constants";
+import {ValidEmail, ValidOTP, ValidPassword} from "./utils/constants";
 import {ArrayOf, Optional} from "./utils/functions";
-import {Nuly, Number_T, OptionalBoolean_T, OptionalString_T, String_T} from "./utils/types";
+import {DataUrl_T, Nuly, Number_T, OptionalBoolean_T, OptionalString_T, String_T} from "./utils/types";
 
 export const RegisterLawyerInput = Type.Intersect([
 	Type.Omit(Lawyer, ["id", "photoPath", "type", "certificationLink", "status", "passwordHash"]),
 	Type.Object({
 		password:            ValidPassword,
-		photoData:           Type.String({maxLength: maxDataUrlLen}),
-		certificationData:   Type.String({maxLength: maxDataUrlLen}),
+		photoData:           DataUrl_T,
+		certificationData:   DataUrl_T,
 		specializationTypes: Type.Array(ID_T),
 	})
 ], {$id: "RegisterLawyerInput"});
@@ -24,7 +25,7 @@ export const RegisterClientInput = Type.Intersect([
 	Type.Omit(Client, ["id", "photoPath", "type", "passwordHash"]),
 	Type.Object({
 		password:  ValidPassword,
-		photoData: Type.String({maxLength: maxDataUrlLen}),
+		photoData: DataUrl_T,
 	})
 ], {$id: "RegisterClientInput"});
 export type RegisterClientInput = Static<typeof RegisterClientInput>;
@@ -209,6 +210,14 @@ export const ResetPasswordInput = Type.Object({
 }, {$id: "ResetPasswordInput"});
 export type ResetPasswordInput = Static<typeof ResetPasswordInput>;
 
+export const UploadFileInput = Type.Object({
+	authToken:  AuthToken,
+	fileData:   DataUrl_T,
+	fileName:   String_T,
+	pathPrefix: Type.String({maxLength: 64})
+}, {$id: "UploadFileInput"});
+export type UploadFileInput = Static<typeof UploadFileInput>;
+
 export const justiceFirmApiSchema = modelSchema({
 	name:      "JusticeFirmApi",
 	endpoints: {
@@ -313,6 +322,12 @@ export const justiceFirmApiSchema = modelSchema({
 			path:                "/user/reset-password",
 			requestBodyChecker:  lazyCheck(ResetPasswordInput),
 			responseBodyChecker: lazyCheck(MessageOr(AuthToken))
+		}),
+		uploadFile:               endpoint({
+			method:              HttpMethods.POST,
+			path:                "/upload-file",
+			requestBodyChecker:  lazyCheck(UploadFileInput),
+			responseBodyChecker: lazyCheck(MessageOr(FileUploadToken))
 		}),
 		// test:           endpoint({
 		// 	method:              HttpMethods.GET,

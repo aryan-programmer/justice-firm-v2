@@ -4,7 +4,7 @@ import {isLeft} from "fp-ts/Either";
 import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {Nuly} from "../../common/utils/types";
 import {ModelResponseOrErr} from "../../singularity/model.client";
-import LawyerCard from "../components/LawyerCard.vue";
+import LawyerCard from "../components/details-cards/LawyerCard.vue";
 import {useModals} from "../store/modalsStore";
 
 const {message, error} = useModals();

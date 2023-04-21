@@ -7,7 +7,7 @@ import {useField, useForm} from 'vee-validate';
 import * as yup from "yup";
 import {genderHumanVals} from "../../common/utils/constants";
 import {genderHumanToDB} from "../../common/utils/functions";
-import FormTextFieldInCol from "../components/FormTextFieldInCol.vue";
+import FormTextFieldInCol from "../components/general/FormTextFieldInCol.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 import {justiceFirmApi} from "../utils/api-fetcher-impl";
@@ -56,6 +56,7 @@ const textFields2: FormTextFieldData[] = [
 
 function photoClear (event: unknown) {
 	photo.setValue(null);
+	photoData = null;
 }
 
 async function photoChange (event: Event) {

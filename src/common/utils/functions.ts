@@ -13,7 +13,7 @@ import {GeolocationNotAvailableError} from "./errors";
 import {memoizeWeak} from "./memoizeWeak";
 import {Nuly} from "./types";
 
-export function isNullOrEmpty (s: string | Nuly): s is (null | "") {
+export function isNullOrEmpty (s: string | Nuly): s is (null | undefined | "") {
 	return s == null || s.length === 0;
 }
 
@@ -151,4 +151,8 @@ export function genderHumanToDB (h: string | Nuly) {
 
 export function genderDBToHuman (h: string | Nuly) {
 	return genderDbValsToHuman[h as keyof typeof genderDbValsToHuman] ?? genderDbValsToHuman.unknown
+}
+
+export function chatGroupAttachmentPathPrefix (groupId: string, userId: string) {
+	return `chat/${groupId}/files/from/${userId}/`
 }

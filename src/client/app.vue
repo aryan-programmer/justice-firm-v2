@@ -5,8 +5,8 @@ import {ref} from "vue";
 import {useDisplay} from "vuetify";
 import {UserAccessType} from "../common/db-types";
 import {capitalizeFirstLetter} from "../common/utils/functions";
-import ModalDisplayer from "./components/ModalDisplayer.vue";
-import NavItem from "./components/NavItem.vue";
+import ModalDisplayer from "./components/general/ModalDisplayer.vue";
+import NavItem from "./components/general/NavItem.vue";
 import {useUserStore} from "./store/userStore";
 
 const userStore = useUserStore();

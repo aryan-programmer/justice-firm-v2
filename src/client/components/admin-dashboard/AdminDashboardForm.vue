@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import {computed, justiceFirmApi, reactive, StatusSelectionOptions} from "#imports";
 import {isLeft} from "fp-ts/Either";
-import {AdminAuthToken} from "../../common/api-types";
-import {StatusEnum} from "../../common/db-types";
-import {LawyerSearchResult} from "../../common/rest-api-schema";
-import {nn} from "../../common/utils/asserts";
-import {genderDBToHuman} from "../../common/utils/functions";
-import {useModals} from "../store/modalsStore";
-import {useUserStore} from "../store/userStore";
-import {DataTableHeader} from "../utils/types";
+import {AdminAuthToken} from "../../../common/api-types";
+import {StatusEnum} from "../../../common/db-types";
+import {LawyerSearchResult} from "../../../common/rest-api-schema";
+import {nn} from "../../../common/utils/asserts";
+import {genderDBToHuman} from "../../../common/utils/functions";
+import {useModals} from "../../store/modalsStore";
+import {useUserStore} from "../../store/userStore";
+import {DataTableHeader} from "../../utils/types";
 import AdminDashboardStatusSelectionCell from "./AdminDashboardStatusSelectionCell.vue";
 
 const userStore        = useUserStore();
@@ -38,7 +38,6 @@ const formFields = reactive<{
 }>({
 	statuses: {}
 });
-
 
 async function onApply () {
 	const confirmed = [] as string[];

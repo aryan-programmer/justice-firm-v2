@@ -1,5 +1,6 @@
 import {FieldContext} from "vee-validate";
 import {StatusEnum} from "../../common/db-types";
+import {Nuly} from "../../common/utils/types";
 import {MessageData} from "../../common/ws-api-schema";
 
 export type SelectItemKey =
@@ -36,6 +37,12 @@ export type FormTextFieldData = {
 	cols: number,
 	lg: number,
 	type: string,
+};
+
+export type UploadFileWithDescriptionDialogEventData = {
+	attachmentDataUrl: string,
+	attachmentName: string,
+	description: string | Nuly
 };
 
 export enum KeepAsIsEnum {

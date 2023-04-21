@@ -4,6 +4,8 @@ import {GetParameterCommand} from "@aws-sdk/client-ssm";
 import {compareSync, hash} from "bcryptjs";
 import {sign} from "jsonwebtoken";
 import {createPool, Pool, UpsertResult} from "mariadb";
+import {extension} from "mime-types";
+import path from "path";
 import {AuthToken, ClientAuthToken, ConstrainedAuthToken, LawyerAuthToken, PrivateAuthToken} from "../common/api-types";
 import {CaseStatusEnum, ID_T, StatusEnum, UserAccessType} from "../common/db-types";
 import {
@@ -29,7 +31,8 @@ import {
 	SessionLoginInput,
 	SetAppointmentStatusInput,
 	SetLawyerStatusesInput,
-	UpgradeAppointmentToCaseInput
+	UpgradeAppointmentToCaseInput,
+	UploadFileInput
 } from "../common/rest-api-schema";
 import {nn} from "../common/utils/asserts";
 import {invalidImageMimeTypeMessage, otpMaxNum, otpMinNum, validImageMimeTypes} from "../common/utils/constants";
@@ -57,6 +60,7 @@ import {
 	uploadDataUrlToS3,
 	verifyAndDecodeJwtToken
 } from "./utils/functions";
+import {FileUploadData, FileUploadToken} from "./utils/types";
 
 function generateAuthTokenResponse<T extends UserAccessType> (
 	userId: number | bigint,
@@ -128,10 +132,11 @@ export class JusticeFirmRestAPIImpl
 			s3Client,
 			s3Bucket,
 			region,
-			dataUrl:     data.certificationData,
-			name:        data.name,
-			prefix:      "lawyers/certifications/",
-			contentType: certificateMimeType
+			dataUrl:               data.certificationData,
+			name:                  data.name,
+			prefix:                "lawyers/certifications/",
+			contentType:           certificateMimeType,
+			keepOriginalExtension: true,
 		});
 		const jwtSecretP        = this.getJwtSecret();
 		const passwordHashP     = hash(data.password, saltRounds);
@@ -1011,6 +1016,38 @@ The Justice Firm Foundation`;
 			lawyer,
 		};
 		return response(200, caseFullData);
+	}
+
+	async uploadFile (params: FnParams<UploadFileInput>):
+		Promise<EndpointResult<Message | FileUploadToken>> {
+		const data      = params.body;
+		const jwtSecret = await this.getJwtSecret();
+		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
+		if (isNullOrEmpty(obj.id)) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Must be signed in to upload a file");
+		}
+
+		const fileMimeType = await getMimeTypeFromUrlServerSide(data.fileData);
+
+		const uploadRes = await uploadDataUrlToS3({
+			s3Client,
+			s3Bucket,
+			region,
+			dataUrl:               data.fileData,
+			name:                  data.fileName,
+			prefix:                data.pathPrefix,
+			contentType:           fileMimeType,
+			keepOriginalExtension: true,
+		});
+
+		const fileUploadToken: FileUploadData = {
+			path: uploadRes.url,
+			mime: fileMimeType,
+			name: path.parse(data.fileName).name + "." + extension(fileMimeType)
+		};
+		return response(200, {
+			jwt: sign(fileUploadToken, jwtSecret)
+		});
 	}
 
 	private extractAndParseLawyerAndClientData (value: Record<string, any>) {

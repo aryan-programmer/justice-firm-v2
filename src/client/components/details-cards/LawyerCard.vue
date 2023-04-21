@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import {computed, useSlots} from "#imports";
 import {useDisplay} from "vuetify";
-import {LawyerSearchResult} from "../../common/rest-api-schema";
-import {genderDBToHuman, isNullOrEmpty} from "../../common/utils/functions";
+import {LawyerSearchResult} from "../../../common/rest-api-schema";
+import {genderDBToHuman, isNullOrEmpty} from "../../../common/utils/functions";
 
 const props = defineProps<{
 	lawyer: LawyerSearchResult,

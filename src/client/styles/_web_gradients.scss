@@ -295,19 +295,19 @@
 //			(linear-gradient(to top, #ebbba7 0%, #cfc7f8 100%)),
 //);
 //
-//// 043 New York
-//@include gradient_defs.define-gradient(
-//		gradient--new-york,
-//		#d9e9f2,
-//			(linear-gradient(to top, #fff1eb 0%, #ace0f9 100%)),
-//);
+// 043 New York
+@include gradient_defs.define-gradient(
+		gradient--new-york,
+		#d9e9f2,
+			(linear-gradient(to top, #fff1eb 0%, #ace0f9 100%)),
+);
 //
-//// 044 Shy Rainbow
-//@include gradient_defs.define-gradient(
-//		gradient--shy-rainbow,
-//		#abb7cc,
-//			(linear-gradient(to right, #eea2a2 0%, #bbc1bf 19%, #57c6e1 42%, #b49fda 79%, #7ac5d8 100%)),
-//);
+// 044 Shy Rainbow
+@include gradient_defs.define-gradient(
+		gradient--shy-rainbow,
+		#abb7cc,
+			(linear-gradient(to right, #eea2a2 0%, #bbc1bf 19%, #57c6e1 42%, #b49fda 79%, #7ac5d8 100%)),
+);
 //
 //// 045 Loon Crest
 //@include gradient_defs.define-gradient(
@@ -512,12 +512,12 @@
 //			(linear-gradient(to top, #ff0844 0%, #ffb199 100%)),
 //);
 //
-//// 074 Sharp Glass
-//@include gradient_defs.define-gradient(
-//		gradient--sharp-glass,
-//		#c9ccd3,
-//			(#C9CCD3 linear-gradient(-180deg, rgba(255, 255, 255, 0.50) 0%, rgba(0, 0, 0, 0.50) 100%)),
-//			(lighten));
+// 074 Sharp Glass
+@include gradient_defs.define-gradient(
+		gradient--sharp-glass,
+		#c9ccd3,
+			(#C9CCD3 linear-gradient(-180deg, rgba(255, 255, 255, 0.50) 0%, rgba(0, 0, 0, 0.50) 100%)),
+			(lighten));
 //
 //// 075 Clean Mirror
 //@include gradient_defs.define-gradient(

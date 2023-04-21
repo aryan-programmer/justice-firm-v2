@@ -7,8 +7,8 @@ import {CaseFullData} from "../../common/rest-api-schema";
 import {nn} from "../../common/utils/asserts";
 import {dateStringFormat, firstIfArray} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
-import ClientCard from "../components/ClientCard.vue";
-import LawyerCard from "../components/LawyerCard.vue";
+import ClientCard from "../components/details-cards/ClientCard.vue";
+import LawyerCard from "../components/details-cards/LawyerCard.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 

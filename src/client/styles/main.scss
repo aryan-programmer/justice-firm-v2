@@ -41,6 +41,13 @@
 	}
 }
 
+.clamp-image-height-lg {
+	// (As above) the multiple repetitions are for increasing the precedence of this selector
+	&.clamp-image-height-lg, &.clamp-image-height-lg img {
+		max-height: 300px;
+	}
+}
+
 .mh-100vh, body, body > div {
 	min-height: 100vh;
 }

@@ -1,4 +1,5 @@
 import {Static, Type} from "@sinclair/typebox";
+import {FileUploadData, FileUploadToken} from "../server/utils/types";
 import {lazyCheck, MessageOr} from "../singularity/helpers";
 import {wsEndpoint, wsModelSchema} from "../singularity/websocket/ws-endpoint";
 import {AuthToken} from "./api-types";
@@ -48,42 +49,53 @@ export const PostMessageInput = Type.Object({
 }, {$id: "PostMessageInput"});
 export type PostMessageInput = Static<typeof PostMessageInput>;
 
+export const PostMessageWithAttachmentInput = Type.Intersect([PostMessageInput, Type.Object({
+	uploadedFile: FileUploadToken,
+})], {$id: "PostMessageWithAttachmentInput"});
+export type PostMessageWithAttachmentInput = Static<typeof PostMessageWithAttachmentInput>;
+
 export const GetMessagesInput = Type.Object({
 	chatAuthToken: ChatAuthToken,
 }, {$id: "GetMessagesInput"});
 export type GetMessagesInput = Static<typeof GetMessagesInput>;
 
 export const MessageData = Type.Object({
-	group: ID_T,
-	ts:    String_T,
-	text:  String_T,
-	from:  ID_T,
-	id:    String_T,
+	group:      ID_T,
+	ts:         String_T,
+	text:       String_T,
+	from:       ID_T,
+	id:         String_T,
+	attachment: Optional(FileUploadData),
 }, {$id: "MessageData"});
 export type MessageData = Static<typeof MessageData>;
 
 export const jfChatterBoxApiSchema = wsModelSchema({
 	name:      "JFChatterBoxApi",
 	endpoints: {
-		$connect:            wsEndpoint({
+		$connect:                  wsEndpoint({
 			path:               "$connect",
 			requestBodyChecker: lazyCheck(Nuly),
 		}),
-		establishConnection: wsEndpoint({
+		establishConnection:       wsEndpoint({
 			path:                "establishConnection",
 			requestBodyChecker:  lazyCheck(EstablishConnectionInput),
 			responseBodyChecker: lazyCheck(MessageOr(EstablishConnectionOutput))
 		}),
-		$disconnect:         wsEndpoint({
+		$disconnect:               wsEndpoint({
 			path:               "$disconnect",
 			requestBodyChecker: lazyCheck(Nuly),
 		}),
-		postMessage:         wsEndpoint({
+		postMessage:               wsEndpoint({
 			path:                "postMessage",
 			requestBodyChecker:  lazyCheck(PostMessageInput),
 			responseBodyChecker: lazyCheck(MessageOr(Nuly)),
 		}),
-		getMessages:         wsEndpoint({
+		postMessageWithAttachment: wsEndpoint({
+			path:                "postMessageWithAttachment",
+			requestBodyChecker:  lazyCheck(PostMessageWithAttachmentInput),
+			responseBodyChecker: lazyCheck(MessageOr(Nuly)),
+		}),
+		getMessages:               wsEndpoint({
 			path:                "getMessages",
 			requestBodyChecker:  lazyCheck(GetMessagesInput),
 			responseBodyChecker: lazyCheck(MessageOr(ArrayOf(MessageData))),

@@ -9,8 +9,8 @@ import {nn} from "../../common/utils/asserts";
 import {dateStringFormat, firstIfArray, isNullOrEmpty} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import CaseUpgradeDialog from "../components/CaseUpgradeDialog.vue";
-import ClientCard from "../components/ClientCard.vue";
-import LawyerCard from "../components/LawyerCard.vue";
+import ClientCard from "../components/details-cards/ClientCard.vue";
+import LawyerCard from "../components/details-cards/LawyerCard.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 

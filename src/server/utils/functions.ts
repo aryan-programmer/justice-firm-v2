@@ -3,12 +3,15 @@ import {PutObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {fileTypeFromBuffer} from "file-type";
 import {verify} from "jsonwebtoken";
 import mapValues from "lodash/mapValues";
-import {extension} from "mime-types";
+import {extension, lookup} from "mime-types";
 import fetch from 'node-fetch';
+import path from "path";
 import {Stream} from "stream";
 import {nn} from "../../common/utils/asserts";
 import {badFileNameChars, isIterable} from "../../common/utils/constants";
+import {Nuly} from "../../common/utils/types";
 import {uniqId} from "../../common/utils/uniq-id";
+import {S3_BUCKET_DATA_URL} from "./constants";
 
 export async function streamToBuffer (stream: Stream): Promise<Buffer> {
 	return new Promise<Buffer>((resolve, reject) => {
@@ -20,12 +23,20 @@ export async function streamToBuffer (stream: Stream): Promise<Buffer> {
 	});
 }
 
-export async function getMimeTypeFromUrlServerSide (dataUrl: string) {
+function mimeTypeFromOptionalFileName (fileName?: string | Nuly) {
+	if (fileName == null) return "application/octet-stream";
+	const res = lookup(fileName);
+	return res !== false ? res : "application/octet-stream";
+}
+
+export async function getMimeTypeFromUrlServerSide (dataUrl: string, fileName?: string | Nuly) {
 	const dataUrlResponse = await fetch(dataUrl);
-	if (dataUrlResponse.body == null) return "text/plain";
+	if (dataUrlResponse.body == null) {
+		return mimeTypeFromOptionalFileName(fileName);
+	}
 	let bodyBuffer = await streamToBuffer(nn(await dataUrlResponse.body));
 	const fileType = await fileTypeFromBuffer(bodyBuffer);
-	return fileType?.mime ?? dataUrlResponse.headers.get('Content-Type') ?? "text/plain";
+	return fileType?.mime ?? dataUrlResponse.headers.get('Content-Type') ?? mimeTypeFromOptionalFileName(fileName);
 }
 
 export async function uploadDataUrlToS3 (args: {
@@ -36,14 +47,17 @@ export async function uploadDataUrlToS3 (args: {
 	s3Bucket: string,
 	prefix: string,
 	region: string,
+	keepOriginalExtension?: boolean | Nuly,
 }) {
 	const {dataUrl, s3Client, name, s3Bucket, prefix, region, contentType} = args;
+	const keepOriginalExtension                                            = args.keepOriginalExtension === true;
 
-	const fileName        = name.replace(badFileNameChars, '_');
+	const parsedPath      = path.parse(name.replace(badFileNameChars, '_').trim());
+	const fileName        = parsedPath.name.trim();
 	const dataUrlResponse = await fetch(dataUrl);
-	const ext             = extension(contentType);
+	const ext             = keepOriginalExtension ? parsedPath.ext : extension(contentType);
 	const uid             = uniqId();
-	let fileKey           = `${prefix}${fileName}${uid}.${ext}`;
+	let fileKey           = `${prefix}${fileName}.${uid}.${ext}`;
 	let bodyBuffer        = await streamToBuffer(nn(await dataUrlResponse.body));
 	const res             = await s3Client.send(new PutObjectCommand({
 		Bucket:      s3Bucket,
@@ -64,6 +78,16 @@ export function verifyAndDecodeJwtToken<T> (data: string, jwtSecret: string) {
 	const decoded = verify(data, jwtSecret);
 	const obj: T  = typeof decoded === "string" ? JSON.parse(decoded) : decoded;
 	return obj;
+}
+
+const S3_BUCKET_DATA_URL_SHORTENED = "_jfs3://"
+
+export function shortenS3Url (path: string) {
+	return path.replace(S3_BUCKET_DATA_URL, S3_BUCKET_DATA_URL_SHORTENED);
+}
+
+export function unShortenS3Url (path: string) {
+	return path.replace(S3_BUCKET_DATA_URL_SHORTENED, S3_BUCKET_DATA_URL);
 }
 
 export type ReallyBasicTypes = string | number | bigint | boolean | null | undefined;

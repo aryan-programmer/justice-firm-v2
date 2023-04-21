@@ -7,7 +7,7 @@ import * as yup from "yup";
 import {ISchema} from "yup";
 import {genderHumanVals, getCaseTypes, maxDataUrlLen, maxFileSize} from "../../common/utils/constants";
 import {genderHumanToDB, getCurrentPosition} from "../../common/utils/functions";
-import FormTextFieldInCol from "../components/FormTextFieldInCol.vue";
+import FormTextFieldInCol from "../components/general/FormTextFieldInCol.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 import {validateDataUrlAsPhotoBrowserSide} from "../utils/functions";
@@ -78,6 +78,7 @@ async function autofillLatLon () {
 
 function photoClear (event: unknown) {
 	photo.setValue(null);
+	photoData = null;
 }
 
 async function photoChange (event: Event) {
@@ -96,6 +97,7 @@ async function photoChange (event: Event) {
 
 function certificateClear (event: unknown) {
 	certificate.setValue(null);
+	certificateData = null;
 }
 
 async function certificateChange (event: Event) {
