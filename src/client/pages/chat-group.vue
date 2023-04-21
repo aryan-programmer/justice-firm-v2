@@ -5,7 +5,6 @@ import {
 	definePageMeta,
 	justiceFirmApi,
 	navigateTo,
-	nextTick,
 	onBeforeUnmount,
 	reactive,
 	ref,
@@ -13,6 +12,7 @@ import {
 	useRouter,
 	watch
 } from "#imports";
+import {nextTick} from "@vue/runtime-core";
 import {isLeft} from "fp-ts/Either";
 import {LocationQuery} from "vue-router";
 import {VTextarea} from "vuetify/components/VTextarea";

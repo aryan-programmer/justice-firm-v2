@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {computed} from "#imports";
-import {extension} from "mime-types";
 import {FileUploadData} from "../../../server/utils/types";
 import FileDownloadButton from "./FileDownloadButton.vue";
 
@@ -10,8 +9,6 @@ const props    = defineProps<{
 const emit     = defineEmits<{
 	(on: 'imageLoad'): void
 }>()
-//gradient--sharp-glass
-const fileName = computed(() => props.file.name ?? "Unnamed." + extension(props.file.mime));
 
 function onLoad () {
 	emit('imageLoad')

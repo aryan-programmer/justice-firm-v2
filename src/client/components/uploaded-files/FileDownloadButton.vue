@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import {computed, getFontAwesomeIconFromMIME} from "#imports";
-import {extension} from "mime-types";
 import {FileUploadData} from "../../../server/utils/types";
 
 const props = defineProps<{
 	file: FileUploadData
 }>();
 
-const fileName = computed(() => props.file.name ?? "Unnamed." + extension(props.file.mime));
+const fileName = computed(() => props.file.name ?? "Unnamed");
 </script>
 
 <template>
