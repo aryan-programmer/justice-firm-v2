@@ -8,7 +8,7 @@ import {AppointmentFullData, SetAppointmentStatusInput} from "../../common/rest-
 import {nn} from "../../common/utils/asserts";
 import {dateStringFormat, firstIfArray, isNullOrEmpty} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
-import CaseUpgradeDialog from "../components/CaseUpgradeDialog.vue";
+import CaseUpgradeDialog from "../components/appointments-cases/UpgradeAppointmentToCaseDialog.vue";
 import ClientCard from "../components/details-cards/ClientCard.vue";
 import LawyerCard from "../components/details-cards/LawyerCard.vue";
 import {useModals} from "../store/modalsStore";
@@ -146,8 +146,7 @@ async function commonSendRes (params: SetAppointmentStatusInput, mode: string) {
 			Opened on: {{ dateStringFormat(appointment.openedOn) }}<br />
 			Appointment time: {{ dateStringFormat(appointment.timestamp) ?? "Unset" }}<br />
 		</p>
-		<pre>
-Description:
+		<pre class="pre-wrap text-body-2">Description:
 {{ appointment.description }}</pre>
 		<p v-if="appointment.status === StatusEnum.Waiting">
 			Status:

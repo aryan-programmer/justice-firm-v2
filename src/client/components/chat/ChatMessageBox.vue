@@ -2,7 +2,7 @@
 import {computed} from "#imports";
 import {nn} from "../../../common/utils/asserts";
 import {MessageDataDisplayable} from "../../utils/types";
-import FilePreview from "../uploaded-files/FilePreview.vue";
+import FilePreview from "../uploaded-files/FilePreviewForChatMessage.vue";
 
 const props = defineProps<{
 	message: MessageDataDisplayable

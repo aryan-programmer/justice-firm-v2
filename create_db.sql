@@ -111,12 +111,18 @@ CREATE TABLE `case` (
 );
 
 CREATE TABLE case_document (
-	id            INT PRIMARY KEY AUTO_INCREMENT,
-	case_id       INT           NOT NULL,
-	uploaded_on   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	document_link VARCHAR(1024) NOT NULL,
+	id             INT PRIMARY KEY AUTO_INCREMENT,
+	case_id        INT           NOT NULL,
+	uploaded_on    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	file_link      VARCHAR(2048) NOT NULL,
+	file_mime      VARCHAR(1024) NOT NULL,
+	file_name      VARCHAR(1024) NOT NULL,
+	description    VARCHAR(1024) NOT NULL,
+	uploaded_by_id INT           NOT NULL,
 	FOREIGN KEY (case_id)
-		REFERENCES `case` (id)
+		REFERENCES `case` (id),
+	FOREIGN KEY (uploaded_by_id)
+		REFERENCES user (id)
 );
 
 CREATE TABLE `group` (

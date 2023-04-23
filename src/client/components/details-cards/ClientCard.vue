@@ -33,8 +33,7 @@ const sideImage = computed(() =>
 				Email: {{ props.client.email }}<br />
 				Phone: {{ props.client.phone }}<br />
 				<span v-if="!isNullOrEmpty(props.client.gender)">Gender: {{ genderDBToHuman(props.client.gender) }}<br /></span>
-				<pre>
-Address:
+				<pre class="pre-wrap text-body-2">Address:
 {{ props.client.address }}</pre>
 			</v-col>
 			<v-col v-if="sideImage" cols="5" class="pa-3">

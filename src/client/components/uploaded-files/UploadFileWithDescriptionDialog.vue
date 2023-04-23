@@ -117,7 +117,7 @@ function close () {
 					type="submit"
 				>
 					<template v-slot:prepend>
-					<v-icon :icon="props.buttonIcon" />
+					<v-icon :icon="props.buttonIcon" class="ml-1" v-if="props.buttonIcon!=null" />
 					</template>
 					{{ props.buttonText ?? props.title }}
 				</v-btn>

@@ -131,7 +131,8 @@ template.yaml
 # CDK asset staging directory
 .cdk.staging
 cdk.out
-scratch.ts
-scratch.sql
+scratch/scratch.ts
+scratch/scratch.sql
 /server-build-metafile.json
 /.output/
+/scratch/

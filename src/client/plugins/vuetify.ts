@@ -33,7 +33,9 @@ import {
 	faImagePortrait,
 	faPaperclip,
 	faPaperPlane,
+	faPlus,
 	faQuestion,
+	faRefresh,
 	faSearch,
 	faSignIn,
 	faSignOut,
@@ -44,12 +46,15 @@ import {
 	faStepForward,
 	faTable,
 	faTimesCircle,
+	faUpload,
 	faUser,
 	faUserPlus,
 	faUserTie,
 	faXmark
 } from "@fortawesome/free-solid-svg-icons";
 import {FontAwesomeIcon} from '@fortawesome/vue-fontawesome'
+//@ts-ignore
+import {VueMasonryPlugin} from 'vue-masonry';
 import {createVuetify} from 'vuetify'
 import {aliases, fa} from 'vuetify/iconsets/fa-svg'
 import {
@@ -109,6 +114,9 @@ library.add(
 	faFileCode,
 	faFileArchive,
 	faDownload,
+	faPlus,
+	faUpload,
+	faRefresh,
 );
 // import * as components from 'vuetify/components'
 // import * as directives from 'vuetify/directives'
@@ -137,4 +145,5 @@ export default defineNuxtPlugin(nuxtApp => {
 	})
 
 	nuxtApp.vueApp.use(vuetify)
+	nuxtApp.vueApp.use(VueMasonryPlugin);
 })

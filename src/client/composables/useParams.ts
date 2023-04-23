@@ -1,6 +1,6 @@
 import {computed, reactive, useRouter} from "#imports";
 
-function useParamsAndQueries () {
+export function useParamsAndQueries () {
 	const router    = useRouter();
 	const routeData = reactive({params: router.currentRoute.value.params, query: router.currentRoute.value.query});
 	router.afterEach(route => {

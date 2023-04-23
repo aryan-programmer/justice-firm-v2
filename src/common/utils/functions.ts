@@ -8,6 +8,7 @@ import {
 	TSchema,
 	Type
 } from "@sinclair/typebox";
+import {AuthToken} from "../api-types";
 import {genderDbValsToHuman, genderHumanValsToDb} from "./constants";
 import {GeolocationNotAvailableError} from "./errors";
 import {memoizeWeak} from "./memoizeWeak";
@@ -155,4 +156,8 @@ export function genderDBToHuman (h: string | Nuly) {
 
 export function chatGroupAttachmentPathPrefix (groupId: string, userId: string) {
 	return `chat/${groupId}/files/from/${userId}/`
+}
+
+export function caseDocumentPathPrefix (caseId: string, authToken: AuthToken) {
+	return `case/${caseId}/docs/by-${authToken.userType.substring(0, 3)}-${authToken.id}/`
 }

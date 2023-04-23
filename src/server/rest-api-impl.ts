@@ -7,20 +7,28 @@ import {createPool, Pool, UpsertResult} from "mariadb";
 import {extension} from "mime-types";
 import path from "path";
 import {AuthToken, ClientAuthToken, ConstrainedAuthToken, LawyerAuthToken, PrivateAuthToken} from "../common/api-types";
-import {CaseStatusEnum, ID_T, StatusEnum, UserAccessType} from "../common/db-types";
 import {
+	CaseDocumentData,
+	CaseStatusEnum,
+	ClientDataResult,
+	ID_T,
+	LawyerSearchResult,
+	StatusEnum,
+	UserAccessType
+} from "../common/db-types";
+import {
+	AddCaseDocumentInput,
 	AppointmentFullData,
 	AppointmentSparseData,
 	CaseFullData,
 	CaseSparseData,
-	ClientDataResult,
 	GetAppointmentsInput,
 	GetByIdInput,
+	GetCaseDocumentsInput,
 	GetCasesDataInput,
 	GetLawyerInput,
 	GetWaitingLawyersInput,
 	justiceFirmApiSchema,
-	LawyerSearchResult,
 	OpenAppointmentRequestInput,
 	RegisterClientInput,
 	RegisterLawyerInput,
@@ -57,6 +65,8 @@ import {otpExpiryTimeMs, saltRounds} from "./utils/constants";
 import {
 	getMimeTypeFromUrlServerSide,
 	printConsumedCapacity,
+	shortenS3Url,
+	unShortenS3Url,
 	uploadDataUrlToS3,
 	verifyAndDecodeJwtToken
 } from "./utils/functions";
@@ -100,7 +110,8 @@ function recordToLawyerSearchResult (value: Record<string, any>) {
 	} as LawyerSearchResult;
 }
 
-const verifyJwtToken = verifyAndDecodeJwtToken<PrivateAuthToken>;
+const verifyJwtToken     = verifyAndDecodeJwtToken<PrivateAuthToken>;
+const verifyFileJwtToken = verifyAndDecodeJwtToken<FileUploadData>;
 
 export class JusticeFirmRestAPIImpl
 	implements APIImplementation<typeof justiceFirmApiSchema> {
@@ -562,12 +573,12 @@ export class JusticeFirmRestAPIImpl
 
 
 			if (data.waiting.length > 0) {
-				const sqlRejectTuple = "?" + ",?".repeat(data.waiting.length - 1);
+				const sqlWaitingTuple = "?" + ",?".repeat(data.waiting.length - 1);
 
 				const waitingRes: UpsertResult = await conn.execute(
 					`UPDATE lawyer
 					 SET status = 'waiting'
-					 WHERE id IN (${sqlRejectTuple});`,
+					 WHERE id IN (${sqlWaitingTuple});`,
 					data.waiting.map(BigInt)
 				);
 			}
@@ -593,39 +604,38 @@ export class JusticeFirmRestAPIImpl
 		}
 
 		const res: Record<string, any>[] = await (await this.getPool()).execute(
-			`
-				SELECT a.id                  AS a_id,
-				       a.group_id            AS a_group_id,
-				       a.case_id             AS a_case_id,
-				       a.description         AS a_description,
-				       a.timestamp           AS a_timestamp,
-				       a.opened_on           AS a_opened_on,
-				       a.status              AS a_status,
-				       c.id                  AS c_id,
-				       c.name                AS c_name,
-				       c.email               AS c_email,
-				       c.phone               AS c_phone,
-				       c.address             AS c_address,
-				       c.photo_path          AS c_photo_path,
-				       c.gender              AS c_gender,
-				       lu.id                 AS l_id,
-				       lu.name               AS l_name,
-				       lu.email              AS l_email,
-				       lu.phone              AS l_phone,
-				       lu.address            AS l_address,
-				       lu.photo_path         AS l_photo_path,
-				       lu.gender             AS l_gender,
-				       ll.latitude           AS l_latitude,
-				       ll.longitude          AS l_longitude,
-				       ll.certification_link AS l_certification_link
-				FROM appointment a
-				JOIN user        c
-				     ON c.id = a.client_id
-				JOIN user        lu
-				     ON lu.id = a.lawyer_id
-				JOIN lawyer      ll
-				     ON lu.id = ll.id
-				WHERE a.id = ?;`, [BigInt(data.id)]);
+			`SELECT a.id                  AS a_id,
+			        a.group_id            AS a_group_id,
+			        a.case_id             AS a_case_id,
+			        a.description         AS a_description,
+			        a.timestamp           AS a_timestamp,
+			        a.opened_on           AS a_opened_on,
+			        a.status              AS a_status,
+			        c.id                  AS c_id,
+			        c.name                AS c_name,
+			        c.email               AS c_email,
+			        c.phone               AS c_phone,
+			        c.address             AS c_address,
+			        c.photo_path          AS c_photo_path,
+			        c.gender              AS c_gender,
+			        lu.id                 AS l_id,
+			        lu.name               AS l_name,
+			        lu.email              AS l_email,
+			        lu.phone              AS l_phone,
+			        lu.address            AS l_address,
+			        lu.photo_path         AS l_photo_path,
+			        lu.gender             AS l_gender,
+			        ll.latitude           AS l_latitude,
+			        ll.longitude          AS l_longitude,
+			        ll.certification_link AS l_certification_link
+			 FROM appointment a
+			 JOIN user        c
+			      ON c.id = a.client_id
+			 JOIN user        lu
+			      ON lu.id = a.lawyer_id
+			 JOIN lawyer      ll
+			      ON lu.id = ll.id
+			 WHERE a.id = ?;`, [BigInt(data.id)]);
 
 		if (res.length === 0) {
 			return message(404, "No such appointment found");
@@ -663,10 +673,7 @@ export class JusticeFirmRestAPIImpl
 		const pool = await this.getPool();
 		if (data.status === StatusEnum.Rejected) {
 			const rejectRes: UpsertResult = await pool.execute(
-				`UPDATE appointment
-				 SET status='rejected'
-				 WHERE id = ?
-				   AND lawyer_id = ?;`,
+				"UPDATE appointment SET status='rejected' WHERE id = ? AND lawyer_id = ?;",
 				[data.appointmentId, jwt.id]
 			);
 			if (rejectRes.affectedRows === 0) {
@@ -677,19 +684,12 @@ export class JusticeFirmRestAPIImpl
 			let confirmRes: UpsertResult;
 			if (data.timestamp == null) {
 				confirmRes = await pool.execute(
-					`UPDATE appointment
-					 SET status='confirmed'
-					 WHERE id = ?
-					   AND lawyer_id = ?;`,
+					"UPDATE appointment SET status='confirmed' WHERE id = ? AND lawyer_id = ?;",
 					[data.appointmentId, jwt.id]
 				);
 			} else {
 				confirmRes = await pool.execute(
-					`UPDATE appointment
-					 SET status='confirmed',
-					     timestamp=?
-					 WHERE id = ?
-					   AND lawyer_id = ?;`,
+					"UPDATE appointment SET status='confirmed', timestamp=? WHERE id = ? AND lawyer_id = ?;",
 					[new Date(data.timestamp), data.appointmentId, jwt.id]
 				);
 			}
@@ -811,15 +811,14 @@ The Justice Firm Foundation`;
 		}
 
 		const res: Record<string, any>[] = await (await this.getPool()).execute(
-			`
-				SELECT a.id          AS a_id,
-				       a.lawyer_id   AS l_id,
-				       a.client_id   AS c_id,
-				       a.group_id    AS a_group_id,
-				       a.case_id     AS a_case_id,
-				       a.description AS a_description
-				FROM appointment a
-				WHERE a.id = ?;`, [BigInt(data.appointmentId)]);
+			`SELECT a.id          AS a_id,
+			        a.lawyer_id   AS l_id,
+			        a.client_id   AS c_id,
+			        a.group_id    AS a_group_id,
+			        a.case_id     AS a_case_id,
+			        a.description AS a_description
+			 FROM appointment a
+			 WHERE a.id = ?;`, [BigInt(data.appointmentId)]);
 
 		if (res.length === 0) {
 			return message(404, "No such appointment found");
@@ -960,37 +959,36 @@ The Justice Firm Foundation`;
 		}
 
 		const res: Record<string, any>[] = await (await this.getPool()).execute(
-			`
-				SELECT s.id                  AS s_id,
-				       s.group_id            AS s_group_id,
-				       s.type_id             AS s_type_id,
-				       ct.name               AS s_type_name,
-				       s.description         AS s_description,
-				       s.opened_on           AS s_opened_on,
-				       s.status              AS s_status,
-				       c.id                  AS c_id,
-				       c.name                AS c_name,
-				       c.email               AS c_email,
-				       c.phone               AS c_phone,
-				       c.address             AS c_address,
-				       c.photo_path          AS c_photo_path,
-				       c.gender              AS c_gender,
-				       lu.id                 AS l_id,
-				       lu.name               AS l_name,
-				       lu.email              AS l_email,
-				       lu.phone              AS l_phone,
-				       lu.address            AS l_address,
-				       lu.photo_path         AS l_photo_path,
-				       lu.gender             AS l_gender,
-				       ll.latitude           AS l_latitude,
-				       ll.longitude          AS l_longitude,
-				       ll.certification_link AS l_certification_link
-				FROM \`case\`  s
-				JOIN user      c ON c.id = s.client_id
-				JOIN user      lu ON lu.id = s.lawyer_id
-				JOIN lawyer    ll ON lu.id = ll.id
-				JOIN case_type ct ON s.type_id = ct.id
-				WHERE s.id = ?;`, [BigInt(data.id)]);
+			`SELECT s.id                  AS s_id,
+			        s.group_id            AS s_group_id,
+			        s.type_id             AS s_type_id,
+			        ct.name               AS s_type_name,
+			        s.description         AS s_description,
+			        s.opened_on           AS s_opened_on,
+			        s.status              AS s_status,
+			        c.id                  AS c_id,
+			        c.name                AS c_name,
+			        c.email               AS c_email,
+			        c.phone               AS c_phone,
+			        c.address             AS c_address,
+			        c.photo_path          AS c_photo_path,
+			        c.gender              AS c_gender,
+			        lu.id                 AS l_id,
+			        lu.name               AS l_name,
+			        lu.email              AS l_email,
+			        lu.phone              AS l_phone,
+			        lu.address            AS l_address,
+			        lu.photo_path         AS l_photo_path,
+			        lu.gender             AS l_gender,
+			        ll.latitude           AS l_latitude,
+			        ll.longitude          AS l_longitude,
+			        ll.certification_link AS l_certification_link
+			 FROM \`case\`  s
+			 JOIN user      c ON c.id = s.client_id
+			 JOIN user      lu ON lu.id = s.lawyer_id
+			 JOIN lawyer    ll ON lu.id = ll.id
+			 JOIN case_type ct ON s.type_id = ct.id
+			 WHERE s.id = ?;`, [BigInt(data.id)]);
 
 		if (res.length === 0) {
 			return message(404, "No such case found");
@@ -1050,6 +1048,90 @@ The Justice Firm Foundation`;
 		});
 	}
 
+	async addCaseDocument (params: FnParams<AddCaseDocumentInput>):
+		Promise<EndpointResult<Message | ID_T>> {
+		const data       = params.body;
+		const caseAccess = await this.verifyCaseAccess(data.authToken, data.caseId);
+		if (Array.isArray(caseAccess)) {
+			return message(caseAccess[0], caseAccess[1]);
+		}
+
+		const jwtSecret = await this.getJwtSecret();
+		const fileData  = verifyFileJwtToken(data.file.jwt, jwtSecret);
+
+		const filePath          = shortenS3Url(fileData.path);
+		const res: UpsertResult = await (await this.getPool()).execute(
+			"INSERT INTO case_document (case_id, file_link, file_mime, file_name, description, uploaded_by_id) VALUES (?, ?, ?, ?, ?, ?)",
+			[data.caseId, filePath, fileData.mime, fileData.name, data.description, caseAccess.id]);
+
+		const caseDocumentId = res.insertId.toString();
+
+		return response(constants.HTTP_STATUS_OK, caseDocumentId);
+	}
+
+	async getCaseDocuments (params: FnParams<GetCaseDocumentsInput>):
+		Promise<EndpointResult<Message | CaseDocumentData[]>> {
+		const data       = params.body;
+		const caseAccess = await this.verifyCaseAccess(data.authToken, data.caseId);
+		if (Array.isArray(caseAccess)) {
+			return message(caseAccess[0], caseAccess[1]);
+		}
+		const res: Record<string, string | number | Date>[] = await (await this.getPool()).execute(
+			`SELECT cd.id  AS case_doc_id,
+			        uploaded_on,
+			        file_link,
+			        file_mime,
+			        file_name,
+			        description,
+			        uploaded_by_id,
+			        u.name AS uploaded_by_name
+			 FROM case_document cd
+			 JOIN user          u ON cd.uploaded_by_id = u.id
+			 WHERE case_id = ?;`,
+			[data.caseId]
+		);
+		const caseDocuments                                 = res?.map((value): CaseDocumentData => {
+			return {
+				id:          value.case_doc_id.toString(),
+				description: value.description.toString(),
+				file:        {
+					path: unShortenS3Url(value.file_link.toString()),
+					mime: value.file_mime.toString(),
+					name: value.file_name?.toString(),
+				},
+				uploadedBy:  {
+					id:   value.uploaded_by_id.toString(),
+					name: value.uploaded_by_name.toString(),
+				},
+				uploadedOn:  value.uploaded_on.toString(),
+			};
+		}) ?? [];
+		return response(200, caseDocuments);
+	}
+
+	private async verifyCaseAccess (authToken: AuthToken, caseId: ID_T): Promise<PrivateAuthToken | [number, string]> {
+		const jwtSecret = await this.getJwtSecret();
+		const jwt       = verifyJwtToken(authToken.jwt, jwtSecret);
+		if (jwt == null) {
+			return [constants.HTTP_STATUS_UNAUTHORIZED, "Invalid auth token"];
+		}
+
+		const res: Record<string, any>[] = await (await this.getPool()).execute(
+			"SELECT s.lawyer_id, s.client_id FROM `case` s WHERE s.id = ?;", [BigInt(caseId)]);
+
+		if (res.length === 0) {
+			return [400, "No such case found"];
+		}
+
+		const value    = res[0];
+		const lawyerId = value.lawyer_id?.toString();
+		const clientId = value.client_id?.toString();
+		if (lawyerId !== jwt.id && clientId !== jwt.id) {
+			return [constants.HTTP_STATUS_UNAUTHORIZED, `User id ${jwt.id} is not allowed access the details of case ${caseId}`];
+		}
+		return jwt;
+	}
+
 	private extractAndParseLawyerAndClientData (value: Record<string, any>) {
 		const lawyer: LawyerSearchResult = {
 			id:                value.l_id.toString(),
@@ -1094,13 +1176,6 @@ The Justice Firm Foundation`;
 		}
 		return generateAuthTokenResponse(id, type, jwtSecret, name.toString());
 	}
-
-// async test (params: FnParams<UnknownBody>): Promise<EndpointResult<Message>> {
-	// 	return message(200, {
-	// 		msg: "Test successful"
-	// 		// env: process.env,
-	// 	});
-	// }
 
 	protected async getJwtSecret () {
 		return this.jwtSecret ??= nn((await ssmClient.send(new GetParameterCommand({

@@ -3,7 +3,7 @@ import {FileUploadData, FileUploadToken} from "../server/utils/types";
 import {lazyCheck, MessageOr} from "../singularity/helpers";
 import {wsEndpoint, wsModelSchema} from "../singularity/websocket/ws-endpoint";
 import {AuthToken} from "./api-types";
-import {ID_T} from "./db-types";
+import {ID_T, IDWithName} from "./db-types";
 import {ArrayOf, Optional} from "./utils/functions";
 import {Nuly, String_T} from "./utils/types";
 
@@ -27,14 +27,8 @@ export type EstablishConnectionInput = Static<typeof EstablishConnectionInput>;
 export const ChatGroupData = Type.Object({
 	name:   String_T,
 	caseId: Optional(ID_T),
-	client: Type.Object({
-		id:   ID_T,
-		name: String_T,
-	}),
-	lawyer: Type.Object({
-		id:   ID_T,
-		name: String_T,
-	}),
+	client: IDWithName,
+	lawyer: IDWithName,
 }, {$id: "ChatGroupData"});
 export type ChatGroupData = Static<typeof ChatGroupData>;
 

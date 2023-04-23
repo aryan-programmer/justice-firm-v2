@@ -55,7 +55,7 @@ export async function uploadDataUrlToS3 (args: {
 	const parsedPath      = path.parse(name.replace(badFileNameChars, '_').trim());
 	const fileName        = parsedPath.name.trim();
 	const dataUrlResponse = await fetch(dataUrl);
-	const ext             = keepOriginalExtension ? parsedPath.ext : extension(contentType);
+	const ext             = (keepOriginalExtension ? parsedPath.ext : extension(contentType) || "bin").replace(".", "");
 	const uid             = uniqId();
 	let fileKey           = `${prefix}${fileName}.${uid}.${ext}`;
 	let bodyBuffer        = await streamToBuffer(nn(await dataUrlResponse.body));

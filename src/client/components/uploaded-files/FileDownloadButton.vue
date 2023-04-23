@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import {computed, getFontAwesomeIconFromMIME} from "#imports";
+import {Nuly} from "../../../common/utils/types";
 import {FileUploadData} from "../../../server/utils/types";
 
 const props = defineProps<{
-	file: FileUploadData
+	file: FileUploadData,
+	buttonText?: string | Nuly
 }>();
 
-const fileName = computed(() => props.file.name ?? "Unnamed");
+const fileName = computed(() => props.buttonText ?? props.file.name ?? "Unnamed");
 </script>
 
 <template>
@@ -16,6 +18,7 @@ const fileName = computed(() => props.file.name ?? "Unnamed");
 	variant="elevated"
 	density="compact"
 	elevation="3"
+	rounded
 	:href="file.path"
 	target="_blank"
 	rel="noopener noreferrer"

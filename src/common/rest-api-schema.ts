@@ -5,10 +5,23 @@ import {lazyCheck, MessageOr} from "../singularity/helpers";
 import {HttpMethods} from "../singularity/httpMethods";
 import {modelSchema} from "../singularity/schema";
 import {AdminAuthToken, AuthToken, ClientAuthToken, LawyerAuthToken} from "./api-types";
-import {CaseStatusEnum_T, CaseType, Client, ID_T, Lawyer, StatusEnum, StatusEnum_T} from "./db-types";
+import {
+	CaseDocumentData,
+	CaseStatusEnum_T,
+	CaseType,
+	Client,
+	ClientDataResult,
+	ID_T,
+	Lawyer,
+	LawyerSearchResult,
+	StatusEnum,
+	StatusEnum_T
+} from "./db-types";
 import {ValidEmail, ValidOTP, ValidPassword} from "./utils/constants";
 import {ArrayOf, Optional} from "./utils/functions";
 import {DataUrl_T, Nuly, Number_T, OptionalBoolean_T, OptionalString_T, String_T} from "./utils/types";
+
+export {ClientDataResult, LawyerSearchResult} from "./db-types";
 
 export const RegisterLawyerInput = Type.Intersect([
 	Type.Omit(Lawyer, ["id", "photoPath", "type", "certificationLink", "status", "passwordHash"]),
@@ -44,15 +57,6 @@ export const SearchLawyersBaseInput = Type.Partial(Type.Object({
 }), {$id: "SearchLawyersBaseInput"});
 export type SearchLawyersBaseInput = Static<typeof SearchLawyersBaseInput>;
 
-const LawyerSearchResult = Type.Intersect([
-	Type.Omit(Lawyer, ["type", "passwordHash", "status"]),
-	Type.Object({
-		distance:            Optional(Number_T),
-		caseSpecializations: Optional(ArrayOf(CaseType)),
-		status:              Optional(StatusEnum_T),
-	})
-], {$id: "LawyerSearchResult"});
-export type LawyerSearchResult = Static<typeof LawyerSearchResult>;
 const LawyerSearchResults = ArrayOf(LawyerSearchResult);
 
 export const SearchAndSortLawyersInput = Type.Partial(Type.Object({
@@ -127,9 +131,6 @@ export const GetByIdInput = Type.Object({
 	id:        ID_T,
 }, {$id: "GetByIdInput"});
 export type GetByIdInput = Static<typeof GetByIdInput>;
-
-const ClientDataResult = Type.Omit(Client, ["type", "passwordHash"], {$id: "ClientDataResult"});
-export type ClientDataResult = Omit<Client, "type" | "passwordHash">;
 
 export const AppointmentFullData = Type.Object({
 	id:          ID_T,
@@ -217,6 +218,20 @@ export const UploadFileInput = Type.Object({
 	pathPrefix: Type.String({maxLength: 64})
 }, {$id: "UploadFileInput"});
 export type UploadFileInput = Static<typeof UploadFileInput>;
+
+export const AddCaseDocumentInput = Type.Object({
+	authToken:   AuthToken,
+	caseId:      ID_T,
+	file:        FileUploadToken,
+	description: String_T,
+}, {$id: "AddCaseDocumentInput"});
+export type AddCaseDocumentInput = Static<typeof AddCaseDocumentInput>;
+
+export const GetCaseDocumentsInput = Type.Object({
+	authToken: AuthToken,
+	caseId:    ID_T,
+}, {$id: "AddCaseDocumentInput"});
+export type GetCaseDocumentsInput = Static<typeof GetCaseDocumentsInput>;
 
 export const justiceFirmApiSchema = modelSchema({
 	name:      "JusticeFirmApi",
@@ -329,10 +344,17 @@ export const justiceFirmApiSchema = modelSchema({
 			requestBodyChecker:  lazyCheck(UploadFileInput),
 			responseBodyChecker: lazyCheck(MessageOr(FileUploadToken))
 		}),
-		// test:           endpoint({
-		// 	method:              HttpMethods.GET,
-		// 	path:                "/test",
-		// 	responseBodyChecker: lazyCheck(Message)
-		// })
+		addCaseDocument:          endpoint({
+			method:              HttpMethods.POST,
+			path:                "/case/documents/add",
+			requestBodyChecker:  lazyCheck(AddCaseDocumentInput),
+			responseBodyChecker: lazyCheck(MessageOr(ID_T))
+		}),
+		getCaseDocuments:         endpoint({
+			method:              HttpMethods.POST,
+			path:                "/case/documents",
+			requestBodyChecker:  lazyCheck(GetCaseDocumentsInput),
+			responseBodyChecker: lazyCheck(MessageOr(ArrayOf(CaseDocumentData)))
+		}),
 	}
 });

@@ -101,6 +101,14 @@ function pathCompare (link: string) {
 	white-space: nowrap;
 	width: 100%;
 }
+
+.main-page-container {
+	width: 100%;
+	min-height: 100%;
+	display: flex;
+	flex-direction: column;
+	padding: 6px !important;
+}
 </style>
 
 <template>
@@ -157,7 +165,7 @@ function pathCompare (link: string) {
 		<div class="pt-2"></div>
 	</v-navigation-drawer>
 	<v-main class="mh-100">
-		<div class="w-100 mh-100 pa-2 d-flex flex-column">
+		<div class="main-page-container">
 			<NuxtPage />
 		</div>
 	</v-main>

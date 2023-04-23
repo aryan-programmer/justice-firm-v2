@@ -1,14 +1,21 @@
 <script setup lang="ts">
 import {computed} from "#imports";
+import {Nuly} from "../../../common/utils/types";
 import {FileUploadData} from "../../../server/utils/types";
-import FileDownloadButton from "./FileDownloadButton.vue";
 
-const props    = defineProps<{
+const props = defineProps<{
 	file: FileUploadData,
+	imageSize?: string | Nuly
 }>();
-const emit     = defineEmits<{
+const emit  = defineEmits<{
 	(on: 'imageLoad'): void
-}>()
+}>();
+
+const sizeClass = computed(() =>
+	props.imageSize == null || props.imageSize === "md" ?
+	'clamp-image-height' :
+	('clamp-image-height-' + props.imageSize)
+);
 
 function onLoad () {
 	emit('imageLoad')
@@ -16,11 +23,9 @@ function onLoad () {
 </script>
 
 <template>
-<v-card v-if="props.file.mime.startsWith('image/')" density="compact" color="gradient--sharp-glass">
-	<v-img :src="props.file.path" class="clamp-image-height-lg" @load="onLoad" />
-	<v-card-actions class="py-1" style="min-height: unset;">
-		<FileDownloadButton :file="props.file" />
-	</v-card-actions>
-</v-card>
-<FileDownloadButton v-else :file="props.file" />
+<v-img
+	v-if="props.file.mime.startsWith('image/')"
+	:src="props.file.path"
+	:class="sizeClass"
+	@load="onLoad" />
 </template>

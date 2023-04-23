@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import {computed} from "#imports";
-import {CaseType} from "../../common/db-types";
-import {CaseSparseData} from "../../common/rest-api-schema";
-import {compareDates, dateFormat, trimStr} from "../../common/utils/functions";
-import {Nuly} from "../../common/utils/types";
-import {DataTableHeader} from "../utils/types";
+import {CaseType} from "../../../common/db-types";
+import {CaseSparseData} from "../../../common/rest-api-schema";
+import {compareDates, dateFormat, trimStr} from "../../../common/utils/functions";
+import {Nuly} from "../../../common/utils/types";
+import {DataTableHeader} from "../../utils/types";
 
 type CaseDataDisplayable = Omit<CaseSparseData, "openedOn"> & {
 	openedOn: Date,

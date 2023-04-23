@@ -13,7 +13,7 @@ import {
 } from "aws-cdk-lib";
 import {RestApi} from "aws-cdk-lib/aws-apigateway";
 import {AttributeType, BillingMode} from "aws-cdk-lib/aws-dynamodb";
-import {Effect, PolicyStatement} from "aws-cdk-lib/aws-iam";
+import {Effect, PolicyStatement, ServicePrincipal} from "aws-cdk-lib/aws-iam";
 import {Code, Function, Runtime} from "aws-cdk-lib/aws-lambda";
 import {Bucket, BucketAccessControl, BucketEncryption, HttpMethods} from "aws-cdk-lib/aws-s3";
 import {IStringParameter} from "aws-cdk-lib/aws-ssm";
@@ -25,6 +25,7 @@ import {jfChatterBoxApiSchema} from "../common/ws-api-schema";
 import {EndpointSchema} from "../singularity/endpoint";
 import {ApiGatewayResourceMap} from "./api-gateway-resource-map";
 import {connectionsByGroupIndex} from "./constants";
+import {LambdaIntegrationNoPermission} from "./LambdaFunctionNoPermissions";
 
 const path = require("path");
 
@@ -195,14 +196,26 @@ export class JusticeFirmStack extends Stack {
 
 	private makeRestApi () {
 		this.api = new RestApi(this, this.apiName, {
-			deploy: true,
+			deploy:                      true,
+			defaultCorsPreflightOptions: {
+				allowOrigins: apiGateway.Cors.ALL_ORIGINS,
+				allowMethods: apiGateway.Cors.ALL_METHODS,
+				allowHeaders: ["*"]
+			},
 		});
 
-		const lambdaIntegration = new apiGateway.LambdaIntegration(this.lambda);
+		const lambdaIntegration = new LambdaIntegrationNoPermission(this.lambda, {proxy: true});
 		const resourceMap       = new ApiGatewayResourceMap(this.api.root);
 
 		mapValues(justiceFirmApiSchema.endpoints, <TReq, TRes> (value: EndpointSchema<TReq, TRes>) => {
 			resourceMap.getFromPath(value.path).addMethod(value.method, lambdaIntegration);
+		});
+
+		// See: https://github.com/aws/aws-cdk/issues/9327#issuecomment-858372987
+		this.lambda.addPermission(`${this.apiName}-APIGWPermissions`, {
+			action:    'lambda:InvokeFunction',
+			principal: new ServicePrincipal('apigateway.amazonaws.com'),
+			sourceArn: this.api.arnForExecuteApi()
 		});
 	}
 

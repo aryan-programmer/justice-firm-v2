@@ -34,6 +34,13 @@
 	white-space: normal;
 }
 
+.clamp-image-height-sm {
+	// (As above) the multiple repetitions are for increasing the precedence of this selector
+	&.clamp-image-height-sm, &.clamp-image-height-sm img {
+		max-height: 150px;
+	}
+}
+
 .clamp-image-height {
 	// (As above) the multiple repetitions are for increasing the precedence of this selector
 	&.clamp-image-height, &.clamp-image-height img {
@@ -57,13 +64,17 @@
 }
 
 .scroll-y {
-	overflow-y: scroll;
-	overflow-y: overlay;
+	overflow-y: scroll !important;
+	overflow-y: overlay !important;
 }
 
 .sticky-top {
-	z-index: 1000;
-	position: -webkit-sticky;
-	position: sticky;
-	top: 1px;
+	z-index: 10000 !important;
+	position: -webkit-sticky !important;
+	position: sticky !important;
+	top: 0px !important;
+}
+
+pre, .pre-wrap {
+	white-space: pre-wrap;
 }

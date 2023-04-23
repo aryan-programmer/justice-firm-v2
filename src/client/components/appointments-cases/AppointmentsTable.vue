@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import {computed} from "#imports";
-import {AppointmentSparseData} from "../../common/rest-api-schema";
-import {compareDates, dateFormat, trimStr} from "../../common/utils/functions";
-import {Nuly} from "../../common/utils/types";
-import {DataTableHeader} from "../utils/types";
+import {AppointmentSparseData} from "../../../common/rest-api-schema";
+import {compareDates, dateFormat, trimStr} from "../../../common/utils/functions";
+import {Nuly} from "../../../common/utils/types";
+import {DataTableHeader} from "../../utils/types";
 
 type AppointmentDataDisplayable = Omit<AppointmentSparseData, "timestamp" | "openedOn"> & {
 	timestamp?: Date | Nuly,

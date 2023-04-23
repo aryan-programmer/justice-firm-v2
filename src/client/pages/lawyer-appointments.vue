@@ -2,7 +2,7 @@
 import {definePageMeta, onMounted, ref} from "#imports";
 import {AppointmentSparseData} from "../../common/rest-api-schema";
 import {Nuly} from "../../common/utils/types";
-import AppointmentsTable from "../components/AppointmentsTable.vue";
+import AppointmentsTable from "../components/appointments-cases/AppointmentsTable.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 import {fetchAppointmentsByCategory} from "../utils/functions";

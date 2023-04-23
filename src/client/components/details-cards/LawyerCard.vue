@@ -36,8 +36,7 @@ const sideImage = computed(() =>
 				<span v-if="!isNullOrEmpty(props.lawyer.gender)">Gender: {{ genderDBToHuman(props.lawyer.gender) }}<br /></span>
 				Latitude & Longitude: ({{ props.lawyer.latitude }}, {{ props.lawyer.longitude }})<br />
 				<span v-if="typeof props.lawyer.distance == 'number'">Spherical distance from current location: {{ props.lawyer.distance.toPrecision(2) }} km<br /></span>
-				<pre>
-Office Address:
+				<pre class="pre-wrap text-body-2">Office Address:
 {{ props.lawyer.address }}</pre>
 				<a :href="props.lawyer.certificationLink" class="text-white mt-3">View certification</a>
 			</v-col>

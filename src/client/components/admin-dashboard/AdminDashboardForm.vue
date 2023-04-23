@@ -100,7 +100,7 @@ async function onApply () {
 	{{ genderDBToHuman(item.raw.gender) }}
 	</template>
 	<template v-slot:item.address="{ item }">
-	<pre>{{ item.raw.address }}</pre>
+	<pre class="pre-wrap text-body-2">{{ item.raw.address }}</pre>
 	</template>
 	<template v-slot:item.photoPath="{ item }">
 	<img :src="item.raw.photoPath" alt="Photo" width="150">
