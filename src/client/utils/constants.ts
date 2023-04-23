@@ -1,8 +1,10 @@
-export const confirmedColor   = "green-accent-4";
-export const waitingColor     = "deep-purple-accent-3";
-export const rejectedColor    = "red-accent-3"
+export const confirmedColor          = "green-accent-4";
+export const waitingColor            = "deep-purple-accent-3";
+export const rejectedColor           = "red-accent-3";
+export const meChatBgColor           = "gradient--landing-aircraft";
+export const otherChatMessageBgColor = "gradient--palo-alto";
 // List of official MIME Types: http://www.iana.org/assignments/media-types/media-types.xhtml
-const iconClasses             = {
+const iconClasses                    = {
 	// Media
 	image: "fa-file-image",
 	audio: "fa-file-audio",
@@ -29,4 +31,4 @@ const iconClasses             = {
 	"application/gzip": "fa-file-archive",
 	"application/zip":  "fa-file-archive"
 };
-export const iconClassesArray = Object.entries(iconClasses);
+export const iconClassesArray        = Object.entries(iconClasses);

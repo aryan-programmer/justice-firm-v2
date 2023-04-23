@@ -37,7 +37,7 @@ function onLoad () {
 
 <template>
 <div>
-	<div class="d-flex flex-column my-2" v-for="messageGroup in messageGroups">
+	<div class="d-flex flex-column my-2" v-for="messageGroup in messageGroups" :key="messageGroup.sortKey.toString()">
 		<div class="sticky-top d-flex flex-column">
 			<v-card
 				class="pa-1 mx-auto"
@@ -49,6 +49,7 @@ function onLoad () {
 		</div>
 		<ChatMessageBox
 			v-for="message in messageGroup.messages"
+			:key="message.id"
 			:message="message"
 			@imageLoad="onLoad"
 		/>

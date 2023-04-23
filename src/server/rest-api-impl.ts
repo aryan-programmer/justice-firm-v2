@@ -1041,7 +1041,7 @@ The Justice Firm Foundation`;
 		const fileUploadToken: FileUploadData = {
 			path: uploadRes.url,
 			mime: fileMimeType,
-			name: path.parse(data.fileName).name + "." + extension(fileMimeType)
+			name: data.fileName,
 		};
 		return response(200, {
 			jwt: sign(fileUploadToken, jwtSecret)

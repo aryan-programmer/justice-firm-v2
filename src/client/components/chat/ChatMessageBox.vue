@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {computed} from "#imports";
 import {nn} from "../../../common/utils/asserts";
+import {meChatBgColor, otherChatMessageBgColor} from "../../utils/constants";
 import {MessageDataDisplayable} from "../../utils/types";
 import FilePreview from "../uploaded-files/FilePreviewForChatMessage.vue";
 
@@ -12,10 +13,10 @@ const emit  = defineEmits<{
 }>()
 
 const isMeDeps  = computed(() => props.message.isMe ? {
-	bgColor: "gradient--landing-aircraft",
+	bgColor: meChatBgColor,
 	class:   "is-me",
 } : {
-	bgColor: "gradient--palo-alto",
+	bgColor: otherChatMessageBgColor,
 	class:   "is-other",
 });
 const lrClasses = computed(() => `${props.message.first ? "first" : ""} ${props.message.last ? "last" : ""}`)
