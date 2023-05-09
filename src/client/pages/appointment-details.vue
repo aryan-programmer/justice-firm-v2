@@ -110,7 +110,7 @@ async function commonSendRes (params: SetAppointmentStatusInput, mode: string) {
 </script>
 
 <template>
-<v-card v-if="appointment!=null" color="gradient--perfect-white" class="elevation-3">
+<v-card v-if="appointment!=null" color="gradient--perfect-white" class="w-100 elevation-3">
 	<v-card-title>
 		<h3>Appointment details</h3>
 	</v-card-title>

@@ -123,18 +123,17 @@ const onSubmit = handleSubmit(async values => {
 					<v-select
 						@blur="gender.handleBlur"
 						v-model="gender.value.value"
-						:error-messages="gender.errorMessage.value"
+						:error-messages="gender.errorMessage.value ?? []"
 						label="Gender"
 						density="comfortable"
 						:items="genderHumanVals"
-					>
-					</v-select>
+					/>
 				</v-col>
 				<FormTextFieldInCol v-for="field in textFields2" :field="field" />
 				<v-col class="py-0" cols="12">
 					<v-textarea
 						v-model="address.value.value"
-						:error-messages="address.errorMessage.value"
+						:error-messages="address.errorMessage.value ?? []"
 						label="Address"
 						rows="3"
 						density="compact"
@@ -142,9 +141,9 @@ const onSubmit = handleSubmit(async values => {
 				</v-col>
 				<v-col class="py-0" cols="12">
 					<v-file-input
-						:prepend-icon="null"
+						:prepend-icon="null as any"
 						prepend-inner-icon="fas fa-image-portrait"
-						:error-messages="photo.errorMessage.value"
+						:error-messages="photo.errorMessage.value ?? []"
 						@change="photoChange"
 						@blur="photo.handleBlur"
 						label="Photo"

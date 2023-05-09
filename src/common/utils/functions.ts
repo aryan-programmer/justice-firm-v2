@@ -9,7 +9,13 @@ import {
 	Type
 } from "@sinclair/typebox";
 import {AuthToken} from "../api-types";
-import {genderDbValsToHuman, genderHumanValsToDb} from "./constants";
+import {StatusEnum, StatusSearchOptionsEnum} from "./constants";
+import {
+	genderDbValsToHuman,
+	genderHumanValsToDb, statusSearchOptionHuman_Any,
+	statusSearchOptionsDbToHuman,
+	statusSearchOptionsHumanValsToDb
+} from "./constants";
 import {GeolocationNotAvailableError} from "./errors";
 import {memoizeWeak} from "./memoizeWeak";
 import {Nuly} from "./types";
@@ -152,6 +158,14 @@ export function genderHumanToDB (h: string | Nuly) {
 
 export function genderDBToHuman (h: string | Nuly) {
 	return genderDbValsToHuman[h as keyof typeof genderDbValsToHuman] ?? genderDbValsToHuman.unknown
+}
+
+export function statusSearchHumanToDB (h: string | Nuly): StatusSearchOptionsEnum | StatusEnum {
+	return statusSearchOptionsHumanValsToDb[h as keyof typeof statusSearchOptionsHumanValsToDb] ?? StatusSearchOptionsEnum.Any
+}
+
+export function statusSearchDBToHuman (h: StatusSearchOptionsEnum | StatusEnum | Nuly) {
+	return statusSearchOptionsDbToHuman[h as keyof typeof statusSearchOptionsDbToHuman] ?? statusSearchOptionHuman_Any
 }
 
 export function chatGroupAttachmentPathPrefix (groupId: string, userId: string) {

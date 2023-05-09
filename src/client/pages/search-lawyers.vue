@@ -5,17 +5,30 @@ import {useField, useForm} from 'vee-validate';
 import {LocationQueryValue} from "vue-router";
 import {useDisplay} from "vuetify";
 import * as yup from "yup";
+import {AdminAuthToken} from "../../common/api-types";
 import {LawyerSearchResult} from "../../common/rest-api-schema";
-import {closeToZero, firstIfArray, getCurrentPosition, toNumIfNotNull} from "../../common/utils/functions";
+import {statusSearchOptionHuman_Any} from "../../common/utils/constants";
+import {
+	closeToZero,
+	firstIfArray,
+	getCurrentPosition,
+	statusSearchHumanToDB,
+	toNumIfNotNull
+} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
+import {Message} from "../../singularity/helpers";
 import {ModelResponseOrErr} from "../../singularity/model.client";
 import LawyerCard from "../components/details-cards/LawyerCard.vue";
+import FormTextFieldInCol from "../components/general/FormTextFieldInCol.vue";
 import {useModals} from "../store/modalsStore";
+import {useUserStore} from "../store/userStore";
+import {FormTextFieldData} from "../utils/types";
 import {optionalNumber} from "../utils/validation-schemas";
 
 let validationSchema         = yup.object({
 	name:      yup.string(),
 	address:   yup.string(),
+	email:     yup.string(),
 	latitude:  optionalNumber(),
 	longitude: optionalNumber(),
 });
@@ -25,10 +38,12 @@ const {handleSubmit, errors} = useForm({
 
 const name      = useField('name');
 const address   = useField('address');
+const email     = useField('email');
 const latitude  = useField('latitude');
 const longitude = useField('longitude');
 
 const {message, error}                    = useModals();
+const userStore                           = useUserStore();
 const router                              = useRouter();
 const route                               = useRoute();
 const display                             = useDisplay();
@@ -37,27 +52,36 @@ const {smAndDown: moveAutoFillButtonDown} = display;
 const lawyers  = ref<LawyerSearchResult[] | Nuly>();
 const showForm = ref<boolean>(false);
 
-async function setFromQuery (query: Record<string, LocationQueryValue | LocationQueryValue[]>) {
+const textFields: FormTextFieldData[] = [
+	{field: name, label: "Name", cols: 12, lg: 6, type: "text"},
+	{field: email, label: "Email", cols: 12, lg: 6, type: "text"},
+];
+
+async function fetchFromQuery () {
+	const query: Record<string, LocationQueryValue | LocationQueryValue[]> = route.query;
+
 	const name_      = name.value.value = firstIfArray(query.name);
+	const email_     = email.value.value = firstIfArray(query.email);
 	const address_   = address.value.value = firstIfArray(query.address);
-	const latitude_  = latitude.value.value = toNumIfNotNull(firstIfArray(query.latitude)) ?? 0;
-	const longitude_ = longitude.value.value = toNumIfNotNull(firstIfArray(query.longitude)) ?? 0;
-	if (name_ == null || address_ == null) return;
+	const latitude_  = latitude.value.value = (toNumIfNotNull(firstIfArray(query.latitude)) ?? 0);
+	const longitude_ = longitude.value.value = (toNumIfNotNull(firstIfArray(query.longitude)) ?? 0);
+	if (name_ == null || address_ == null || email_ == null) return;
 
 	let body = closeToZero(latitude_) || closeToZero(longitude_) ? {
 		name:    name_,
 		address: address_,
+		email:   email_,
 	} : {
 		name:      name_,
 		address:   address_,
+		email:     email_,
 		latitude:  latitude_,
 		longitude: longitude_,
 	};
 	console.log(body, query);
-	const resP: Promise<ModelResponseOrErr<LawyerSearchResult[]>> = justiceFirmApi.searchLawyers(body);
+	const res = await justiceFirmApi.searchLawyers(body);
 
-	const res = await resP;
-	if (isLeft(res) || !res.right.ok || res.right.body == null) {
+	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
 		await error("Failed to search lawyers");
 		return;
@@ -77,18 +101,19 @@ async function autofillLatLon () {
 
 const onSubmit = handleSubmit(async values => {
 	const name      = values.name?.toString() ?? "";
+	const email     = values.email?.toString() ?? "";
 	const address   = values.address?.toString() ?? "";
 	const latitude  = values.latitude == null ? 0 : +values.latitude;
 	const longitude = values.longitude == null ? 0 : +values.longitude;
 
 	await navigateTo({
 		...router.currentRoute.value,
-		query: {name, address, latitude, longitude}
+		query: {name, email, address, latitude, longitude}
 	});
 });
 
 watch(() => route.query, value => {
-	setFromQuery(value);
+	fetchFromQuery();
 }, {immediate: true});
 </script>
 
@@ -98,25 +123,17 @@ watch(() => route.query, value => {
 	@submit.prevent="onSubmit">
 	<v-card color="gradient--plum-bath" theme="dark" density="compact">
 		<v-card-title class="text-wrap">
-			<p class="text-h4 mb-4">Search for a lawyer</p>
+			<p class="text-h4 mb-4">Find a lawyer</p>
 		</v-card-title>
 		<v-card-text>
-			<!--			{{errors}}-->
-			<v-text-field
-				class="mb-1"
-				@blur="name.handleBlur"
-				v-model="name.value.value"
-				:error-messages="name.errorMessage.value"
-				label="Name"
-				density="compact"
-				type="text"
-				hide-details
-			/>
+			<v-row>
+				<FormTextFieldInCol v-for="field in textFields" :field="field" density="compact" />
+			</v-row>
 			<v-textarea
 				class="mb-1"
 				@blur="address.handleBlur"
 				v-model="address.value.value"
-				:error-messages="address.errorMessage.value"
+				:error-messages="address.errorMessage.value ?? []"
 				label="Address"
 				rows="3"
 				density="compact"
@@ -132,7 +149,7 @@ watch(() => route.query, value => {
 							class="me-1"
 							@blur="latitude.handleBlur"
 							v-model="latitude.value.value"
-							:error-messages="latitude.errorMessage.value"
+							:error-messages="latitude.errorMessage.value ?? []"
 							label="Latitude"
 							density="compact"
 							type="number"
@@ -144,7 +161,7 @@ watch(() => route.query, value => {
 							:class="moveAutoFillButtonDown?'':'me-1'"
 							@blur="longitude.handleBlur"
 							v-model="longitude.value.value"
-							:error-messages="longitude.errorMessage.value"
+							:error-messages="longitude.errorMessage.value ?? []"
 							label="Longitude"
 							density="compact"
 							type="number"

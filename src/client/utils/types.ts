@@ -63,3 +63,5 @@ export enum BtnVariants {
 	Outlined = "outlined",
 	Plain    = "plain",
 }
+
+export type Density = 'default' | 'comfortable' | 'compact';

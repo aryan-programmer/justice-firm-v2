@@ -4,8 +4,6 @@ import {GetParameterCommand} from "@aws-sdk/client-ssm";
 import {compareSync, hash} from "bcryptjs";
 import {sign} from "jsonwebtoken";
 import {createPool, Pool, UpsertResult} from "mariadb";
-import {extension} from "mime-types";
-import path from "path";
 import {AuthToken, ClientAuthToken, ConstrainedAuthToken, LawyerAuthToken, PrivateAuthToken} from "../common/api-types";
 import {
 	CaseDocumentData,
@@ -14,6 +12,8 @@ import {
 	ID_T,
 	LawyerSearchResult,
 	StatusEnum,
+	StatusSearchOptions,
+	StatusSearchOptionsEnum,
 	UserAccessType
 } from "../common/db-types";
 import {
@@ -112,6 +112,39 @@ function recordToLawyerSearchResult (value: Record<string, any>) {
 
 const verifyJwtToken     = verifyAndDecodeJwtToken<PrivateAuthToken>;
 const verifyFileJwtToken = verifyAndDecodeJwtToken<FileUploadData>;
+
+function getSqlWhereAndClauseFromStatus (status: StatusSearchOptions): {
+	statusWherePart: string,
+	statusQueryArray: [StatusSearchOptions] | []
+} {
+	switch (status) {
+	case StatusSearchOptionsEnum.Any:
+		return {
+			statusWherePart:  " 1 = 1 ",
+			statusQueryArray: []
+		};
+	case StatusSearchOptionsEnum.NotConfirmed:
+		return {
+			statusWherePart:  " l.status != ? ",
+			statusQueryArray: [StatusEnum.Confirmed]
+		};
+	case StatusSearchOptionsEnum.NotRejected:
+		return {
+			statusWherePart:  " l.status != ? ",
+			statusQueryArray: [StatusEnum.Rejected]
+		};
+	case StatusSearchOptionsEnum.NotWaiting:
+		return {
+			statusWherePart:  " l.status != ? ",
+			statusQueryArray: [StatusEnum.Waiting]
+		};
+	default:
+		return {
+			statusWherePart:  " l.status = ? ",
+			statusQueryArray: [status]
+		};
+	}
+}
 
 export class JusticeFirmRestAPIImpl
 	implements APIImplementation<typeof justiceFirmApiSchema> {
@@ -250,6 +283,7 @@ export class JusticeFirmRestAPIImpl
 		Promise<EndpointResult<LawyerSearchResult[]>> {
 		const data    = params.body;
 		const name    = `%${data.name ?? ""}%`;
+		const email   = `%${data.email ?? ""}%`;
 		const address = `%${data.address ?? ""}%`;
 
 		let res: Record<string, any>[];
@@ -271,9 +305,10 @@ export class JusticeFirmRestAPIImpl
 				      ON u.id = l.id
 				 WHERE l.status = 'confirmed'
 				   AND u.name LIKE ?
+				   AND u.email LIKE ?
 				   AND u.address LIKE ?
 				 ORDER BY distance ASC
-				 LIMIT 25;`, [data.latitude, data.longitude, name, address]);
+				 LIMIT 100;`, [data.latitude, data.longitude, name, email, address]);
 		} else {
 			res = await (await this.getPool()).execute(
 				`SELECT u.id,
@@ -291,9 +326,10 @@ export class JusticeFirmRestAPIImpl
 				      ON u.id = l.id
 				 WHERE l.status = 'confirmed'
 				   AND u.name LIKE ?
+				   AND u.email LIKE ?
 				   AND u.address LIKE ?
 				 ORDER BY name ASC
-				 LIMIT 25;`, [name, address]);
+				 LIMIT 100;`, [name, email, address]);
 		}
 
 		const lawyers: LawyerSearchResult[] = res.map(recordToLawyerSearchResult);
@@ -306,11 +342,15 @@ export class JusticeFirmRestAPIImpl
 		const jwtSecret = await this.getJwtSecret();
 		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
 		const name      = `%${data.name ?? ""}%`;
+		const email     = `%${data.email ?? ""}%`;
 		const address   = `%${data.address ?? ""}%`;
+		const status    = data.status;
 		if (obj.userType !== UserAccessType.Admin) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				"To get the list of waiting lawyers the user must be authenticated as an administrator.");
 		}
+
+		const {statusWherePart, statusQueryArray} = getSqlWhereAndClauseFromStatus(status);
 
 		let res: Record<string, any>[];
 		if ("latitude" in data && "longitude" in data && data.latitude != null && data.longitude != null) {
@@ -331,9 +371,11 @@ export class JusticeFirmRestAPIImpl
 				 JOIN user   u
 				      ON u.id = l.id
 				 WHERE u.name LIKE ?
+				   AND u.email LIKE ?
 				   AND u.address LIKE ?
-				 ORDER BY distance ASC
-				 LIMIT 25;`, [data.latitude, data.longitude, name, address]);
+				   AND ${statusWherePart}
+				 ORDER BY distance ASC, u.name ASC`,
+				[data.latitude, data.longitude, name, email, address, ...statusQueryArray]);
 		} else {
 			res = await (await this.getPool()).execute(
 				`SELECT u.id,
@@ -351,9 +393,10 @@ export class JusticeFirmRestAPIImpl
 				 JOIN user   u
 				      ON u.id = l.id
 				 WHERE u.name LIKE ?
+				   AND u.email LIKE ?
 				   AND u.address LIKE ?
-				 ORDER BY name ASC
-				 LIMIT 25;`, [name, address]);
+				   AND ${statusWherePart}
+				 ORDER BY name ASC`, [name, email, address, ...statusQueryArray]);
 		}
 
 		const lawyers: LawyerSearchResult[] = res.map(recordToLawyerSearchResult);
@@ -384,8 +427,7 @@ export class JusticeFirmRestAPIImpl
 			 FROM lawyer l
 			 JOIN user   u
 			      ON u.id = l.id
-			 WHERE l.status = 'waiting'
-			 LIMIT 25;`);
+			 WHERE l.status = 'waiting'`);
 		const lawyers: LawyerSearchResult[] = res.map(recordToLawyerSearchResult);
 		return response(200, lawyers);
 	}
@@ -1162,7 +1204,12 @@ The Justice Firm Foundation`;
 	private async getLoginResponse (email: string, password: string) {
 		const jwtSecret = await this.getJwtSecret();
 
-		const resSet: { id: number | bigint, password_hash: string, type: UserAccessType, name: string }[] = await (await this.getPool()).execute(
+		const resSet: {
+			id: number | bigint,
+			password_hash: string,
+			type: UserAccessType,
+			name: string
+		}[] = await (await this.getPool()).execute(
 			"SELECT id, name, password_hash, type FROM user WHERE user.email = ?;",
 			[email]
 		);

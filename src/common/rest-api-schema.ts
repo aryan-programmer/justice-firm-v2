@@ -15,7 +15,7 @@ import {
 	Lawyer,
 	LawyerSearchResult,
 	StatusEnum,
-	StatusEnum_T
+	StatusEnum_T, StatusSearchOptions
 } from "./db-types";
 import {ValidEmail, ValidOTP, ValidPassword} from "./utils/constants";
 import {ArrayOf, Optional} from "./utils/functions";
@@ -53,6 +53,7 @@ export const MessageOrAuthToken = MessageOr(AuthToken);
 
 export const SearchLawyersBaseInput = Type.Partial(Type.Object({
 	name:    String_T,
+	email:   String_T,
 	address: String_T,
 }), {$id: "SearchLawyersBaseInput"});
 export type SearchLawyersBaseInput = Static<typeof SearchLawyersBaseInput>;
@@ -61,6 +62,7 @@ const LawyerSearchResults = ArrayOf(LawyerSearchResult);
 
 export const SearchAndSortLawyersInput = Type.Partial(Type.Object({
 	name:      String_T,
+	email:     String_T,
 	address:   String_T,
 	latitude:  Number_T,
 	longitude: Number_T,
@@ -109,14 +111,20 @@ export const GetWaitingLawyersInput = Type.Object({
 }, {$id: "GetWaitingLawyersInput"});
 export type GetWaitingLawyersInput = Static<typeof GetWaitingLawyersInput>;
 
+export const SearchAllLawyersBaseInput = Type.Object({
+	authToken: AdminAuthToken,
+	status:    StatusSearchOptions,
+}, {$id: "SearchAllLawyersBaseInput"});
+export type SearchAllLawyersBaseInput = Static<typeof SearchAllLawyersBaseInput>;
+
 export const SearchAllLawyersInput = Type.Union([
-		Type.Intersect([SearchLawyersBaseInput, GetWaitingLawyersInput]),
-		Type.Intersect([SearchAndSortLawyersInput, GetWaitingLawyersInput]),
+		Type.Intersect([SearchLawyersBaseInput, SearchAllLawyersBaseInput]),
+		Type.Intersect([SearchAndSortLawyersInput, SearchAllLawyersBaseInput]),
 	],
 	{$id: "SearchAllLawyersInput"});
 export type SearchAllLawyersInput =
-	(SearchLawyersBaseInput & GetWaitingLawyersInput)
-	| (SearchAndSortLawyersInput & GetWaitingLawyersInput);
+	| (SearchLawyersBaseInput & SearchAllLawyersBaseInput)
+	| (SearchAndSortLawyersInput & SearchAllLawyersBaseInput);
 
 export const SetLawyerStatusesInput = Type.Object({
 	authToken: AdminAuthToken,

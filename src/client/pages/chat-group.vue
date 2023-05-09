@@ -217,7 +217,7 @@ async function openConnection (value: LocationQuery) {
 		<v-card
 			v-if="chatClient!=null && chatData!=null"
 			color="gradient--wide-matrix"
-			class="elevation-3 chat-group-card pa-2 v-col v-col-12 v-col-lg-11"
+			class="elevation-3 chat-group-card pa-2 w-100"
 		>
 			<v-card-title class="py-2 border-b-sm text-white" style="border-block-end-color: white !important;">
 				<span class="h4">{{ chatData.name }}</span>

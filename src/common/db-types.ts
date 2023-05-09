@@ -1,15 +1,21 @@
 import {Static, Type} from "@sinclair/typebox";
 import {FileUploadData} from "../server/utils/types";
-import {ValidEmail, ValidPhone} from "./utils/constants";
+import {
+	StatusEnum,
+	StatusSearchOptionsEnum,
+	ValidEmail,
+	ValidPhone
+} from "./utils/constants";
 import {ArrayOf, Optional} from "./utils/functions";
 import {Number_T, String_T} from "./utils/types";
+export {StatusEnum,StatusSearchOptionsEnum} from "./utils/constants";
 
 export const ID_T = Type.String({$id: "ID_T"});
 export type ID_T = string;
 
 export const CaseType = Type.Object({
-	id:   ID_T,
-	name: String_T,
+	name: Type.String(),
+	id:   Type.String(),
 }, {$id: "CaseType"});
 export type CaseType = Static<typeof CaseType>;
 
@@ -21,13 +27,13 @@ export enum UserAccessType {
 
 export const UserAccessType_T = Type.Enum(UserAccessType, {$id: "UserAccessType"})
 
-export enum StatusEnum {
-	Waiting   = 'waiting',
-	Rejected  = 'rejected',
-	Confirmed = 'confirmed'
-}
 
+
+export const StatusSearchOptionsEnum_T = Type.Enum(StatusSearchOptionsEnum, {$id: "StatusSearchOptionsEnum"})
 export const StatusEnum_T = Type.Enum(StatusEnum, {$id: "StatusEnum"})
+
+export const StatusSearchOptions       = Type.Union([StatusSearchOptionsEnum_T, StatusEnum_T], {$id:"StatusSearchOptions"});
+export type StatusSearchOptions = StatusSearchOptionsEnum | StatusEnum;
 
 export enum CaseStatusEnum {
 	Waiting = 'waiting',

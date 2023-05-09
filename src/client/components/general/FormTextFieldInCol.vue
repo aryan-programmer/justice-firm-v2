@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import {FormTextFieldData} from "../../utils/types";
+import {Nuly} from "../../../common/utils/types";
+import {Density, FormTextFieldData} from "../../utils/types";
 
-const props = defineProps<{ field: FormTextFieldData }>();
+const props = defineProps<{
+	field: FormTextFieldData,
+	density?: Density | Nuly
+}>();
 </script>
 
 <template>
@@ -13,9 +17,9 @@ const props = defineProps<{ field: FormTextFieldData }>();
 	<v-text-field
 		@blur="props.field.field.handleBlur"
 		v-model="props.field.field.value.value"
-		:error-messages="props.field.field.errorMessage.value"
+		:error-messages="props.field.field.errorMessage.value ?? []"
 		:label="props.field.label"
-		density="comfortable"
+		:density="props.density ?? 'comfortable'"
 		:type="props.field.type"
 	/>
 </v-col>

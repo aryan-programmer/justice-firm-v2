@@ -1,5 +1,5 @@
 import {Type} from "@sinclair/typebox";
-import {CaseType} from "../db-types";
+import type {CaseType, StatusSearchOptions} from "../db-types";
 
 export const badFileNameChars = /[^a-zA-Z0-9.]/g;
 export const emailRegex       = /^(([^<>()[\]\.,;:\s@\"]+(\.[^<>()[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$/i;
@@ -37,6 +37,50 @@ export const genderHumanValsToDb = {
 	"Prefer to not specify": "not-specified",
 };
 export const genderHumanVals     = Object.keys(genderHumanValsToDb);
+
+export enum StatusSearchOptionsEnum {
+	Any          = "any",
+	NotConfirmed = 'not-confirmed',
+	NotRejected  = 'not-rejected',
+	NotWaiting   = 'not-waiting',
+}
+
+export enum StatusEnum {
+	Waiting   = 'waiting',
+	Rejected  = 'rejected',
+	Confirmed = 'confirmed'
+}
+
+const statusSearchOptions: StatusSearchOptions[]                             = [
+	StatusSearchOptionsEnum.Any,
+	StatusEnum.Confirmed,
+	StatusEnum.Waiting,
+	StatusEnum.Rejected,
+	StatusSearchOptionsEnum.NotRejected,
+	StatusSearchOptionsEnum.NotConfirmed,
+	StatusSearchOptionsEnum.NotWaiting,
+];
+export const statusSearchOptionsDbToHuman: Record<StatusSearchOptions, string> = {
+	[StatusSearchOptionsEnum.Any]:          "Any",
+	[StatusEnum.Confirmed]:                 "Confirmed",
+	[StatusEnum.Waiting]:                   "Waiting",
+	[StatusEnum.Rejected]:                  "Rejected",
+	[StatusSearchOptionsEnum.NotRejected]:  "Not Rejected",
+	[StatusSearchOptionsEnum.NotConfirmed]: "Not Confirmed",
+	[StatusSearchOptionsEnum.NotWaiting]:   "Not Waiting",
+};
+export const statusSearchOptionsHumanValsToDb = {
+	"Any":           StatusSearchOptionsEnum.Any,
+	"Confirmed":     StatusEnum.Confirmed,
+	"Waiting":       StatusEnum.Waiting,
+	"Rejected":      StatusEnum.Rejected,
+	"Not Rejected":  StatusSearchOptionsEnum.NotRejected,
+	"Not Confirmed": StatusSearchOptionsEnum.NotConfirmed,
+	"Not Waiting":   StatusSearchOptionsEnum.NotWaiting,
+};
+export const statusSearchOptionHuman_Any      = "Any";
+
+export const statusSearchOptionsHumanVals = Object.keys(statusSearchOptionsHumanValsToDb);
 
 export function getCaseTypes (): CaseType[] {
 	return [

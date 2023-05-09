@@ -72,8 +72,9 @@ const userDeps    = computed(() => {
 		return {
 			links: [
 				{icon: "fa-bug-slash", title: "Home", link: "/"},
-				{icon: "fa-search", title: "Search Lawyers", link: "/admin-search-lawyers"},
-				{icon: "fa-table", title: "Admin Dashboard", link: "/admin-dashboard"},
+				{icon: "fa-search", title: "Find Lawyer", link: "/search-lawyers"},
+				{icon: "fa-table", title: "Search Lawyers Dashboard", link: "/admin-search-lawyers"},
+				//{icon: "fa-table", title: "Admin Dashboard", link: "/admin-dashboard"},
 				// {icon: "fa-sign-out", title: "Sign out", link: "/sign-out"},
 			],
 			color: "gradient--premium-dark",

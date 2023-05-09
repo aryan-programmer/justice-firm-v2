@@ -3,7 +3,7 @@ import {computed, justiceFirmApi, reactive, StatusSelectionOptions} from "#impor
 import {isLeft} from "fp-ts/Either";
 import {AdminAuthToken} from "../../../common/api-types";
 import {StatusEnum} from "../../../common/db-types";
-import {LawyerSearchResult} from "../../../common/rest-api-schema";
+import {LawyerSearchResult} from "../../../common/db-types";
 import {nn} from "../../../common/utils/asserts";
 import {genderDBToHuman} from "../../../common/utils/functions";
 import {useModals} from "../../store/modalsStore";
