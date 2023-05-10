@@ -15,7 +15,8 @@ import {
 	Lawyer,
 	LawyerSearchResult,
 	StatusEnum,
-	StatusEnum_T, StatusSearchOptions
+	StatusEnum_T,
+	StatusSearchOptions
 } from "./db-types";
 import {ValidEmail, ValidOTP, ValidPassword} from "./utils/constants";
 import {ArrayOf, Optional} from "./utils/functions";
@@ -42,6 +43,36 @@ export const RegisterClientInput = Type.Intersect([
 	})
 ], {$id: "RegisterClientInput"});
 export type RegisterClientInput = Static<typeof RegisterClientInput>;
+
+export const UpdateProfileInput = Type.Intersect([
+	Type.Omit(Client, ["photoPath", "id", "email", "type", "passwordHash"]),
+	Type.Object({
+		authToken:   AuthToken,
+		newPassword: Optional(ValidPassword),
+		photoData:   Optional(DataUrl_T),
+	})
+], {$id: "UpdateProfileInput"});
+export type UpdateProfileInput = Static<typeof UpdateProfileInput>;
+
+export const UpdateLawyerProfileInput = Type.Intersect([
+	Type.Omit(Lawyer, ["id", "email", "photoPath", "type", "certificationLink", "status", "passwordHash"]),
+	Type.Object({
+		authToken:           AuthToken,
+		newPassword:         Optional(ValidPassword),
+		photoData:           Optional(DataUrl_T),
+		certificationData:   Optional(DataUrl_T),
+		specializationTypes: Optional(ArrayOf(ID_T)),
+	})
+], {$id: "UpdateLawyerProfileInput"});
+export type UpdateLawyerProfileInput = Static<typeof UpdateLawyerProfileInput>;
+
+export const GetSelfProfileInput = Type.Object({
+	authToken: AuthToken
+}, {$id: "GetSelfProfileInput"});
+export type GetSelfProfileInput = Static<typeof GetSelfProfileInput>;
+
+export const GetSelfProfileOutput = Type.Union([ClientDataResult, LawyerSearchResult], {$id: "GetSelfProfileOutput"});
+export type GetSelfProfileOutput = Static<typeof GetSelfProfileOutput>;
 
 export const SessionLoginInput = Type.Object({
 	email:    ValidEmail,
@@ -75,6 +106,10 @@ export type SearchLawyersInput = SearchLawyersBaseInput | SearchAndSortLawyersIn
 
 export const GetLawyerInput = Type.Object({
 	id:                     ID_T,
+	authToken:              Optional(AuthToken),
+	getStatistics:          OptionalBoolean_T,
+	getBareCases:           OptionalBoolean_T,
+	getBareAppointments:    OptionalBoolean_T,
 	getCaseSpecializations: OptionalBoolean_T,
 }, {$id: "GetLawyerInput"});
 export type GetLawyerInput = Static<typeof GetLawyerInput>;
@@ -129,7 +164,10 @@ export type SearchAllLawyersInput =
 export const SetLawyerStatusesInput = Type.Object({
 	authToken: AdminAuthToken,
 	confirmed: ArrayOf(ID_T),
-	rejected:  ArrayOf(ID_T),
+	rejected:  ArrayOf(Type.Object({
+		id:     ID_T,
+		reason: String_T
+	})),
 	waiting:   ArrayOf(ID_T),
 }, {$id: "SetLawyerStatusesInput"});
 export type SetLawyerStatusesInput = Static<typeof SetLawyerStatusesInput>;
@@ -256,6 +294,24 @@ export const justiceFirmApiSchema = modelSchema({
 			requestBodyChecker:  lazyCheck(RegisterClientInput),
 			responseBodyChecker: lazyCheck(MessageOr(ClientAuthToken)),
 		}),
+		getSelfProfile:           endpoint({
+			method:              HttpMethods.POST,
+			path:                "/user/profile/get-self",
+			requestBodyChecker:  lazyCheck(GetSelfProfileInput),
+			responseBodyChecker: lazyCheck(MessageOr(GetSelfProfileOutput)),
+		}),
+		updateProfile:            endpoint({
+			method:              HttpMethods.POST,
+			path:                "/user/profile/update",
+			requestBodyChecker:  lazyCheck(UpdateProfileInput),
+			responseBodyChecker: lazyCheck(MessageOr(AuthToken)),
+		}),
+		updateLawyerProfile:      endpoint({
+			method:              HttpMethods.POST,
+			path:                "/user/profile/update-lawyer",
+			requestBodyChecker:  lazyCheck(UpdateLawyerProfileInput),
+			responseBodyChecker: lazyCheck(MessageOr(LawyerAuthToken)),
+		}),
 		sessionLogin:             endpoint({
 			method:              HttpMethods.POST,
 			path:                "/session",
@@ -284,7 +340,7 @@ export const justiceFirmApiSchema = modelSchema({
 			method:              HttpMethods.POST,
 			path:                "/user/lawyer/get",
 			requestBodyChecker:  lazyCheck(GetLawyerInput),
-			responseBodyChecker: lazyCheck(Optional(LawyerSearchResult)),
+			responseBodyChecker: lazyCheck(MessageOr(LawyerSearchResult)),
 		}),
 		setLawyerStatuses:        endpoint({
 			method:              HttpMethods.POST,

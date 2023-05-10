@@ -40,7 +40,7 @@ async function fetchLawyers () {
 <template>
 <h2>Administrator Dashboard</h2>
 <AdminDashboardForm
-	:waiting-lawyers="waitingLawyers"
+	:lawyers="waitingLawyers"
 	@apply-success="fetchLawyers"
 	v-if="waitingLawyers!=null && waitingLawyers.length>0"
 />

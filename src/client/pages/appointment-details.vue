@@ -6,7 +6,7 @@ import {LawyerAuthToken} from "../../common/api-types";
 import {StatusEnum, UserAccessType} from "../../common/db-types";
 import {AppointmentFullData, SetAppointmentStatusInput} from "../../common/rest-api-schema";
 import {nn} from "../../common/utils/asserts";
-import {dateStringFormat, firstIfArray, isNullOrEmpty} from "../../common/utils/functions";
+import {dateStringFormat, firstIfArray, isNullOrEmpty, statusSearchDBToHuman} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import CaseUpgradeDialog from "../components/appointments-cases/UpgradeAppointmentToCaseDialog.vue";
 import ClientCard from "../components/details-cards/ClientCard.vue";
@@ -148,18 +148,12 @@ async function commonSendRes (params: SetAppointmentStatusInput, mode: string) {
 		</p>
 		<pre class="pre-wrap text-body-2">Description:
 {{ appointment.description }}</pre>
-		<p v-if="appointment.status === StatusEnum.Waiting">
-			Status:
-			<v-chip class="fw-bold" color="amber-darken-3" variant="tonal">Waiting</v-chip>
-		</p>
-		<p v-else-if="appointment.status === StatusEnum.Confirmed">
-			Status:
-			<v-chip class="fw-bold" color="green-darken-3" variant="tonal">Confirmed</v-chip>
-		</p>
-		<p v-else-if="appointment.status === StatusEnum.Rejected">
-			Status:
-			<v-chip class="fw-bold" color="red-darken-2" variant="tonal">Rejected</v-chip>
-		</p>
+		Status:
+		<v-chip
+			class="fw-bold"
+			:color="getColorFromStatus(appointment.status)"
+			variant="tonal">{{ statusSearchDBToHuman(appointment.status) }}
+		</v-chip>
 	</v-card-text>
 	<v-card-actions>
 		<div v-if="showingAppointmentConfirmRejectButtons">

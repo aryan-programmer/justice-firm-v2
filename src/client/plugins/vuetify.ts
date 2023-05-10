@@ -2,6 +2,7 @@ import {defineNuxtPlugin} from "#app";
 import {library} from '@fortawesome/fontawesome-svg-core'
 import {faSquare as farSquare} from "@fortawesome/free-regular-svg-icons";
 import {
+	faArrowRotateLeft,
 	faBars,
 	faBriefcase,
 	faBugSlash,
@@ -30,6 +31,7 @@ import {
 	faFileWord,
 	faGavel,
 	faHome,
+	faIdBadge,
 	faImagePortrait,
 	faPaperclip,
 	faPaperPlane,
@@ -117,6 +119,8 @@ library.add(
 	faPlus,
 	faUpload,
 	faRefresh,
+	faArrowRotateLeft,
+	faIdBadge,
 );
 // import * as components from 'vuetify/components'
 // import * as directives from 'vuetify/directives'

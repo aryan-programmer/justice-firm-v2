@@ -1,16 +1,21 @@
+// noinspection JSUnusedGlobalSymbols
+
 import {DeleteItemCommand, PutItemCommand, ReturnConsumedCapacity, ReturnValue} from "@aws-sdk/client-dynamodb";
 import {SendEmailCommand} from "@aws-sdk/client-ses";
 import {GetParameterCommand} from "@aws-sdk/client-ssm";
 import {compareSync, hash} from "bcryptjs";
 import {sign} from "jsonwebtoken";
-import {createPool, Pool, UpsertResult} from "mariadb";
+import {createPool, Pool, PoolConnection, UpsertResult} from "mariadb";
 import {AuthToken, ClientAuthToken, ConstrainedAuthToken, LawyerAuthToken, PrivateAuthToken} from "../common/api-types";
 import {
+	AppointmentBareData,
+	CaseBareData,
 	CaseDocumentData,
 	CaseStatusEnum,
 	ClientDataResult,
 	ID_T,
 	LawyerSearchResult,
+	LawyerStatistics,
 	StatusEnum,
 	StatusSearchOptions,
 	StatusSearchOptionsEnum,
@@ -27,6 +32,8 @@ import {
 	GetCaseDocumentsInput,
 	GetCasesDataInput,
 	GetLawyerInput,
+	GetSelfProfileInput,
+	GetSelfProfileOutput,
 	GetWaitingLawyersInput,
 	justiceFirmApiSchema,
 	OpenAppointmentRequestInput,
@@ -39,10 +46,12 @@ import {
 	SessionLoginInput,
 	SetAppointmentStatusInput,
 	SetLawyerStatusesInput,
+	UpdateLawyerProfileInput,
+	UpdateProfileInput,
 	UpgradeAppointmentToCaseInput,
 	UploadFileInput
 } from "../common/rest-api-schema";
-import {nn} from "../common/utils/asserts";
+import {assert, nn} from "../common/utils/asserts";
 import {invalidImageMimeTypeMessage, otpMaxNum, otpMinNum, validImageMimeTypes} from "../common/utils/constants";
 import {isNullOrEmpty, nullOrEmptyCoalesce, toNumIfNotNull} from "../common/utils/functions";
 import {Nuly} from "../common/utils/types";
@@ -93,20 +102,36 @@ function generateAuthTokenResponse<T extends UserAccessType> (
 	});
 }
 
-function recordToLawyerSearchResult (value: Record<string, any>) {
+function recordToClientData (value: Record<string, any>): ClientDataResult {
 	return {
-		id:                value.id.toString(),
-		name:              value.name.toString(),
-		email:             value.email.toString(),
-		phone:             value.phone.toString(),
-		address:           value.address.toString(),
-		photoPath:         value.photo_path.toString(),
-		gender:            value.gender?.toString(),
+		id:        value.id.toString(),
+		name:      value.name.toString(),
+		email:     value.email.toString(),
+		phone:     value.phone.toString(),
+		address:   value.address.toString(),
+		photoPath: value.photo_path.toString(),
+		gender:    value.gender?.toString(),
+	}
+}
+
+function recordToLawyerSearchResult (value: Record<string, any>, extractStatistics: boolean = false) {
+	const stats: LawyerStatistics | Nuly = extractStatistics ? {
+		rejectedAppointments:  toNumIfNotNull(value.rejected_appointments) ?? 0,
+		waitingAppointments:   toNumIfNotNull(value.waiting_appointments) ?? 0,
+		confirmedAppointments: toNumIfNotNull(value.confirmed_appointments) ?? 0,
+		totalAppointments:     toNumIfNotNull(value.total_appointments) ?? 0,
+		totalCases:            toNumIfNotNull(value.total_cases) ?? 0,
+		totalClients:          toNumIfNotNull(value.total_clients) ?? 0,
+	} : undefined;
+	return {
+		...recordToClientData(value),
 		latitude:          Number(value.latitude),
 		longitude:         Number(value.longitude),
 		certificationLink: value.certification_link.toString(),
 		status:            nullOrEmptyCoalesce(value.status?.toString(), StatusEnum.Confirmed),
-		distance:          toNumIfNotNull(value.distance)
+		distance:          toNumIfNotNull(value.distance),
+		rejectionReason:   nullOrEmptyCoalesce(value.rejection_reason?.toString(), undefined),
+		statistics:        stats,
 	} as LawyerSearchResult;
 }
 
@@ -204,16 +229,199 @@ export class JusticeFirmRestAPIImpl
 			);
 
 			if (data.specializationTypes.length > 0) {
-				let params    = data.specializationTypes.map(value => ([userId, value]));
-				const specRes = await conn.batch(
-					"INSERT INTO lawyer_specialization(lawyer_id, case_type_id) VALUES (?, ?);",
-					params
-				);
+				await this.insertSpecializationTypesWithConnection(data.specializationTypes, userId, conn);
 			}
 
 			await conn.commit();
 
 			return generateAuthTokenResponse(userId, UserAccessType.Lawyer, jwtSecret, data.name);
+		} catch (e) {
+			await conn.rollback();
+			throw e;
+		} finally {
+			await conn.release();
+		}
+	}
+
+	async getSelfProfile (params: FnParams<GetSelfProfileInput>):
+		Promise<EndpointResult<GetSelfProfileOutput | Message>> {
+		const data      = params.body;
+		const jwtSecret = await this.getJwtSecret();
+		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
+		if (obj.userType === UserAccessType.Lawyer) {
+			return await this.getLawyer({
+				body: {
+					id:                     obj.id,
+					getStatistics:          true,
+					getCaseSpecializations: true,
+					authToken:              data.authToken,
+				}
+			});
+		}
+
+		const pool                       = await this.getPool();
+		const res: Record<string, any>[] = await pool.execute(
+			`SELECT u.id,
+			        u.name,
+			        u.email,
+			        u.phone,
+			        u.address,
+			        u.photo_path,
+			        u.gender
+			 FROM user u
+			 WHERE u.id = ?;`, [+obj.id]);
+
+		if (res.length === 0) {
+			return message(404, "No such user found");
+		}
+
+		return response(200, recordToClientData(res[0]));
+	}
+
+	async updateProfile (params: FnParams<UpdateProfileInput>):
+		Promise<EndpointResult<AuthToken | Message>> {
+		const data: UpdateProfileInput = params.body;
+
+		const jwtSecret = await this.getJwtSecret();
+		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
+		if (obj == null) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Unauthorized");
+		}
+
+		const updateQueryPieces = ["name = ?", "phone = ?", "address = ?", "gender = ?"];
+		const updateQueryParams = [data.name, data.phone, data.address, data.gender];
+
+		if (data.newPassword != null) {
+			const passwordHash = await hash(data.newPassword, saltRounds);
+			updateQueryPieces.push("password_hash = ?");
+			updateQueryParams.push(passwordHash);
+		}
+
+		if (data.photoData != null) {
+			const photoMimeType = await getMimeTypeFromUrlServerSide(data.photoData);
+
+			if (!validImageMimeTypes.includes(photoMimeType)) {
+				return message(constants.HTTP_STATUS_BAD_REQUEST, invalidImageMimeTypeMessage)
+			}
+			const photoRes = await uploadDataUrlToS3({
+				s3Client,
+				s3Bucket,
+				region,
+				dataUrl:     data.photoData,
+				name:        data.name,
+				prefix:      "clients/photos/",
+				contentType: photoMimeType
+			});
+			updateQueryPieces.push("photo_path = ?");
+			updateQueryParams.push(photoRes.url);
+		}
+
+		const updateQuerySets = updateQueryPieces.join(", ");
+
+		const id = BigInt(obj.id);
+
+		const userUpdateRes: UpsertResult = await (await this.getPool()).execute(
+			`UPDATE user SET ${updateQuerySets} WHERE id = ?;`,
+			[...updateQueryParams, id]
+		);
+
+		console.log({userUpdateRes});
+
+		return generateAuthTokenResponse(id, obj.userType, jwtSecret, data.name);
+	}
+
+	async updateLawyerProfile (params: FnParams<UpdateLawyerProfileInput>):
+		Promise<EndpointResult<LawyerAuthToken | Message>> {
+		const data: UpdateLawyerProfileInput = params.body;
+
+		const jwtSecret = await this.getJwtSecret();
+		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
+		if (obj == null || obj.userType !== UserAccessType.Lawyer) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED, "You must be a lawyer to use this method");
+		}
+
+		const userUpdateQueryPieces = ["name = ?", "phone = ?", "address = ?", "gender = ?"];
+		const userUpdateQueryParams = [data.name, data.phone, data.address, data.gender];
+
+		const lawyerUpdateQueryPieces                      = ["latitude = ?", "longitude = ?"];
+		const lawyerUpdateQueryParams: (string | number)[] = [data.latitude, data.longitude];
+
+		if (data.newPassword != null) {
+			const passwordHash = await hash(data.newPassword, saltRounds);
+			userUpdateQueryPieces.push("password_hash = ?");
+			userUpdateQueryParams.push(passwordHash);
+		}
+
+		if (data.photoData != null) {
+			const photoMimeType = await getMimeTypeFromUrlServerSide(data.photoData);
+
+			if (!validImageMimeTypes.includes(photoMimeType)) {
+				return message(constants.HTTP_STATUS_BAD_REQUEST, invalidImageMimeTypeMessage)
+			}
+			const photoRes = await uploadDataUrlToS3({
+				s3Client,
+				s3Bucket,
+				region,
+				dataUrl:     data.photoData,
+				name:        data.name,
+				prefix:      "lawyers/photos/",
+				contentType: photoMimeType
+			});
+			userUpdateQueryPieces.push("photo_path = ?");
+			userUpdateQueryParams.push(photoRes.url);
+		}
+
+		if (data.certificationData != null) {
+			const certificateMimeType = await getMimeTypeFromUrlServerSide(data.certificationData);
+			const certificationRes    = await uploadDataUrlToS3({
+				s3Client,
+				s3Bucket,
+				region,
+				dataUrl:               data.certificationData,
+				name:                  data.name,
+				prefix:                "lawyers/certifications/",
+				contentType:           certificateMimeType,
+				keepOriginalExtension: true,
+			});
+			lawyerUpdateQueryPieces.push("certification_link = ?");
+			lawyerUpdateQueryParams.push(certificationRes.url);
+		}
+
+		const conn = await this.getConnection();
+		try {
+			await conn.beginTransaction();
+			await conn.commit();
+
+			const lawyerId = BigInt(obj.id);
+
+			const userUpdateQuerySets         = userUpdateQueryPieces.join(", ");
+			const userUpdateRes: UpsertResult = await conn.execute(
+				`UPDATE user SET ${userUpdateQuerySets} WHERE id = ?;`,
+				[...userUpdateQueryParams, lawyerId]
+			);
+			console.log({userUpdateRes});
+
+			const lawyerUpdateQuerySets         = lawyerUpdateQueryPieces.join(", ");
+			const lawyerUpdateRes: UpsertResult = await conn.execute(
+				`UPDATE lawyer SET ${lawyerUpdateQuerySets} WHERE id = ?;`,
+				[...lawyerUpdateQueryParams, lawyerId]
+			);
+			console.log({lawyerUpdateRes});
+
+			if (data.specializationTypes != null && data.specializationTypes.length > 0) {
+				// TODO: Come up with a better system
+				const deleteSpecializationsResult: UpsertResult = await conn.execute(
+					`DELETE FROM lawyer_specialization WHERE lawyer_id = ?;`,
+					[lawyerId]
+				);
+				const insertSpecializationsResult               = await this.insertSpecializationTypesWithConnection(
+					data.specializationTypes,
+					lawyerId,
+					conn);
+				console.log({deleteSpecializationsResult, insertSpecializationsResult});
+			}
+
+			return generateAuthTokenResponse(lawyerId, UserAccessType.Lawyer, jwtSecret, data.name);
 		} catch (e) {
 			await conn.rollback();
 			throw e;
@@ -332,7 +540,7 @@ export class JusticeFirmRestAPIImpl
 				 LIMIT 100;`, [name, email, address]);
 		}
 
-		const lawyers: LawyerSearchResult[] = res.map(recordToLawyerSearchResult);
+		const lawyers: LawyerSearchResult[] = res.map((v) => recordToLawyerSearchResult(v));
 		return response(200, lawyers);
 	}
 
@@ -341,14 +549,15 @@ export class JusticeFirmRestAPIImpl
 		const data      = params.body;
 		const jwtSecret = await this.getJwtSecret();
 		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
-		const name      = `%${data.name ?? ""}%`;
-		const email     = `%${data.email ?? ""}%`;
-		const address   = `%${data.address ?? ""}%`;
-		const status    = data.status;
 		if (obj.userType !== UserAccessType.Admin) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				"To get the list of waiting lawyers the user must be authenticated as an administrator.");
 		}
+
+		const name    = `%${data.name ?? ""}%`;
+		const email   = `%${data.email ?? ""}%`;
+		const address = `%${data.address ?? ""}%`;
+		const status  = data.status;
 
 		const {statusWherePart, statusQueryArray} = getSqlWhereAndClauseFromStatus(status);
 
@@ -366,10 +575,18 @@ export class JusticeFirmRestAPIImpl
 				        l.latitude,
 				        l.longitude,
 				        l.certification_link,
+				        l.rejection_reason,
+				        las.rejected_appointments,
+				        las.waiting_appointments,
+				        las.confirmed_appointments,
+				        las.total_appointments,
+				        lcs.total_cases,
+				        lcs.total_clients,
 				        ST_DISTANCE_SPHERE(POINT(l.latitude, l.longitude), POINT(?, ?)) AS distance
-				 FROM lawyer l
-				 JOIN user   u
-				      ON u.id = l.id
+				 FROM lawyer                        l
+				 JOIN user                          u ON u.id = l.id
+				 JOIN lawyer_appointment_statistics las ON l.id = las.lawyer_id
+				 JOIN lawyer_case_statistics        lcs ON l.id = lcs.lawyer_id
 				 WHERE u.name LIKE ?
 				   AND u.email LIKE ?
 				   AND u.address LIKE ?
@@ -388,10 +605,18 @@ export class JusticeFirmRestAPIImpl
 				        l.status,
 				        l.latitude,
 				        l.longitude,
-				        l.certification_link
-				 FROM lawyer l
-				 JOIN user   u
-				      ON u.id = l.id
+				        l.certification_link,
+				        l.rejection_reason,
+				        las.rejected_appointments,
+				        las.waiting_appointments,
+				        las.confirmed_appointments,
+				        las.total_appointments,
+				        lcs.total_cases,
+				        lcs.total_clients
+				 FROM lawyer                        l
+				 JOIN user                          u ON u.id = l.id
+				 JOIN lawyer_appointment_statistics las ON l.id = las.lawyer_id
+				 JOIN lawyer_case_statistics        lcs ON l.id = lcs.lawyer_id
 				 WHERE u.name LIKE ?
 				   AND u.email LIKE ?
 				   AND u.address LIKE ?
@@ -399,7 +624,7 @@ export class JusticeFirmRestAPIImpl
 				 ORDER BY name ASC`, [name, email, address, ...statusQueryArray]);
 		}
 
-		const lawyers: LawyerSearchResult[] = res.map(recordToLawyerSearchResult);
+		const lawyers: LawyerSearchResult[] = res.map((v) => recordToLawyerSearchResult(v, true));
 		return response(200, lawyers);
 	}
 
@@ -428,16 +653,30 @@ export class JusticeFirmRestAPIImpl
 			 JOIN user   u
 			      ON u.id = l.id
 			 WHERE l.status = 'waiting'`);
-		const lawyers: LawyerSearchResult[] = res.map(recordToLawyerSearchResult);
+		const lawyers: LawyerSearchResult[] = res.map((v) => recordToLawyerSearchResult(v));
 		return response(200, lawyers);
 	}
 
 	async getLawyer (params: FnParams<GetLawyerInput>):
-		Promise<EndpointResult<LawyerSearchResult | Nuly>> {
-		const data = params.body;
+		Promise<EndpointResult<LawyerSearchResult | Message>> {
+		const data                             = params.body;
+		const getBareAppointments              = data.getBareAppointments === true;
+		const getBareCases                     = data.getBareCases === true;
+		let authToken: PrivateAuthToken | Nuly = undefined;
+
+		if (getBareAppointments || getBareCases) {
+			const jwtSecret = await this.getJwtSecret();
+			const obj       = data.authToken != null ? verifyJwtToken(data.authToken.jwt, jwtSecret) : null;
+			if (obj == null || obj.userType !== UserAccessType.Admin) {
+				return message(constants.HTTP_STATUS_UNAUTHORIZED,
+					"To get the bare appointments or cases data the user must be authenticated as an administrator.");
+			}
+			authToken = obj;
+		}
 
 		const pool                       = await this.getPool();
 		const res: Record<string, any>[] = await pool.execute(
+			data.getStatistics === true ?
 			`SELECT u.id,
 			        u.name,
 			        u.email,
@@ -447,17 +686,42 @@ export class JusticeFirmRestAPIImpl
 			        u.gender,
 			        l.latitude,
 			        l.longitude,
-			        l.certification_link
+			        l.certification_link,
+			        l.status,
+			        l.rejection_reason,
+			        las.rejected_appointments,
+			        las.waiting_appointments,
+			        las.confirmed_appointments,
+			        las.total_appointments,
+			        lcs.total_cases,
+			        lcs.total_clients
+			 FROM lawyer                        l
+			 JOIN user                          u ON u.id = l.id
+			 JOIN lawyer_appointment_statistics las ON l.id = las.lawyer_id
+			 JOIN lawyer_case_statistics        lcs ON l.id = lcs.lawyer_id
+			 WHERE l.id = ?;` :
+			`SELECT u.id,
+			        u.name,
+			        u.email,
+			        u.phone,
+			        u.address,
+			        u.photo_path,
+			        u.gender,
+			        l.latitude,
+			        l.longitude,
+			        l.certification_link,
+			        l.status,
+			        l.rejection_reason
 			 FROM lawyer l
 			 JOIN user   u
 			      ON u.id = l.id
 			 WHERE l.id = ?;`, [+data.id]);
 
 		if (res.length === 0) {
-			return response(404, null);
+			return message(404, "No such lawyer found");
 		}
 
-		const lawyers: LawyerSearchResult = recordToLawyerSearchResult(res[0]);
+		const lawyer: LawyerSearchResult = recordToLawyerSearchResult(res[0], data.getStatistics === true);
 		if (data.getCaseSpecializations === true) {
 			const res: Record<string, any>[] = await pool.execute(
 				`SELECT ct.id,
@@ -465,13 +729,66 @@ export class JusticeFirmRestAPIImpl
 				 FROM lawyer_specialization ls
 				 JOIN case_type             ct
 				      ON ct.id = ls.case_type_id
-				 WHERE ls.lawyer_id = ?;`, [BigInt(lawyers.id)]);
-			lawyers.caseSpecializations      = res.map(value => ({
+				 WHERE ls.lawyer_id = ?;`, [BigInt(lawyer.id)]);
+			lawyer.caseSpecializations       = res.map(value => ({
 				id:   value.id.toString(),
 				name: value.name.toString(),
 			}));
 		}
-		return response(200, lawyers);
+
+		if (getBareAppointments || getBareCases) {
+			assert(authToken != null && authToken.userType === UserAccessType.Admin);
+			if (getBareAppointments) {
+				const res: Record<string, any>[] = await pool.execute(
+					`SELECT a.id,
+					        a.client_id AS oth_id,
+					        cu.name     AS oth_name,
+					        a.case_id,
+					        a.status,
+					        a.opened_on,
+					        a.timestamp
+					 FROM appointment a
+					 JOIN user        cu ON a.client_id = cu.id
+					 WHERE a.lawyer_id = ?;`, [BigInt(lawyer.id)]);
+				lawyer.appointments              = res.map(value => ({
+					id:        value.id.toString(),
+					othId:     value.oth_id.toString(),
+					othName:   value.oth_name.toString(),
+					caseId:    value.case_id?.toString(),
+					timestamp: value.timestamp?.toString(),
+					openedOn:  value.opened_on.toString(),
+					status:    value.status.toString(),
+				} as AppointmentBareData));
+			}
+
+			if (getBareCases) {
+				const res: Record<string, any>[] = await pool.execute(
+					`SELECT c.id,
+					        c.client_id AS oth_id,
+					        cu.name     AS oth_name,
+					        c.type_id   AS type_id,
+					        ct.name     AS type_name,
+					        c.status,
+					        c.opened_on
+					 FROM \`case\`  c
+					 JOIN user      cu ON c.client_id = cu.id
+					 JOIN case_type ct ON c.type_id = ct.id
+					 WHERE c.lawyer_id = ?;`, [BigInt(lawyer.id)]);
+				lawyer.cases                     = res.map(value => ({
+					id:       value.id.toString(),
+					othId:    value.oth_id.toString(),
+					othName:  value.oth_name.toString(),
+					openedOn: value.opened_on.toString(),
+					status:   value.status.toString(),
+					caseType: {
+						id:   value.type_id.toString(),
+						name: value.type_name.toString(),
+					}
+				} as CaseBareData));
+			}
+		}
+
+		return response(200, lawyer);
 	}
 
 	async openAppointmentRequest (params: FnParams<OpenAppointmentRequestInput>):
@@ -603,16 +920,17 @@ export class JusticeFirmRestAPIImpl
 			}
 
 			if (data.rejected.length > 0) {
-				const sqlRejectTuple = "?" + ",?".repeat(data.rejected.length - 1);
+				const rejectParams = data.rejected.map(({id, reason}) => [reason, id]);
 
-				const rejectRes: UpsertResult = await conn.execute(
+				const rejectRes = await conn.batch(
 					`UPDATE lawyer
-					 SET status = 'rejected'
-					 WHERE id IN (${sqlRejectTuple});`,
-					data.rejected.map(BigInt)
+					 SET status           = 'rejected',
+					     rejection_reason = ?
+					 WHERE id = ?;`,
+					rejectParams
 				);
+				console.log({rejectRes});
 			}
-
 
 			if (data.waiting.length > 0) {
 				const sqlWaitingTuple = "?" + ",?".repeat(data.waiting.length - 1);
@@ -1149,6 +1467,11 @@ The Justice Firm Foundation`;
 			};
 		}) ?? [];
 		return response(200, caseDocuments);
+	}
+
+	private async insertSpecializationTypesWithConnection (specializationTypes: Array<ID_T>, userId: number | bigint, conn: PoolConnection) {
+		let params = specializationTypes.map(value => ([userId, value]));
+		return await conn.batch("INSERT INTO lawyer_specialization(lawyer_id, case_type_id) VALUES (?, ?);", params);
 	}
 
 	private async verifyCaseAccess (authToken: AuthToken, caseId: ID_T): Promise<PrivateAuthToken | [number, string]> {

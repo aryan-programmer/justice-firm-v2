@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed} from "#imports";
+import {computed, useSlots} from "#imports";
 import {useDisplay} from "vuetify";
 import {ClientDataResult} from "../../../common/rest-api-schema";
 import {genderDBToHuman, isNullOrEmpty} from "../../../common/utils/functions";
@@ -10,6 +10,7 @@ const props = defineProps<{
 	class?: string,
 }>();
 
+const slots                             = useSlots();
 const display                           = useDisplay();
 const {smAndDown: ignoreSideBySideTrue} = display;
 
@@ -41,5 +42,11 @@ const sideImage = computed(() =>
 			</v-col>
 		</v-row>
 	</v-card-text>
+	<v-card-actions
+		v-if="slots.actions != null"
+		class="flex-row flex-wrap align-center mt-0 pt-0"
+		style="min-height: 0px;">
+		<slot name="actions" />
+	</v-card-actions>
 </v-card>
 </template>

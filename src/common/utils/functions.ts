@@ -9,11 +9,13 @@ import {
 	Type
 } from "@sinclair/typebox";
 import {AuthToken} from "../api-types";
-import {StatusEnum, StatusSearchOptionsEnum} from "./constants";
 import {
 	genderDbValsToHuman,
-	genderHumanValsToDb, statusSearchOptionHuman_Any,
+	genderHumanValsToDb,
+	StatusEnum,
+	statusSearchOptionHuman_Any,
 	statusSearchOptionsDbToHuman,
+	StatusSearchOptionsEnum,
 	statusSearchOptionsHumanValsToDb
 } from "./constants";
 import {GeolocationNotAvailableError} from "./errors";

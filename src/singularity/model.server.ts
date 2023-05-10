@@ -70,7 +70,11 @@ function awsWrapGetter<TEndpoints extends APIEndpoints = APIEndpoints> (
 			params,
 			event) as PromiseOrEndpointResult<TResBody>;
 		return async function transformerFunction (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
-			const res: { body: unknown; statusCode: number, headers?: Record<string, unknown> } = await baseWrapperFunction(
+			const res: {
+				body: unknown;
+				statusCode: number,
+				headers?: Record<string, unknown>
+			} = await baseWrapperFunction(
 				implFn,
 				validateOutputs,
 				event,

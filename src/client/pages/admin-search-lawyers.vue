@@ -4,22 +4,19 @@ import {isLeft} from "fp-ts/Either";
 import {useField, useForm} from 'vee-validate';
 import {LocationQueryValue} from "vue-router";
 import {useDisplay} from "vuetify";
-import {InferType} from "yup";
 import * as yup from "yup";
+import {InferType} from "yup";
 import {AdminAuthToken} from "../../common/api-types";
-import {StatusEnum, StatusSearchOptionsEnum} from "../../common/db-types";
 import {LawyerSearchResult} from "../../common/rest-api-schema";
-import {genderHumanVals, statusSearchOptionHuman_Any, statusSearchOptionsHumanVals} from "../../common/utils/constants";
+import {statusSearchOptionHuman_Any, statusSearchOptionsHumanVals} from "../../common/utils/constants";
 import {
-	capitalizeFirstLetter,
 	closeToZero,
 	firstIfArray,
-	getCurrentPosition, statusSearchDBToHuman, statusSearchHumanToDB,
+	getCurrentPosition,
+	statusSearchHumanToDB,
 	toNumIfNotNull
 } from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
-import {Message} from "../../singularity/helpers";
-import {ModelResponseOrErr} from "../../singularity/model.client";
 import AdminDashboardForm from "../components/admin-dashboard/AdminDashboardForm.vue";
 import FormTextFieldInCol from "../components/general/FormTextFieldInCol.vue";
 import {useModals} from "../store/modalsStore";
@@ -255,7 +252,7 @@ watch(() => route.query, value => {
 	<div v-if="lawyers.length > 0">
 		<h2>Found lawyers:</h2>
 		<AdminDashboardForm
-			:waiting-lawyers="lawyers"
+			:lawyers="lawyers"
 			@apply-success="fetchFromQuery"
 			display-current-status
 		/>

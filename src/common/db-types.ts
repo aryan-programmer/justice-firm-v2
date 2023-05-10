@@ -1,14 +1,10 @@
 import {Static, Type} from "@sinclair/typebox";
 import {FileUploadData} from "../server/utils/types";
-import {
-	StatusEnum,
-	StatusSearchOptionsEnum,
-	ValidEmail,
-	ValidPhone
-} from "./utils/constants";
+import {StatusEnum, StatusSearchOptionsEnum, ValidEmail, ValidPhone} from "./utils/constants";
 import {ArrayOf, Optional} from "./utils/functions";
-import {Number_T, String_T} from "./utils/types";
-export {StatusEnum,StatusSearchOptionsEnum} from "./utils/constants";
+import {Number_T, OptionalString_T, String_T} from "./utils/types";
+
+export {StatusEnum, StatusSearchOptionsEnum} from "./utils/constants";
 
 export const ID_T = Type.String({$id: "ID_T"});
 export type ID_T = string;
@@ -28,11 +24,10 @@ export enum UserAccessType {
 export const UserAccessType_T = Type.Enum(UserAccessType, {$id: "UserAccessType"})
 
 
-
 export const StatusSearchOptionsEnum_T = Type.Enum(StatusSearchOptionsEnum, {$id: "StatusSearchOptionsEnum"})
-export const StatusEnum_T = Type.Enum(StatusEnum, {$id: "StatusEnum"})
+export const StatusEnum_T              = Type.Enum(StatusEnum, {$id: "StatusEnum"})
 
-export const StatusSearchOptions       = Type.Union([StatusSearchOptionsEnum_T, StatusEnum_T], {$id:"StatusSearchOptions"});
+export const StatusSearchOptions = Type.Union([StatusSearchOptionsEnum_T, StatusEnum_T], {$id: "StatusSearchOptions"});
 export type StatusSearchOptions = StatusSearchOptionsEnum | StatusEnum;
 
 export enum CaseStatusEnum {
@@ -52,7 +47,7 @@ export const User = Type.Object({
 	passwordHash: String_T,
 	photoPath:    String_T,
 	type:         UserAccessType_T,
-	gender:       Optional(String_T)
+	gender:       String_T
 }, {$id: "User"});
 export type User = Static<typeof User>;
 
@@ -71,6 +66,7 @@ export const Lawyer = Type.Intersect([
 		longitude:         Type.Number(),
 		certificationLink: String_T,
 		status:            StatusEnum_T,
+		rejectionReason:   OptionalString_T,
 	})
 ], {$id: "Lawyer"});
 export type Lawyer = Static<typeof Lawyer>;
@@ -93,12 +89,46 @@ export const CaseDocumentData = Type.Object({
 }, {$id: "CaseDocumentData"});
 export type CaseDocumentData = Static<typeof CaseDocumentData>;
 
+export const LawyerStatistics = Type.Object({
+	rejectedAppointments:  Number_T,
+	waitingAppointments:   Number_T,
+	confirmedAppointments: Number_T,
+	totalAppointments:     Number_T,
+	totalCases:            Number_T,
+	totalClients:          Number_T,
+}, {$id: "LawyerStatistics"});
+export type LawyerStatistics = Static<typeof LawyerStatistics>;
+
+export const AppointmentBareData = Type.Object({
+	id:        ID_T,
+	othId:     ID_T,
+	othName:   String_T,
+	timestamp: OptionalString_T,
+	openedOn:  String_T,
+	status:    StatusEnum_T,
+	caseId:    Optional(ID_T),
+}, {$id: "AppointmentBareData"});
+export type AppointmentBareData = Static<typeof AppointmentBareData>;
+
+export const CaseBareData = Type.Object({
+	id:       ID_T,
+	othId:    ID_T,
+	othName:  String_T,
+	caseType: CaseType,
+	openedOn: String_T,
+	status:   CaseStatusEnum_T,
+}, {$id: "CaseBareData"});
+export type CaseBareData = Static<typeof CaseBareData>;
+
 export const LawyerSearchResult = Type.Intersect([
 	Type.Omit(Lawyer, ["type", "passwordHash", "status"]),
 	Type.Object({
 		distance:            Optional(Number_T),
 		caseSpecializations: Optional(ArrayOf(CaseType)),
 		status:              Optional(StatusEnum_T),
+		statistics:          Optional(LawyerStatistics),
+		cases:               Optional(ArrayOf(CaseBareData)),
+		appointments:        Optional(ArrayOf(AppointmentBareData)),
 	})
 ], {$id: "LawyerSearchResult"});
 export type LawyerSearchResult = Static<typeof LawyerSearchResult>;

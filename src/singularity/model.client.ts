@@ -80,6 +80,7 @@ function fetchImplementationMapper<TEndpoints extends APIEndpoints = APIEndpoint
 			if (validateInputs) {
 				const errors = endpoint.checkBody(body);
 				if (errors != null && errors.length !== 0) {
+					console.log(body);
 					return left(errors);
 				}
 			}

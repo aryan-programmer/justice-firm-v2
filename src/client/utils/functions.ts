@@ -17,7 +17,7 @@ import {ModalStoreWrapper} from "../store/modalsStore";
 import {UserStore_T} from "../store/userStore";
 import {justiceFirmApi} from "./api-fetcher-impl";
 import {confirmedColor, iconClassesArray, rejectedColor, waitingColor} from "./constants";
-import {MessageDataDisplayable} from "./types";
+import {KeepAsIsEnum, MessageDataDisplayable, StatusSelectionOptions} from "./types";
 
 export class FileReaderEventError extends Error {
 	public readonly event: ProgressEvent<FileReader>;
@@ -182,4 +182,8 @@ export function getFontAwesomeIconFromMIME (mimeType: string) {
 
 export function isFilePreviewable (file: FileUploadData) {
 	return file.mime.startsWith('image/');
+}
+
+export function statusSelectionOptionCoalesce (v1: StatusSelectionOptions | Nuly, v2: StatusEnum) {
+	return v1 == null || v1 === KeepAsIsEnum.KeepAsIs ? v2 : v1;
 }

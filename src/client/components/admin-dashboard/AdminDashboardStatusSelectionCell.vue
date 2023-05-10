@@ -23,6 +23,14 @@ function updateModelVal (val: any) {
 }
 </script>
 
+<style>
+.no-min-w-btn {
+	background: unset;
+	min-width: 10px;
+	padding: 0 5px;
+}
+</style>
+
 <template>
 <div class="d-flex flex-column justify-center align-center">
 	<v-btn
@@ -31,7 +39,8 @@ function updateModelVal (val: any) {
 		:active="isKeep"
 		@click="updateModelVal(KeepAsIsEnum.KeepAsIs)"
 		:color="isKeep?getColorFromStatus(props.origVal):'black'"
-		class="w-100 p-2">
+		density="comfortable"
+		class="w-100 px-2">
 		Keep {{ props.origVal }}
 	</v-btn>
 	<v-btn-toggle

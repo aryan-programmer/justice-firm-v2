@@ -7,7 +7,6 @@ import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {assert} from "../../common/utils/asserts";
 import {isNullOrEmpty} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
-import {ModelResponseOrErr} from "../../singularity/model.client";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 
@@ -37,10 +36,10 @@ watch(() => route.query.id, async value => {
 		return;
 	}
 
-	const resP: Promise<ModelResponseOrErr<LawyerSearchResult | Nuly>> = justiceFirmApi.getLawyer({id});
+	const resP = justiceFirmApi.getLawyer({id});
 
 	const res = await resP;
-	if (isLeft(res) || !res.right.ok || res.right.body == null) {
+	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
 		await error("Failed to find a lawyer with the id " + id);
 		await navigateTo("/");

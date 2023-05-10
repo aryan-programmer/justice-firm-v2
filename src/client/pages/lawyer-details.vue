@@ -1,16 +1,21 @@
 <script setup lang="ts">
 import {justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
-import {LawyerSearchResult} from "../../common/rest-api-schema";
+import {UserAccessType} from "../../common/db-types";
+import {GetLawyerInput, LawyerSearchResult} from "../../common/rest-api-schema";
 import {Nuly} from "../../common/utils/types";
-import {ModelResponseOrErr} from "../../singularity/model.client";
+import BareAppointmentsDistributor from "../components/appointments-cases/BareAppointmentsDistributor.vue";
+import BareCasesTable from "../components/appointments-cases/BareCasesTable.vue";
 import LawyerCard from "../components/details-cards/LawyerCard.vue";
 import {useModals} from "../store/modalsStore";
+import {useUserStore} from "../store/userStore";
 
 const {message, error} = useModals();
 const router           = useRouter();
 const route            = useRoute();
+const userStore        = useUserStore();
 const lawyer           = ref<LawyerSearchResult | Nuly>();
+const isAdmin          = computed(() => userStore.authToken != null && userStore.authToken.userType === UserAccessType.Admin);
 
 watch(() => route.query.id, async value => {
 	const id = value?.toString();
@@ -20,13 +25,20 @@ watch(() => route.query.id, async value => {
 		return;
 	}
 
-	const resP: Promise<ModelResponseOrErr<LawyerSearchResult | Nuly>> = justiceFirmApi.getLawyer({
+	const body: GetLawyerInput = isAdmin.value ? {
 		id:                     id,
 		getCaseSpecializations: true,
-	});
-
-	const res = await resP;
-	if (isLeft(res) || !res.right.ok || res.right.body == null) {
+		getBareAppointments:    true,
+		getBareCases:           true,
+		getStatistics:          true,
+		authToken:              userStore.authToken,
+	} : {
+		id:                     id,
+		getCaseSpecializations: true,
+		// getStatistics:          true,
+	};
+	const res                  = await justiceFirmApi.getLawyer(body);
+	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
 		await error("Failed to find a lawyer with the id " + id);
 		await navigateTo("/");
@@ -38,39 +50,33 @@ watch(() => route.query.id, async value => {
 }, {immediate: true});
 </script>
 
-<style>
-.lawyer-details-card-parent {
-	display: flex;
-}
-
-.lawyer-details-card {
-	margin-right: auto;
-	margin-left: auto;
-}
-</style>
-
 <template>
-<v-row
-	v-if="lawyer!=null"
-	class="lawyer-details-card-parent"
->
-	<div class="v-col v-col-12 v-col-sm-9 lawyer-details-card">
-		<LawyerCard
-			:lawyer="lawyer"
-			side-by-side
-			class=""
-		>
-			<template #actions>
-			<v-btn
-				:to="`/open-appointment?id=${lawyer.id}`"
-				color="teal-lighten-3"
-				density="default"
-				elevation="2"
-				rounded
-				variant="elevated">Open appointment request
-			</v-btn>
-			</template>
-		</LawyerCard>
+<div v-if="lawyer!=null">
+	<LawyerCard
+		:lawyer="lawyer"
+		side-by-side
+		class="w-100"
+		:show-user-id="isAdmin"
+	>
+		<template #actions>
+		<v-btn
+			v-if="!isAdmin"
+			:to="`/open-appointment?id=${lawyer.id}`"
+			color="teal-lighten-3"
+			density="compact"
+			elevation="2"
+			rounded
+			variant="elevated">Open appointment request
+		</v-btn>
+		</template>
+	</LawyerCard>
+
+	<div v-if="lawyer.cases != null">
+		<br />
+		<h2>Lawyer's Current Open Cases</h2>
+		<BareCasesTable :cases="lawyer.cases" other-user-title="Client" class="bg-blue-lighten-3" />
 	</div>
-</v-row>
+
+	<BareAppointmentsDistributor :appointments="lawyer.appointments" v-if="lawyer.appointments != null" />
+</div>
 </template>

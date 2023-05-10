@@ -974,12 +974,12 @@
 //			(linear-gradient(to right, #0acffe 0%, #495aff 100%)),
 //);
 //
-//// 140 Mole Hall
-//@include gradient_defs.define-gradient(
-//		gradient--mole-hall,
-//		#819b9a,
-//			(linear-gradient(-20deg, #616161 0%, #9bc5c3 100%)),
-//);
+// 140 Mole Hall
+@include gradient_defs.define-gradient(
+		gradient--mole-hall,
+		#819b9a,
+			(linear-gradient(-20deg, #bababa 0%, #9bc5c3 100%)),
+);
 //
 //// 141 Earl Gray
 //@include gradient_defs.define-gradient(
@@ -1163,12 +1163,12 @@
 //			(linear-gradient(-225deg, #7085B6 0%, #87A7D9 50%, #DEF3F8 100%)),
 //);
 //
-//// 167 Sea Strike
-//@include gradient_defs.define-gradient(
-//		gradient--sea-strike,
-//		#5bdbe5,
-//			(linear-gradient(-225deg, #77FFD2 0%, #6297DB 48%, #1EECFF 100%)),
-//);
+// 167 Sea Strike
+@include gradient_defs.define-gradient(
+		gradient--sea-strike,
+		#5bdbe5,
+			(linear-gradient(-225deg, #77FFD2 0%, #6297DB 48%, #1EECFF 100%)),
+);
 //
 //// 168 Night Call
 //@include gradient_defs.define-gradient(

@@ -179,7 +179,10 @@ $case-documents-expansion-title-height: 32px;
 <template>
 <div class="case-details-card-parent-parent">
 	<v-sheet elevation="3" rounded class="case-details-card-parent">
-		<v-card v-if="caseData!=null" color="gradient--juicy-peach" class="elevation-0 w-100 case-details-card scroll-y">
+		<v-card
+			v-if="caseData!=null"
+			color="gradient--juicy-peach"
+			class="elevation-0 w-100 case-details-card scroll-y">
 			<v-card-title>
 				<h3>Case details</h3>
 			</v-card-title>

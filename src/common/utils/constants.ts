@@ -51,7 +51,7 @@ export enum StatusEnum {
 	Confirmed = 'confirmed'
 }
 
-const statusSearchOptions: StatusSearchOptions[]                             = [
+const statusSearchOptions: StatusSearchOptions[]                               = [
 	StatusSearchOptionsEnum.Any,
 	StatusEnum.Confirmed,
 	StatusEnum.Waiting,
@@ -69,7 +69,7 @@ export const statusSearchOptionsDbToHuman: Record<StatusSearchOptions, string> =
 	[StatusSearchOptionsEnum.NotConfirmed]: "Not Confirmed",
 	[StatusSearchOptionsEnum.NotWaiting]:   "Not Waiting",
 };
-export const statusSearchOptionsHumanValsToDb = {
+export const statusSearchOptionsHumanValsToDb                                  = {
 	"Any":           StatusSearchOptionsEnum.Any,
 	"Confirmed":     StatusEnum.Confirmed,
 	"Waiting":       StatusEnum.Waiting,
@@ -78,7 +78,7 @@ export const statusSearchOptionsHumanValsToDb = {
 	"Not Confirmed": StatusSearchOptionsEnum.NotConfirmed,
 	"Not Waiting":   StatusSearchOptionsEnum.NotWaiting,
 };
-export const statusSearchOptionHuman_Any      = "Any";
+export const statusSearchOptionHuman_Any                                       = "Any";
 
 export const statusSearchOptionsHumanVals = Object.keys(statusSearchOptionsHumanValsToDb);
 

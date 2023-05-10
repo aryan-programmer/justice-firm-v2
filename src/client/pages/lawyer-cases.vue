@@ -22,5 +22,5 @@ onMounted(async () => {
 
 <template>
 <h1>View Cases</h1>
-<CasesTable other-user-title="Client" :cases="cases" class="bg-amber-lighten-3" />
+<CasesTable other-user-title="Client" :cases="cases" class="bg-blue-lighten-3" />
 </template>

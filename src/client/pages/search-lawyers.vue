@@ -5,19 +5,10 @@ import {useField, useForm} from 'vee-validate';
 import {LocationQueryValue} from "vue-router";
 import {useDisplay} from "vuetify";
 import * as yup from "yup";
-import {AdminAuthToken} from "../../common/api-types";
+import {UserAccessType} from "../../common/db-types";
 import {LawyerSearchResult} from "../../common/rest-api-schema";
-import {statusSearchOptionHuman_Any} from "../../common/utils/constants";
-import {
-	closeToZero,
-	firstIfArray,
-	getCurrentPosition,
-	statusSearchHumanToDB,
-	toNumIfNotNull
-} from "../../common/utils/functions";
+import {closeToZero, firstIfArray, getCurrentPosition, toNumIfNotNull} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
-import {Message} from "../../singularity/helpers";
-import {ModelResponseOrErr} from "../../singularity/model.client";
 import LawyerCard from "../components/details-cards/LawyerCard.vue";
 import FormTextFieldInCol from "../components/general/FormTextFieldInCol.vue";
 import {useModals} from "../store/modalsStore";
@@ -48,6 +39,7 @@ const router                              = useRouter();
 const route                               = useRoute();
 const display                             = useDisplay();
 const {smAndDown: moveAutoFillButtonDown} = display;
+const isAdmin                             = computed(() => userStore.authToken != null && userStore.authToken.userType === UserAccessType.Admin);
 
 const lawyers  = ref<LawyerSearchResult[] | Nuly>();
 const showForm = ref<boolean>(false);
@@ -228,7 +220,7 @@ watch(() => route.query, value => {
 				sm="6"
 				md="4"
 				lg="3">
-				<LawyerCard :lawyer="lawyer">
+				<LawyerCard :lawyer="lawyer" :show-user-id="isAdmin">
 					<template #actions>
 					<v-btn
 						:to="`/lawyer-details?id=${lawyer.id}`"
@@ -239,12 +231,12 @@ watch(() => route.query, value => {
 						variant="tonal">View more details
 					</v-btn>
 					<v-btn
+						v-if="!isAdmin"
 						:to="`/open-appointment?id=${lawyer.id}`"
-						class="ms-0 mt-2"
-						color="teal-lighten-4"
+						color="cyan-darken-4"
 						density="compact"
 						rounded
-						variant="tonal">Open appointment request
+						variant="elevated">Open appointment request
 					</v-btn>
 					</template>
 				</LawyerCard>

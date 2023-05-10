@@ -3,6 +3,8 @@ CREATE DATABASE IF NOT EXISTS justice_firm;
 USE justice_firm;
 
 SET FOREIGN_KEY_CHECKS = 0;
+DROP VIEW IF EXISTS lawyer_appointment_statistics;
+DROP VIEW IF EXISTS lawyer_case_statistics;
 DROP TABLE IF EXISTS user;
 DROP TABLE IF EXISTS client;
 DROP TABLE IF EXISTS lawyer;
@@ -42,6 +44,7 @@ CREATE TABLE lawyer (
 	longitude          DECIMAL(6, 3) NOT NULL,
 	certification_link VARCHAR(1024) NOT NULL,
 	status             ENUM ('waiting', 'rejected', 'confirmed') DEFAULT 'waiting',
+	rejection_reason   VARCHAR(1024) NULL,
 	FOREIGN KEY (id)
 		REFERENCES user (id)
 );
@@ -162,6 +165,30 @@ ALTER TABLE appointment
 ALTER TABLE `case`
 	ADD FOREIGN KEY (group_id)
 		REFERENCES `group` (id);
+
+CREATE VIEW lawyer_case_statistics AS
+SELECT l.id                        AS lawyer_id,
+       COUNT(c.id)                 AS total_cases,
+       COUNT(DISTINCT c.client_id) AS total_clients
+FROM lawyer            l
+LEFT OUTER JOIN `case` c ON l.id = c.lawyer_id
+GROUP BY l.id;
+
+CREATE VIEW lawyer_appointment_statistics AS
+SELECT l.id        AS lawyer_id,
+       COUNT(CASE
+	             WHEN a.status = 'waiting' THEN a.id
+             END)  AS waiting_appointments,
+       COUNT(CASE
+	             WHEN a.status = 'confirmed' THEN a.id
+             END)  AS confirmed_appointments,
+       COUNT(CASE
+	             WHEN a.status = 'rejected' THEN a.id
+             END)  AS rejected_appointments,
+       COUNT(a.id) AS total_appointments
+FROM lawyer                 l
+LEFT OUTER JOIN appointment a ON l.id = a.lawyer_id
+GROUP BY l.id;
 
 INSERT INTO case_type(name)
 VALUES ('Bankruptcy'),
