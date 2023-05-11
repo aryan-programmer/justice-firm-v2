@@ -89,7 +89,7 @@ const onSubmit = handleSubmit(async values => {
 		await error("Invalid data");
 		return;
 	}
-	if (values.newPassword !== values.reNewPassword) {
+	if (nullOrEmptyCoalesce(values.newPassword, null) != nullOrEmptyCoalesce(values.reNewPassword, null)) {
 		await error("Password & retyped password must match");
 		return;
 	}

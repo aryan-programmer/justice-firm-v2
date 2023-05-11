@@ -132,7 +132,7 @@ const onSubmit = handleSubmit(async values => {
 		await error("Invalid data");
 		return;
 	}
-	if (values.newPassword !== values.reNewPassword) {
+	if (nullOrEmptyCoalesce(values.newPassword, null) != nullOrEmptyCoalesce(values.reNewPassword, null)) {
 		await error("Password & retyped password must match");
 		return;
 	}
@@ -141,7 +141,7 @@ const onSubmit = handleSubmit(async values => {
 		specializationTypes = [];
 		const specs         = values.caseSpecializations;
 		for (const key of Object.keys(specs)) {
-			if (specs[key] != null) {
+			if (specs[key] === "1") {
 				specializationTypes.push(key.substring(2));
 			}
 		}
@@ -159,6 +159,7 @@ const onSubmit = handleSubmit(async values => {
 		longitude:           +values.longitude,
 		specializationTypes: specializationTypes,
 	}
+	console.log(body, values);
 	const res                            = await justiceFirmApi.updateLawyerProfile(body);
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);

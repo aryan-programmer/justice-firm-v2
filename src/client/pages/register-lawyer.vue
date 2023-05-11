@@ -122,7 +122,7 @@ const onSubmit = handleSubmit(async values => {
 	const specializationTypes: string[] = [];
 	const specs                         = values.caseSpecializations;
 	for (const key of Object.keys(specs)) {
-		if (specs[key] != null) {
+		if (specs[key] === "1") {
 			specializationTypes.push(key.substring(2));
 		}
 	}
