@@ -79,10 +79,8 @@ async function scrollToBottom () {
 	await nextTick();
 	const el = scrollingBox.value?.$el as HTMLDivElement | Nuly;
 	if (el == null) {
-		console.log("Null");
 		return;
 	}
-	console.log(el, el.scrollHeight);
 	el.scrollTop = el.scrollHeight;
 }
 
@@ -113,15 +111,14 @@ async function postMessage () {
 async function postMessageWithAttachment (data: UploadFileWithDescriptionDialogEventData) {
 	const cl = chatClient.value;
 	if (cl == null || chatGroupId == null || userStore.authToken == null) return;
-	console.log(data);
 	const uploadRes = await justiceFirmApi.uploadFile({
 		fileName:   data.attachmentName,
 		fileData:   data.attachmentDataUrl,
 		pathPrefix: chatGroupAttachmentPathPrefix(chatGroupId, userStore.authToken.id),
 		authToken:  userStore.authToken,
 	});
-	console.log(uploadRes);
 	if (isLeft(uploadRes) || !uploadRes.right.ok || uploadRes.right.body == null || "message" in uploadRes.right.body) {
+		console.log(uploadRes);
 		await error("Failed to upload attachment");
 		return;
 	}
@@ -132,8 +129,8 @@ async function postMessageWithAttachment (data: UploadFileWithDescriptionDialogE
 	};
 
 	const res = await cl.postMessageWithAttachment(body);
-	console.log(res);
 	if (isLeft(res) || !res.right.ok) {
+		console.log(res);
 		await error("Failed to post message");
 		return;
 	}
@@ -161,12 +158,12 @@ async function openConnection (value: LocationQuery) {
 		return;
 	}
 	const establishConnBody = res.right.body;
-	console.log(establishConnBody);
-	chatData.value    = establishConnBody;
-	chatClient.value  = cl;
-	chatGroupId       = id;
-	const messagesRes = await cl.getMessages({chatAuthToken: establishConnBody.chatAuthToken});
+	chatData.value          = establishConnBody;
+	chatClient.value        = cl;
+	chatGroupId             = id;
+	const messagesRes       = await cl.getMessages({chatAuthToken: establishConnBody.chatAuthToken});
 	if (isLeft(messagesRes) || !messagesRes.right.ok || messagesRes.right.body == null || "message" in messagesRes.right.body) {
+		console.log(messagesRes);
 		await error(`Failed to get messages`);
 		return;
 	}
@@ -177,7 +174,6 @@ async function openConnection (value: LocationQuery) {
 	for (const msg of msgs) {
 		pastMessages.add(msg.id);
 	}
-	console.log(msgs);
 	messages.messages = msgs;
 	await scrollToBottom();
 }

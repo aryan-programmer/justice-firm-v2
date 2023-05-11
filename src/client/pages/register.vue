@@ -60,8 +60,6 @@ function photoClear (event: unknown) {
 }
 
 async function photoChange (event: Event) {
-	// console.log(event, 112);
-	// console.log(photoInputRef);
 	photo.handleChange(event);
 	const file = (event.target as HTMLInputElement)?.files?.[0];
 	if (file == null) return;
@@ -96,7 +94,6 @@ const onSubmit = handleSubmit(async values => {
 		await error("Failed to sign up.")
 		return;
 	}
-	console.log(res.right.body);
 	userStore.signIn(res.right.body);
 	message /*not-awaiting*/("Registered as a client successfully");
 	await navigateTo("/");

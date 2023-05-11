@@ -5,7 +5,7 @@ import {useField, useForm} from 'vee-validate';
 import {LocationQueryValue} from "vue-router";
 import {useDisplay} from "vuetify";
 import * as yup from "yup";
-import {UserAccessType} from "../../common/db-types";
+import {StatusEnum, UserAccessType} from "../../common/db-types";
 import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {closeToZero, firstIfArray, getCurrentPosition, toNumIfNotNull} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
@@ -59,7 +59,7 @@ async function fetchFromQuery () {
 	const longitude_ = longitude.value.value = (toNumIfNotNull(firstIfArray(query.longitude)) ?? 0);
 	if (name_ == null || address_ == null || email_ == null) return;
 
-	let body = closeToZero(latitude_) || closeToZero(longitude_) ? {
+	let body  = closeToZero(latitude_) || closeToZero(longitude_) ? {
 		name:    name_,
 		address: address_,
 		email:   email_,
@@ -70,7 +70,6 @@ async function fetchFromQuery () {
 		latitude:  latitude_,
 		longitude: longitude_,
 	};
-	console.log(body, query);
 	const res = await justiceFirmApi.searchLawyers(body);
 
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
@@ -81,12 +80,10 @@ async function fetchFromQuery () {
 
 	lawyers.value  = res.right.body;
 	showForm.value = false;
-	console.log(res.right.body);
 }
 
 async function autofillLatLon () {
 	const currentPos = await getCurrentPosition();
-	console.log(currentPos);
 	latitude.setValue(currentPos.coords.latitude);
 	longitude.setValue(currentPos.coords.longitude);
 }
@@ -231,7 +228,7 @@ watch(() => route.query, value => {
 						variant="tonal">View more details
 					</v-btn>
 					<v-btn
-						v-if="!isAdmin"
+						v-if="!isAdmin && lawyer.status === StatusEnum.Confirmed"
 						:to="`/open-appointment?id=${lawyer.id}`"
 						color="cyan-darken-4"
 						density="compact"

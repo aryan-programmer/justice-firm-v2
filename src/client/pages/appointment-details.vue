@@ -59,7 +59,6 @@ async function fetchAppointment (value: LocationQuery) {
 		await error("Specify an appointment to view details for");
 		return;
 	}
-	console.log({id});
 	const res = await justiceFirmApi.getAppointmentRequest({
 		authToken: nn(userStore.authToken),
 		id,
@@ -70,9 +69,7 @@ async function fetchAppointment (value: LocationQuery) {
 		await error(`Failed to find the appointment with the ID ${id}`);
 		return;
 	}
-	const a = res.right.body;
-	console.log(a);
-	appointment.value = a;
+	appointment.value = res.right.body;
 }
 
 async function confirmAppointment () {

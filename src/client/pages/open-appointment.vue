@@ -2,7 +2,7 @@
 import {computed, definePageMeta, justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {ClientAuthToken} from "../../common/api-types";
-import {UserAccessType} from "../../common/db-types";
+import {StatusEnum, UserAccessType} from "../../common/db-types";
 import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {assert} from "../../common/utils/asserts";
 import {isNullOrEmpty} from "../../common/utils/functions";
@@ -36,12 +36,16 @@ watch(() => route.query.id, async value => {
 		return;
 	}
 
-	const resP = justiceFirmApi.getLawyer({id});
-
-	const res = await resP;
+	const res = await justiceFirmApi.getLawyer({id});
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
 		await error("Failed to find a lawyer with the id " + id);
+		await navigateTo("/");
+		return;
+	}
+
+	if (res.right.body.status !== StatusEnum.Confirmed) {
+		await error(`The lawyer ${res.right.body.name}'s application has not been confirmed yet, and so no appointment requests can be made to them.`);
 		await navigateTo("/");
 		return;
 	}

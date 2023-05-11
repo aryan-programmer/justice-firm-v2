@@ -32,6 +32,8 @@ import {
 	GetCaseDocumentsInput,
 	GetCasesDataInput,
 	GetLawyerInput,
+	GetLawyerStatusInput,
+	GetLawyerStatusOutput,
 	GetSelfProfileInput,
 	GetSelfProfileOutput,
 	GetWaitingLawyersInput,
@@ -791,6 +793,30 @@ export class JusticeFirmRestAPIImpl
 		return response(200, lawyer);
 	}
 
+	async getLawyerStatusInformation (params: FnParams<GetLawyerStatusInput>):
+		Promise<EndpointResult<GetLawyerStatusOutput | Message>> {
+		const data = params.body;
+
+		const pool                       = await this.getPool();
+		const res: Record<string, any>[] = await pool.execute(
+			`SELECT l.status, l.rejection_reason
+			 FROM lawyer l
+			 WHERE l.id = ?;`, [+data.id]);
+
+		if (res.length === 0) {
+			return message(404, "No such lawyer found");
+		}
+
+		const r0 = res[0];
+
+		const statusOutput: GetLawyerStatusOutput = {
+			status:          r0.status.toString(),
+			rejectionReason: r0.rejection_reason?.toString(),
+		};
+
+		return response(200, statusOutput);
+	}
+
 	async openAppointmentRequest (params: FnParams<OpenAppointmentRequestInput>):
 		Promise<EndpointResult<ID_T | Message>> {
 		const data: OpenAppointmentRequestInput = params.body;
@@ -800,6 +826,16 @@ export class JusticeFirmRestAPIImpl
 		if (obj.userType !== UserAccessType.Client) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				"To open an appointment request the user must be authenticated as a client.");
+		}
+
+		const lawyerStatus = await this.getLawyerStatusInformation({
+			body: {
+				id: data.lawyerId
+			}
+		});
+		if ("message" in lawyerStatus.body || lawyerStatus.body.status !== StatusEnum.Confirmed) {
+			return message(constants.HTTP_STATUS_FORBIDDEN,
+				"The lawyer with id " + data.lawyerId + " has not been confirmed.");
 		}
 
 		const timestamp = data.timestamp == null ? null : new Date(data.timestamp);
@@ -903,7 +939,7 @@ export class JusticeFirmRestAPIImpl
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				"To set the statuses of lawyers the user must be authenticated as an administrator.");
 		}
-		if (data.rejected.length === 0 && data.confirmed.length === 0) return noContent;
+		if (data.rejected.length === 0 && data.confirmed.length === 0 && data.waiting.length === 0) return noContent;
 		const conn = await this.getConnection();
 		try {
 			await conn.beginTransaction();
@@ -913,7 +949,8 @@ export class JusticeFirmRestAPIImpl
 
 				const confirmRes: UpsertResult = await conn.execute(
 					`UPDATE lawyer
-					 SET status = 'confirmed'
+					 SET status           = 'confirmed',
+					     rejection_reason = NULL
 					 WHERE id IN (${sqlConfirmTuple});`,
 					data.confirmed.map(BigInt)
 				);
@@ -937,7 +974,8 @@ export class JusticeFirmRestAPIImpl
 
 				const waitingRes: UpsertResult = await conn.execute(
 					`UPDATE lawyer
-					 SET status = 'waiting'
+					 SET status           = 'waiting',
+					     rejection_reason = NULL
 					 WHERE id IN (${sqlWaitingTuple});`,
 					data.waiting.map(BigInt)
 				);

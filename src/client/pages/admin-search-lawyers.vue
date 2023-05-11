@@ -82,7 +82,7 @@ async function fetchFromQuery () {
 	const longitude_   = longitude.value.value = (toNumIfNotNull(firstIfArray(query.longitude)) ?? 0);
 	if (name_ == null || address_ == null || email_ == null) return;
 
-	let body = closeToZero(latitude_) || closeToZero(longitude_) ? {
+	let body  = closeToZero(latitude_) || closeToZero(longitude_) ? {
 		name:    name_,
 		address: address_,
 		email:   email_,
@@ -95,7 +95,6 @@ async function fetchFromQuery () {
 		latitude:  latitude_,
 		longitude: longitude_,
 	};
-	console.log(body, query);
 	const res = await justiceFirmApi.searchAllLawyers({
 		...body,
 		authToken: userStore.authToken as AdminAuthToken,
@@ -108,12 +107,10 @@ async function fetchFromQuery () {
 
 	lawyers.value  = res.right.body;
 	showForm.value = false;
-	console.log(res.right.body);
 }
 
 async function autofillLatLon () {
 	const currentPos = await getCurrentPosition();
-	console.log(currentPos);
 	latitude.setValue(currentPos.coords.latitude);
 	longitude.setValue(currentPos.coords.longitude);
 }

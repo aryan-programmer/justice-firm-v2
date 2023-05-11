@@ -5,6 +5,7 @@ import {ref} from "vue";
 import {useDisplay} from "vuetify";
 import {UserAccessType} from "../common/db-types";
 import {capitalizeFirstLetter} from "../common/utils/functions";
+import LawyerStatusDisplayer from "./components/general/LawyerStatusDisplayer.vue";
 import ModalDisplayer from "./components/general/ModalDisplayer.vue";
 import NavItem from "./components/general/NavItem.vue";
 import {useUserStore} from "./store/userStore";
@@ -19,7 +20,6 @@ const rail                        = computed(() => !hideSideNavBreakpoint.value)
 const router = useRouter();
 
 const userInfo    = computed(() => {
-	// console.log(display, {isSideNavVisible:isSideNavVisible.value, hideSideNavBreakpoint: hideSideNavBreakpoint.value}, display.name.value);
 	if (userStore.authToken == null) {
 		return "Anonymous user";
 	}
@@ -114,6 +114,7 @@ function pathCompare (link: string) {
 
 <template>
 <ModalDisplayer />
+<LawyerStatusDisplayer />
 <v-layout class="mh-100vh">
 	<v-app-bar
 		:color="userDeps.color"

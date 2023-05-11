@@ -44,8 +44,8 @@ async function addCaseDocument (data: UploadFileWithDescriptionDialogEventData) 
 		pathPrefix: caseDocumentPathPrefix(caseData.value.id, userStore.authToken),
 		authToken:  userStore.authToken,
 	});
-	console.log(uploadRes);
 	if (isLeft(uploadRes) || !uploadRes.right.ok || uploadRes.right.body == null || "message" in uploadRes.right.body) {
+		console.log(uploadRes);
 		await error("Failed to upload case document");
 		return;
 	}
@@ -57,8 +57,8 @@ async function addCaseDocument (data: UploadFileWithDescriptionDialogEventData) 
 	};
 
 	const res = await justiceFirmApi.addCaseDocument(body);
-	console.log(res);
 	if (isLeft(res) || !res.right.ok) {
+		console.log(res);
 		await error("Failed to add case document");
 		return;
 	}
@@ -81,9 +81,7 @@ async function fetchCaseDocuments (retryIfFailed = true) {
 		}
 		return;
 	}
-	const a = res.right.body;
-	console.log(a);
-	caseDocuments.value = a;
+	caseDocuments.value = res.right.body;
 }
 
 async function fetchCase (value: LocationQuery) {
@@ -93,7 +91,6 @@ async function fetchCase (value: LocationQuery) {
 		await error("Specify a case to view details for");
 		return;
 	}
-	console.log({id});
 	const res = await justiceFirmApi.getCase({
 		authToken: nn(userStore.authToken),
 		id,
@@ -104,9 +101,7 @@ async function fetchCase (value: LocationQuery) {
 		await error(`Failed to find the case with the ID ${id}`);
 		return;
 	}
-	const a = res.right.body;
-	console.log(a);
-	caseData.value = a;
+	caseData.value = res.right.body;
 	await fetchCaseDocuments();
 }
 </script>

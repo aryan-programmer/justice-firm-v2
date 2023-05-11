@@ -39,7 +39,6 @@ const onSubmit = handleSubmit(async values => {
 		email:    values.email,
 		password: values.password,
 	});
-	console.log(res);
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		await error("Failed to sign in")
 		return;
@@ -49,8 +48,8 @@ const onSubmit = handleSubmit(async values => {
 		return;
 	}
 	const authToken: AuthToken = res.right.body;
+	await message(`Signed in as a ${authToken.userType} successfully`);
 	userStore.signIn(authToken);
-	message /*not-awaiting*/(`Signed in as a ${authToken.userType} successfully`);
 	await navigateTo("/");
 });
 </script>

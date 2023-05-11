@@ -11,11 +11,9 @@ export const useUserStore = defineStore('UserStore', () => {
 	return {
 		authToken,
 		signIn (token: AuthToken) {
-			console.log("Token", token);
 			authToken.value = token;
 		},
 		signOut () {
-			console.log("Signing Out");
 			authToken.value = null;
 		}
 	};

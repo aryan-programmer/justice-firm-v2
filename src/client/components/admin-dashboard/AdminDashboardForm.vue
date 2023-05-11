@@ -50,7 +50,6 @@ watch(() => props.lawyers, (lawyers) => {
 		const vId                    = "id" + lawyer.id;
 		currentRejectionReasons[vId] = lawyer.rejectionReason;
 	}
-	console.log(currentRejectionReasons)
 	formFields.newRejectionReasons = currentRejectionReasons;
 }, {immediate: true});
 
@@ -77,7 +76,6 @@ async function onApply () {
 			});
 		}
 	}
-	console.log({confirmed, rejected});
 	const res = await justiceFirmApi.setLawyerStatuses({
 		authToken: nn(userStore.authToken) as AdminAuthToken,
 		rejected,

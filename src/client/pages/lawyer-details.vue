@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
-import {UserAccessType} from "../../common/db-types";
+import {StatusEnum, UserAccessType} from "../../common/db-types";
 import {GetLawyerInput, LawyerSearchResult} from "../../common/rest-api-schema";
 import {Nuly} from "../../common/utils/types";
 import BareAppointmentsDistributor from "../components/appointments-cases/BareAppointmentsDistributor.vue";
@@ -46,7 +46,6 @@ watch(() => route.query.id, async value => {
 	}
 
 	lawyer.value = res.right.body;
-	console.log(res.right.body);
 }, {immediate: true});
 </script>
 
@@ -60,7 +59,7 @@ watch(() => route.query.id, async value => {
 	>
 		<template #actions>
 		<v-btn
-			v-if="!isAdmin"
+			v-if="!isAdmin && lawyer.status === StatusEnum.Confirmed"
 			:to="`/open-appointment?id=${lawyer.id}`"
 			color="teal-lighten-3"
 			density="compact"

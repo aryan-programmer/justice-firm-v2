@@ -53,10 +53,6 @@ const modals           = useModals();
 const userStore        = useUserStore();
 const {message, error} = modals;
 
-watch(() => errors.value, value => {
-	console.log(value)
-}, {immediate: true});
-
 let photoData: string | null | undefined       = null;
 let certificateData: string | null | undefined = null;
 
@@ -80,7 +76,6 @@ const textFields2: FormTextFieldData[] = [
 
 async function autofillLatLon () {
 	const currentPos = await getCurrentPosition();
-	console.log(currentPos);
 	latitude.setValue(currentPos.coords.latitude);
 	longitude.setValue(currentPos.coords.longitude);
 }
@@ -91,8 +86,6 @@ function photoClear (event: unknown) {
 }
 
 async function photoChange (event: Event) {
-	// console.log(event, 112);
-	// console.log(photoInputRef);
 	photo.handleChange(event);
 	const file = (event.target as HTMLInputElement)?.files?.[0];
 	if (file == null) return;
@@ -165,15 +158,13 @@ const onSubmit = handleSubmit(async values => {
 		latitude:            +values.latitude,
 		longitude:           +values.longitude,
 		specializationTypes: specializationTypes,
-	};
-	console.log(body);
-	const res = await justiceFirmApi.updateLawyerProfile(body);
+	}
+	const res                            = await justiceFirmApi.updateLawyerProfile(body);
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
 		await error("Failed to set your profile.")
 		return;
 	}
-	console.log(res.right.body);
 	userStore.signIn(res.right.body);
 	message /*not-awaiting*/("Set your profile successfully");
 	await navigateTo("/user-profile");

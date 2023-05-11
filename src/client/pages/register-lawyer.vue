@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {definePageMeta, justiceFirmApi, navigateTo, onMounted, readFileAsDataUrl, watch} from "#imports";
+import {definePageMeta, justiceFirmApi, navigateTo, onMounted, readFileAsDataUrl} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import isEmpty from "lodash/isEmpty";
 import {useField, useForm} from 'vee-validate';
@@ -8,6 +8,7 @@ import {ISchema} from "yup";
 import {genderHumanVals, getCaseTypes, maxDataUrlLen, maxFileSize} from "../../common/utils/constants";
 import {genderHumanToDB, getCurrentPosition} from "../../common/utils/functions";
 import FormTextFieldInCol from "../components/general/FormTextFieldInCol.vue";
+import {useLawyerStatusCheckerStore} from "../store/lawyerStatusCheckerStore";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 import {validateDataUrlAsPhotoBrowserSide} from "../utils/functions";
@@ -31,9 +32,6 @@ let validationSchema         = yup.object({
 const {handleSubmit, errors} = useForm({
 	validationSchema: validationSchema,
 });
-watch(() => errors, value => {
-	console.log({...errors});
-}, {immediate: true});
 
 const name        = useField('name');
 const email       = useField('email');
@@ -47,9 +45,10 @@ const latitude    = useField('latitude');
 const longitude   = useField('longitude');
 const gender      = useField('gender');
 
-const modals           = useModals();
-const userStore        = useUserStore();
-const {message, error} = modals;
+const modals                   = useModals();
+const userStore                = useUserStore();
+const lawyerStatusCheckerStore = useLawyerStatusCheckerStore();
+const {message, error}         = modals;
 
 let photoData: string | null | undefined       = null;
 let certificateData: string | null | undefined = null;
@@ -71,7 +70,6 @@ const textFields2: FormTextFieldData[] = [
 
 async function autofillLatLon () {
 	const currentPos = await getCurrentPosition();
-	console.log(currentPos);
 	latitude.setValue(currentPos.coords.latitude);
 	longitude.setValue(currentPos.coords.longitude);
 }
@@ -82,8 +80,6 @@ function photoClear (event: unknown) {
 }
 
 async function photoChange (event: Event) {
-	// console.log(event, 112);
-	// console.log(photoInputRef);
 	photo.handleChange(event);
 	const file = (event.target as HTMLInputElement)?.files?.[0];
 	if (file == null) return;
@@ -125,7 +121,6 @@ const onSubmit = handleSubmit(async values => {
 	}
 	const specializationTypes: string[] = [];
 	const specs                         = values.caseSpecializations;
-	console.log(specs);
 	for (const key of Object.keys(specs)) {
 		if (specs[key] != null) {
 			specializationTypes.push(key.substring(2));
@@ -144,14 +139,13 @@ const onSubmit = handleSubmit(async values => {
 		longitude:         +values.longitude,
 		specializationTypes,
 	};
-	console.log(body);
-	const res = await justiceFirmApi.registerLawyer(body);
+	const res  = await justiceFirmApi.registerLawyer(body);
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
 		await error("Failed to sign up.")
 		return;
 	}
-	console.log(res.right.body);
+	lawyerStatusCheckerStore.suppressNextPopup();
 	userStore.signIn(res.right.body);
 	message /*not-awaiting*/("Registered as a lawyer successfully");
 	await navigateTo("/");

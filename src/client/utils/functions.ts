@@ -36,7 +36,6 @@ export function readFileAsDataUrl (file: File): Promise<string> {
 		fileReader.addEventListener('load', () => {
 			const res = fileReader.result;
 			assert(typeof res === "string");
-			console.log(res.length);
 			resolve(res);
 		});
 		const listener = (ev: ProgressEvent<FileReader>) => {
@@ -92,7 +91,6 @@ export async function fetchCasesIntoRef (
 		await modals.error(`Failed to get cases: ${res.right.body.message}`);
 		return;
 	}
-	console.log(res);
 	casesRef.value = res.right.body;
 }
 

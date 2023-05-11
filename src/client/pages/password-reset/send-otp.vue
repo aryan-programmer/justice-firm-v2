@@ -31,7 +31,6 @@ const onSubmit = handleSubmit(async values => {
 	const res = await justiceFirmApi.sendPasswordResetOTP({
 		email: values.email,
 	});
-	console.log(res);
 	if (isLeft(res) || !res.right.ok) {
 		await error("Failed to send password reset OTP")
 		return;

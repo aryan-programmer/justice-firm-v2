@@ -139,7 +139,6 @@ export const PartialObject = memoizeWeak(function PartialObject<T extends TObjec
 export async function getCurrentPosition (options?: PositionOptions) {
 	return new Promise<GeolocationPosition>((resolve, reject) => {
 		if (navigator.geolocation) {
-			console.log(navigator.geolocation);
 			navigator.geolocation.getCurrentPosition(resolve, reject, options);
 		} else {
 			reject(new GeolocationNotAvailableError());

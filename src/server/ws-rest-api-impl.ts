@@ -92,7 +92,7 @@ export class JusticeFirmWsRestAPIImpl
 
 	constructor () {
 		super();
-		this.setup().catch(ex => console.log(ex));
+		this.setup().catch(ex => console.trace(ex));
 	}
 
 	async setup () {

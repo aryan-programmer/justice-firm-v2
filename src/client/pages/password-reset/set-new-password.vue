@@ -55,8 +55,8 @@ const onSubmit = handleSubmit(async values => {
 		password: values.password,
 		otp:      values.otp,
 	});
-	console.log(res);
 	if (isLeft(res) || res.right.body == null) {
+		console.log(res);
 		await error("Failed to set a new password")
 		return;
 	}

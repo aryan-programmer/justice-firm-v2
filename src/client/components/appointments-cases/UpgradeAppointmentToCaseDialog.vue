@@ -41,9 +41,7 @@ async function upgradeAppointmentToCase () {
 		authToken:     nn(userStore.authToken) as LawyerAuthToken,
 		groupName:     chatGroupName.value,
 	};
-	console.log(body);
-	// return;
-	const res = await justiceFirmApi.upgradeAppointmentToCase(body);
+	const res                                 = await justiceFirmApi.upgradeAppointmentToCase(body);
 	if (isLeft(res) || !res.right.ok || (res.right.body == null || typeof res.right.body != "string")) {
 		console.log(res);
 		await error(`Failed to upgrade appointment to a case`);

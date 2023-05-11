@@ -38,7 +38,6 @@ watch(() => userStore.authToken, async value => {
 	}
 
 	profile.value = res.right.body;
-	console.log(res.right.body);
 }, {immediate: true});
 </script>
 
