@@ -8,6 +8,7 @@ import {capitalizeFirstLetter} from "../common/utils/functions";
 import LawyerStatusDisplayer from "./components/general/LawyerStatusDisplayer.vue";
 import ModalDisplayer from "./components/general/ModalDisplayer.vue";
 import NavItem from "./components/general/NavItem.vue";
+import SnackbarListDisplayer from "./components/general/SnackbarListDisplayer.vue";
 import {useUserStore} from "./store/userStore";
 
 const userStore = useUserStore();
@@ -113,6 +114,7 @@ function pathCompare (link: string) {
 </style>
 
 <template>
+<SnackbarListDisplayer />
 <ModalDisplayer />
 <LawyerStatusDisplayer />
 <v-layout class="mh-100vh">

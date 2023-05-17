@@ -1025,7 +1025,9 @@ export class JusticeFirmRestAPIImpl
 			        lu.gender             AS l_gender,
 			        ll.latitude           AS l_latitude,
 			        ll.longitude          AS l_longitude,
-			        ll.certification_link AS l_certification_link
+			        ll.certification_link AS l_certification_link,
+			        ll.status             AS l_status,
+			        ll.rejection_reason   AS l_rejection_reason
 			 FROM appointment a
 			 JOIN user        c
 			      ON c.id = a.client_id
@@ -1380,7 +1382,9 @@ The Justice Firm Foundation`;
 			        lu.gender             AS l_gender,
 			        ll.latitude           AS l_latitude,
 			        ll.longitude          AS l_longitude,
-			        ll.certification_link AS l_certification_link
+			        ll.certification_link AS l_certification_link,
+			        ll.status             AS l_status,
+			        ll.rejection_reason   AS l_rejection_reason
 			 FROM \`case\`  s
 			 JOIN user      c ON c.id = s.client_id
 			 JOIN user      lu ON lu.id = s.lawyer_id
@@ -1547,7 +1551,8 @@ The Justice Firm Foundation`;
 			latitude:          Number(value.l_latitude),
 			longitude:         Number(value.l_longitude),
 			certificationLink: value.l_certification_link.toString(),
-			status:            StatusEnum.Confirmed,
+			status:            value.l_status.toString(),
+			rejectionReason:   value.l_rejection_reason?.toString(),
 			distance:          undefined,
 		} as LawyerSearchResult;
 		const client: ClientDataResult   = {

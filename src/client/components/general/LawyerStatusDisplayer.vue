@@ -5,25 +5,25 @@ import {useLawyerStatusCheckerStore} from "../../store/lawyerStatusCheckerStore"
 import {useModals} from "../../store/modalsStore";
 
 const lawyerStatusCheckerStore = useLawyerStatusCheckerStore();
-const {message, error}         = useModals();
+const {message, errorMessage}         = useModals();
 watch(() => lawyerStatusCheckerStore.shouldDisplayStatus, async value => {
 	if (lawyerStatusCheckerStore.shouldDisplayStatus && lawyerStatusCheckerStore.status != null) {
 		const status = lawyerStatusCheckerStore.status;
 		switch (status.status) {
 		case StatusEnum.Rejected:
-			await error("Your application has been rejected for the following reason(s): " +
+			await errorMessage("Your application has been rejected for the following reason(s): " +
 			            nullOrEmptyCoalesce(status.rejectionReason, "Unknown reason"), {
-				title: "Lawyer application status update"
+				timeoutMs: 15000
 			});
 			break;
 		case StatusEnum.Confirmed:
 			await message("Your application has been confirmed", {
-				title: "Lawyer application status update"
+				timeoutMs: 10000
 			});
 			break;
 		case StatusEnum.Waiting:
-			await error("Warning: Your application is in the waiting state", {
-				title: "Lawyer application status update"
+			await errorMessage("Warning: Your application is in the waiting state", {
+				timeoutMs: 15000
 			});
 			break;
 		}

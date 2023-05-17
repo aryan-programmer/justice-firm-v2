@@ -48,7 +48,7 @@ const onSubmit = handleSubmit(async values => {
 		return;
 	}
 	const authToken: AuthToken = res.right.body;
-	await message(`Signed in as a ${authToken.userType} successfully`);
+	message /*not-awaiting*/(`Signed in as a ${authToken.userType} successfully`);
 	userStore.signIn(authToken);
 	await navigateTo("/");
 });

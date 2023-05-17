@@ -1,3 +1,12 @@
+<!--<script setup lang="ts">-->
+<!--import {useModals} from "../store/modalsStore";-->
+
+<!--const modals = useModals();-->
+
+<!--onMounted(async () => {-->
+<!--});-->
+<!--</script>-->
+
 <style lang="scss">
 .jumbotron-wrap {
 	display: flex;

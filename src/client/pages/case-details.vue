@@ -62,8 +62,8 @@ async function addCaseDocument (data: UploadFileWithDescriptionDialogEventData) 
 		await error("Failed to add case document");
 		return;
 	}
-	await message("Uploaded case document successfully");
 	await fetchCaseDocuments();
+	await message("Uploaded case document successfully");
 }
 
 async function fetchCaseDocuments (retryIfFailed = true) {

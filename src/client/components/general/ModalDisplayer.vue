@@ -6,7 +6,10 @@ import {CloseType, ModalData, ModalStore_T, useModalStore} from "../../store/mod
 
 const modalStore: ModalStore_T = useModalStore();
 
-const {isOpen} = storeToRefs(modalStore);
+//@ts-ignore
+window.modalStore = modalStore;
+
+const {isOpen, snackbars} = storeToRefs(modalStore);
 
 const modalOptions: ComputedRef<ModalData> = computed(() => modalStore.modalOptions.modalOptions!);
 const closeDelay                           = 1000;
