@@ -4,11 +4,12 @@ import {HttpMethods} from "../singularity/httpMethods";
 
 import {jfApiAwsFunnelFunctions} from "./api-impl";
 
-const {restApiImpl, wsApiImpl} = jfApiAwsFunnelFunctions();
+const {restApiImpl, wsChatterBoxApiImpl} = jfApiAwsFunnelFunctions();
 
 export async function handler (
 	event: APIGatewayProxyEvent | APIGatewayProxyWebsocketEventV2):
 	Promise<APIGatewayProxyResult | APIGatewayProxyStructuredResultV2> {
+	// console.log("handler:", event, process.env);
 	if ("resource" in event) {
 		const resource = restApiImpl?.[event.resource];
 		if (resource == null) {
@@ -26,9 +27,9 @@ export async function handler (
 		}
 		return await fn(event);
 	}
-	const ev       = event as APIGatewayProxyWebsocketEventV2;
+	const ev = event as APIGatewayProxyWebsocketEventV2;
 	const routeKey = ev.requestContext.routeKey;
-	const resource = wsApiImpl?.[routeKey];
+	const resource = wsChatterBoxApiImpl?.[routeKey];
 	if (resource == null) {
 		return {
 			statusCode: 404,

@@ -11,7 +11,7 @@ import {
 import {AuthToken} from "../api-types";
 import {
 	genderDbValsToHuman,
-	genderHumanValsToDb,
+	genderHumanValsToDb, radiusOfEarthInKm,
 	StatusEnum,
 	statusSearchOptionHuman_Any,
 	statusSearchOptionsDbToHuman,
@@ -175,4 +175,25 @@ export function chatGroupAttachmentPathPrefix (groupId: string, userId: string) 
 
 export function caseDocumentPathPrefix (caseId: string, authToken: AuthToken) {
 	return `case/${caseId}/docs/by-${authToken.userType.substring(0, 3)}-${authToken.id}/`
+}
+
+export function getDistanceFromLatLonInKm (
+	lat1: number,
+	lon1: number,
+	lat2: number,
+	lon2: number,
+	radius: number = radiusOfEarthInKm
+) {
+	const dLat = deg2rad(lat2 - lat1);
+	const dLon = deg2rad(lon2 - lon1);
+	const a    =
+		      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+		      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+		      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+	const c    = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+	return radius * c;
+}
+
+export function deg2rad (deg: number) {
+	return deg * (Math.PI / 180)
 }

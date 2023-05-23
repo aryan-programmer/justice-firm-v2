@@ -26,11 +26,11 @@ import {
 } from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import {
-	EstablishConnectionOutput,
+	EstablishChatConnectionOutput,
 	MessageData,
 	PostMessageInput,
 	PostMessageWithAttachmentInput
-} from "../../common/ws-api-schema";
+} from "../../common/ws-chatter-box-api-schema";
 import ChatMessagesList from "../components/chat/ChatMessagesList.vue";
 import UploadFileWithDescriptionDialog from "../components/uploaded-files/UploadFileWithDescriptionDialog.vue";
 import {useModals} from "../store/modalsStore";
@@ -46,7 +46,7 @@ const userStore        = useUserStore();
 const route            = useRoute();
 const router           = useRouter();
 const chatClient       = ref<ChatWSAPIClient | Nuly>();
-const chatData         = ref<EstablishConnectionOutput | Nuly>();
+const chatData         = ref<EstablishChatConnectionOutput | Nuly>();
 const messageText      = ref<string>("");
 const scrollingBox     = ref<VTextarea | Nuly>();
 const canPost          = computed(() =>

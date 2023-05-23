@@ -30,10 +30,11 @@ const sideImage = computed(() =>
 <v-card
 	color="gradient--sweet-period"
 	:class="props.class"
-	theme="dark">
+	elevation="3"
+	theme="light">
 	<v-img v-if="!sideImage" :src="props.lawyer.photoPath" class="clamp-image-height" />
 	<v-card-text>
-		<v-row no-gutters class="justify-space-between">
+		<v-row no-gutters class="justify-space-between text-white">
 			<v-col cols="12" :md="sideImage?8:12" class="pt-0 mt-0">
 				<v-card-title class="ps-0 mt-0 pt-0">
 					{{ props.lawyer.name }}
@@ -46,7 +47,7 @@ const sideImage = computed(() =>
 						<span v-if="!isNullOrEmpty(props.lawyer.gender)">Gender: {{ genderDBToHuman(props.lawyer.gender) }}<br /></span>
 						Latitude & Longitude: ({{ props.lawyer.latitude }}, {{ props.lawyer.longitude }})<br />
 						<span v-if="typeof props.lawyer.distance == 'number'">
-					Spherical distance from current location: {{ props.lawyer.distance.toPrecision(2) }} km<br />
+					Spherical distance from current location: {{ props.lawyer.distance < 1 ? 'Less than 1' : props.lawyer.distance.toFixed(2) }} km<br />
 				</span>
 						<pre class="pre-wrap text-body-2">Office Address:
 {{ props.lawyer.address }}</pre>

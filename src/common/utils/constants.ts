@@ -9,6 +9,8 @@ export const otpLength        = 6;
 export const maxFileSize      = "2 MB";
 export const maxDataUrlLen    = 3100000; // A bit more than 2048 kb
 
+export const radiusOfEarthInKm = 6371;
+
 export const otpMinNum = +("1" + "0".repeat(otpLength - 1));
 export const otpMaxNum = +("9".repeat(otpLength));
 

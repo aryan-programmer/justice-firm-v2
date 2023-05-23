@@ -136,11 +136,11 @@ export function getEditProfileSchemaForLawyer () {
 		...getEditProfileSchemaForClient("Office address"),
 		latitude:    yup
 			             .number()
-			             .required()
+			             .optional()
 			             .label("Office address latitude"),
 		longitude:   yup
 			             .number()
-			             .required()
+			             .optional()
 			             .label("Office address longitude"),
 		certificate: yup
 			             .mixed()

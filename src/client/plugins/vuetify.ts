@@ -32,7 +32,7 @@ import {
 	faGavel,
 	faHome,
 	faIdBadge,
-	faImagePortrait,
+	faImagePortrait, faInfo, faInfoCircle,
 	faPaperclip,
 	faPaperPlane,
 	faPlus,
@@ -121,6 +121,8 @@ library.add(
 	faRefresh,
 	faArrowRotateLeft,
 	faIdBadge,
+	faInfo,
+	faInfoCircle
 );
 // import * as components from 'vuetify/components'
 // import * as directives from 'vuetify/directives'

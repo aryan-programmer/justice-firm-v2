@@ -125,7 +125,7 @@ export const LawyerSearchResult = Type.Intersect([
 	Type.Object({
 		distance:            Optional(Number_T),
 		caseSpecializations: Optional(ArrayOf(CaseType)),
-		status:              Optional(StatusEnum_T),
+		status:              StatusEnum_T,
 		statistics:          Optional(LawyerStatistics),
 		cases:               Optional(ArrayOf(CaseBareData)),
 		appointments:        Optional(ArrayOf(AppointmentBareData)),

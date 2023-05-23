@@ -247,7 +247,20 @@ watch(() => route.query, value => {
 <div v-if="lawyers != null">
 	<v-divider class="my-2" />
 	<div v-if="lawyers.length > 0">
-		<h2>Found lawyers:</h2>
+		<div class="d-flex flex-row flex-wrap justify-space-between">
+			<h2 class="d-inline">Found lawyers:</h2>
+			<v-tooltip text="Hold SHIFT while scrolling the mouse to scroll horizontally.">
+				<template v-slot:activator="{ props }">
+				<v-btn
+					v-bind="props"
+					variant="flat"
+					class="ma-1"
+					density="compact"
+					prepend-icon="fa-info-circle">Horizontal Scroll
+				</v-btn>
+				</template>
+			</v-tooltip>
+		</div>
 		<AdminDashboardForm
 			:lawyers="lawyers"
 			@apply-success="fetchFromQuery"

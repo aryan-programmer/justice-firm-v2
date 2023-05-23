@@ -55,6 +55,7 @@ const {message, error} = modals;
 
 let photoData: string | null | undefined       = null;
 let certificateData: string | null | undefined = null;
+let profile: LawyerSearchResult | Nuly         = null;
 
 const caseSpecializationsFields    = caseTypes.map(value => useField(`caseSpecializations.id${value.id}`));
 const caseSpecializationFieldsById = caseTypes.reduce((previousValue, currentValue, i) => {
@@ -108,6 +109,7 @@ async function certificateChange (event: Event) {
 	if (file == null) return;
 	certificateData = await readFileAsDataUrl(file);
 	if (certificateData.length > maxDataUrlLen) {
+		certificateClear(null);
 		await error(`The file must be less than ${maxFileSize} in size.`)
 	}
 }
@@ -155,20 +157,20 @@ const onSubmit = handleSubmit(async values => {
 		phone:               values.phone,
 		gender:              genderHumanToDB(values.gender),
 		certificationData:   nullOrEmptyCoalesce(certificateData, undefined),
-		latitude:            +values.latitude,
-		longitude:           +values.longitude,
+		latitude:            +(values.latitude ?? profile?.latitude ?? 0),
+		longitude:           +(values.longitude ?? profile?.longitude ?? 0),
 		specializationTypes: specializationTypes,
 	}
 	console.log(body, values);
-	const res                            = await justiceFirmApi.updateLawyerProfile(body);
+	const res = await justiceFirmApi.updateLawyerProfile(body);
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
 		await error("Failed to set your profile.")
 		return;
 	}
+	await navigateTo("/");
 	userStore.signIn(res.right.body);
 	message /*not-awaiting*/("Set your profile successfully");
-	await navigateTo("/user-profile");
 });
 
 watch(() => userStore.authToken, async value => {
@@ -188,7 +190,7 @@ watch(() => userStore.authToken, async value => {
 		return;
 	}
 
-	const profile         = res.right.body as LawyerSearchResult;
+	profile               = res.right.body as LawyerSearchResult;
 	name.value.value      = profile.name;
 	phone.value.value     = profile.phone;
 	address.value.value   = profile.address;
@@ -208,10 +210,6 @@ watch(() => userStore.authToken, async value => {
 
 	email.value = profile.email;
 }, {immediate: true});
-
-onMounted(() => {
-	autofillLatLon();
-});
 </script>
 
 <template>

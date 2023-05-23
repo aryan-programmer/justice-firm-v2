@@ -2,7 +2,7 @@
 import {computed} from "#imports";
 import _ from "lodash";
 import {getDateTimeHeader, getDayFromMs} from "../../../common/utils/functions";
-import {MessageData} from "../../../common/ws-api-schema";
+import {MessageData} from "../../../common/ws-chatter-box-api-schema";
 import {useUserStore} from "../../store/userStore";
 import {messageDataToDisplayable} from "../../utils/functions";
 import ChatMessageBox from "./ChatMessageBox.vue";

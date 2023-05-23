@@ -2,23 +2,17 @@
 
 import {DeleteItemCommand, PutItemCommand, ReturnConsumedCapacity, ReturnValue} from "@aws-sdk/client-dynamodb";
 import {SendEmailCommand} from "@aws-sdk/client-ses";
-import {GetParameterCommand} from "@aws-sdk/client-ssm";
 import {compareSync, hash} from "bcryptjs";
 import {sign} from "jsonwebtoken";
-import {createPool, Pool, PoolConnection, UpsertResult} from "mariadb";
+import {PoolConnection, UpsertResult} from "mariadb";
 import {AuthToken, ClientAuthToken, ConstrainedAuthToken, LawyerAuthToken, PrivateAuthToken} from "../common/api-types";
 import {
-	AppointmentBareData,
-	CaseBareData,
 	CaseDocumentData,
 	CaseStatusEnum,
 	ClientDataResult,
 	ID_T,
 	LawyerSearchResult,
-	LawyerStatistics,
 	StatusEnum,
-	StatusSearchOptions,
-	StatusSearchOptionsEnum,
 	UserAccessType
 } from "../common/db-types";
 import {
@@ -36,7 +30,6 @@ import {
 	GetLawyerStatusOutput,
 	GetSelfProfileInput,
 	GetSelfProfileOutput,
-	GetWaitingLawyersInput,
 	justiceFirmApiSchema,
 	OpenAppointmentRequestInput,
 	RegisterClientInput,
@@ -53,14 +46,15 @@ import {
 	UpgradeAppointmentToCaseInput,
 	UploadFileInput
 } from "../common/rest-api-schema";
-import {assert, nn} from "../common/utils/asserts";
+import {nn} from "../common/utils/asserts";
 import {invalidImageMimeTypeMessage, otpMaxNum, otpMinNum, validImageMimeTypes} from "../common/utils/constants";
-import {isNullOrEmpty, nullOrEmptyCoalesce, toNumIfNotNull} from "../common/utils/functions";
+import {isNullOrEmpty, nullOrEmptyCoalesce} from "../common/utils/functions";
 import {Nuly} from "../common/utils/types";
 import {constants} from "../singularity/constants";
 import {EndpointResult, FnParams} from "../singularity/endpoint";
 import {message, Message, noContent, response} from "../singularity/helpers";
 import {APIImplementation} from "../singularity/schema";
+import {DbModelMethods} from "./db-model-methods";
 import {
 	dynamoDbClient,
 	passwordResetOtpTableName,
@@ -69,12 +63,12 @@ import {
 	s3Bucket,
 	s3Client,
 	sesClient,
-	sesSourceEmailAddress,
-	ssmClient
+	sesSourceEmailAddress
 } from "./environment-clients";
 import {otpExpiryTimeMs, saltRounds} from "./utils/constants";
 import {
 	getMimeTypeFromUrlServerSide,
+	getSqlTupleForInOperator,
 	printConsumedCapacity,
 	shortenS3Url,
 	unShortenS3Url,
@@ -104,79 +98,18 @@ function generateAuthTokenResponse<T extends UserAccessType> (
 	});
 }
 
-function recordToClientData (value: Record<string, any>): ClientDataResult {
-	return {
-		id:        value.id.toString(),
-		name:      value.name.toString(),
-		email:     value.email.toString(),
-		phone:     value.phone.toString(),
-		address:   value.address.toString(),
-		photoPath: value.photo_path.toString(),
-		gender:    value.gender?.toString(),
-	}
-}
-
-function recordToLawyerSearchResult (value: Record<string, any>, extractStatistics: boolean = false) {
-	const stats: LawyerStatistics | Nuly = extractStatistics ? {
-		rejectedAppointments:  toNumIfNotNull(value.rejected_appointments) ?? 0,
-		waitingAppointments:   toNumIfNotNull(value.waiting_appointments) ?? 0,
-		confirmedAppointments: toNumIfNotNull(value.confirmed_appointments) ?? 0,
-		totalAppointments:     toNumIfNotNull(value.total_appointments) ?? 0,
-		totalCases:            toNumIfNotNull(value.total_cases) ?? 0,
-		totalClients:          toNumIfNotNull(value.total_clients) ?? 0,
-	} : undefined;
-	return {
-		...recordToClientData(value),
-		latitude:          Number(value.latitude),
-		longitude:         Number(value.longitude),
-		certificationLink: value.certification_link.toString(),
-		status:            nullOrEmptyCoalesce(value.status?.toString(), StatusEnum.Confirmed),
-		distance:          toNumIfNotNull(value.distance),
-		rejectionReason:   nullOrEmptyCoalesce(value.rejection_reason?.toString(), undefined),
-		statistics:        stats,
-	} as LawyerSearchResult;
-}
-
 const verifyJwtToken     = verifyAndDecodeJwtToken<PrivateAuthToken>;
 const verifyFileJwtToken = verifyAndDecodeJwtToken<FileUploadData>;
 
-function getSqlWhereAndClauseFromStatus (status: StatusSearchOptions): {
-	statusWherePart: string,
-	statusQueryArray: [StatusSearchOptions] | []
-} {
-	switch (status) {
-	case StatusSearchOptionsEnum.Any:
-		return {
-			statusWherePart:  " 1 = 1 ",
-			statusQueryArray: []
-		};
-	case StatusSearchOptionsEnum.NotConfirmed:
-		return {
-			statusWherePart:  " l.status != ? ",
-			statusQueryArray: [StatusEnum.Confirmed]
-		};
-	case StatusSearchOptionsEnum.NotRejected:
-		return {
-			statusWherePart:  " l.status != ? ",
-			statusQueryArray: [StatusEnum.Rejected]
-		};
-	case StatusSearchOptionsEnum.NotWaiting:
-		return {
-			statusWherePart:  " l.status != ? ",
-			statusQueryArray: [StatusEnum.Waiting]
-		};
-	default:
-		return {
-			statusWherePart:  " l.status = ? ",
-			statusQueryArray: [status]
-		};
-	}
-}
-
 export class JusticeFirmRestAPIImpl
 	implements APIImplementation<typeof justiceFirmApiSchema> {
-	private pool: Pool | Nuly        = null;
-	private jwtSecret: string | Nuly = null;
+	constructor (private common: DbModelMethods) {
+		// this.getLawyerData = function (this: JusticeFirmRestAPIImpl, ...args) {
+		// 	return this.common.cacheResult("getLawyerData-" + JSON.stringify(args),
+		// 		() => this.getLawyerData(...args)
+		// 	);
+		// };
+	}
 
 	async registerLawyer (params: FnParams<RegisterLawyerInput>):
 		Promise<EndpointResult<LawyerAuthToken | Message>> {
@@ -209,12 +142,12 @@ export class JusticeFirmRestAPIImpl
 			contentType:           certificateMimeType,
 			keepOriginalExtension: true,
 		});
-		const jwtSecretP        = this.getJwtSecret();
+		const jwtSecretP        = this.common.getJwtSecret();
 		const passwordHashP     = hash(data.password, saltRounds);
 
 		const [passwordHash, photoRes, certificationRes, jwtSecret] =
 			      await Promise.all([passwordHashP, photoResP, certificationResP, jwtSecretP]);
-		const conn                                                  = await this.getConnection();
+		const conn                                                  = await this.common.getConnection();
 		try {
 			await conn.beginTransaction();
 
@@ -248,20 +181,20 @@ export class JusticeFirmRestAPIImpl
 	async getSelfProfile (params: FnParams<GetSelfProfileInput>):
 		Promise<EndpointResult<GetSelfProfileOutput | Message>> {
 		const data      = params.body;
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
 		if (obj.userType === UserAccessType.Lawyer) {
-			return await this.getLawyer({
-				body: {
-					id:                     obj.id,
-					getStatistics:          true,
-					getCaseSpecializations: true,
-					authToken:              data.authToken,
-				}
+			const res = await this.common.getLawyerData(obj.id, {
+				getStatistics:          true,
+				getCaseSpecializations: true,
 			});
+			if (res == null) {
+				return message(404, "Not found");
+			}
+			return response(200, res);
 		}
 
-		const pool                       = await this.getPool();
+		const pool                       = await this.common.getPool();
 		const res: Record<string, any>[] = await pool.execute(
 			`SELECT u.id,
 			        u.name,
@@ -277,14 +210,14 @@ export class JusticeFirmRestAPIImpl
 			return message(404, "No such user found");
 		}
 
-		return response(200, recordToClientData(res[0]));
+		return response(200, DbModelMethods.recordToClientData(res[0]));
 	}
 
 	async updateProfile (params: FnParams<UpdateProfileInput>):
 		Promise<EndpointResult<AuthToken | Message>> {
 		const data: UpdateProfileInput = params.body;
 
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
 		if (obj == null) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Unauthorized");
@@ -322,7 +255,7 @@ export class JusticeFirmRestAPIImpl
 
 		const id = BigInt(obj.id);
 
-		const userUpdateRes: UpsertResult = await (await this.getPool()).execute(
+		const userUpdateRes: UpsertResult = await (await this.common.getPool()).execute(
 			`UPDATE user SET ${updateQuerySets} WHERE id = ?;`,
 			[...updateQueryParams, id]
 		);
@@ -336,7 +269,7 @@ export class JusticeFirmRestAPIImpl
 		Promise<EndpointResult<LawyerAuthToken | Message>> {
 		const data: UpdateLawyerProfileInput = params.body;
 
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
 		if (obj == null || obj.userType !== UserAccessType.Lawyer) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "You must be a lawyer to use this method");
@@ -389,7 +322,7 @@ export class JusticeFirmRestAPIImpl
 			lawyerUpdateQueryParams.push(certificationRes.url);
 		}
 
-		const conn = await this.getConnection();
+		const conn = await this.common.getConnection();
 		try {
 			await conn.beginTransaction();
 			await conn.commit();
@@ -421,6 +354,10 @@ export class JusticeFirmRestAPIImpl
 					lawyerId,
 					conn);
 				console.log({deleteSpecializationsResult, insertSpecializationsResult});
+
+				await this.common.invalidateLawyerCache(obj.id, {invalidateCaseSpecializations: true});
+			} else {
+				await this.common.invalidateLawyerCache(obj.id);
 			}
 
 			return generateAuthTokenResponse(lawyerId, UserAccessType.Lawyer, jwtSecret, data.name);
@@ -436,7 +373,7 @@ export class JusticeFirmRestAPIImpl
 		Promise<EndpointResult<ClientAuthToken | Message>> {
 		const data: RegisterClientInput = params.body;
 
-		const jwtSecret    = await this.getJwtSecret();
+		const jwtSecret    = await this.common.getJwtSecret();
 		const passwordHash = await hash(data.password, saltRounds);
 
 		const photoMimeType = await getMimeTypeFromUrlServerSide(data.photoData);
@@ -454,7 +391,7 @@ export class JusticeFirmRestAPIImpl
 			contentType: photoMimeType
 		});
 
-		const conn = await this.getConnection()
+		const conn = await this.common.getConnection()
 		try {
 			await conn.beginTransaction();
 
@@ -491,172 +428,48 @@ export class JusticeFirmRestAPIImpl
 
 	async searchLawyers (params: FnParams<SearchLawyersInput>):
 		Promise<EndpointResult<LawyerSearchResult[]>> {
-		const data    = params.body;
-		const name    = `%${data.name ?? ""}%`;
-		const email   = `%${data.email ?? ""}%`;
-		const address = `%${data.address ?? ""}%`;
+		console.log("/user/lawyer/search: searchLawyers: ", params);
+		const data = params.body;
 
-		let res: Record<string, any>[];
+		let coords: { latitude: number; longitude: number } | Nuly = null;
 		if ("latitude" in data && "longitude" in data && data.latitude != null && data.longitude != null) {
-			res = await (await this.getPool()).execute(
-				`SELECT u.id,
-				        u.name,
-				        u.email,
-				        u.phone,
-				        u.address,
-				        u.photo_path,
-				        u.gender,
-				        l.latitude,
-				        l.longitude,
-				        l.certification_link,
-				        ST_DISTANCE_SPHERE(POINT(l.latitude, l.longitude), POINT(?, ?)) AS distance
-				 FROM lawyer l
-				 JOIN user   u
-				      ON u.id = l.id
-				 WHERE l.status = 'confirmed'
-				   AND u.name LIKE ?
-				   AND u.email LIKE ?
-				   AND u.address LIKE ?
-				 ORDER BY distance ASC
-				 LIMIT 100;`, [data.latitude, data.longitude, name, email, address]);
-		} else {
-			res = await (await this.getPool()).execute(
-				`SELECT u.id,
-				        u.name,
-				        u.email,
-				        u.phone,
-				        u.address,
-				        u.photo_path,
-				        u.gender,
-				        l.latitude,
-				        l.longitude,
-				        l.certification_link
-				 FROM lawyer l
-				 JOIN user   u
-				      ON u.id = l.id
-				 WHERE l.status = 'confirmed'
-				   AND u.name LIKE ?
-				   AND u.email LIKE ?
-				   AND u.address LIKE ?
-				 ORDER BY name ASC
-				 LIMIT 100;`, [name, email, address]);
+			coords = {latitude: +data.latitude, longitude: +data.longitude};
 		}
+		const res: LawyerSearchResult[] = await this.common.searchAllLawyers({
+			address: data.address ?? "",
+			email:   data.email ?? "",
+			name:    data.name ?? "",
+			coords:  coords,
+			status:  StatusEnum.Confirmed,
+		});
 
-		const lawyers: LawyerSearchResult[] = res.map((v) => recordToLawyerSearchResult(v));
-		return response(200, lawyers);
+		return response(200, res);
 	}
 
 	async searchAllLawyers (params: FnParams<SearchAllLawyersInput>):
 		Promise<EndpointResult<LawyerSearchResult[] | Message>> {
 		const data      = params.body;
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
 		if (obj.userType !== UserAccessType.Admin) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				"To get the list of waiting lawyers the user must be authenticated as an administrator.");
 		}
 
-		const name    = `%${data.name ?? ""}%`;
-		const email   = `%${data.email ?? ""}%`;
-		const address = `%${data.address ?? ""}%`;
-		const status  = data.status;
-
-		const {statusWherePart, statusQueryArray} = getSqlWhereAndClauseFromStatus(status);
-
-		let res: Record<string, any>[];
+		let coords: { latitude: number; longitude: number } | Nuly = null;
 		if ("latitude" in data && "longitude" in data && data.latitude != null && data.longitude != null) {
-			res = await (await this.getPool()).execute(
-				`SELECT u.id,
-				        u.name,
-				        u.email,
-				        u.phone,
-				        u.address,
-				        u.photo_path,
-				        u.gender,
-				        l.status,
-				        l.latitude,
-				        l.longitude,
-				        l.certification_link,
-				        l.rejection_reason,
-				        las.rejected_appointments,
-				        las.waiting_appointments,
-				        las.confirmed_appointments,
-				        las.total_appointments,
-				        lcs.total_cases,
-				        lcs.total_clients,
-				        ST_DISTANCE_SPHERE(POINT(l.latitude, l.longitude), POINT(?, ?)) AS distance
-				 FROM lawyer                        l
-				 JOIN user                          u ON u.id = l.id
-				 JOIN lawyer_appointment_statistics las ON l.id = las.lawyer_id
-				 JOIN lawyer_case_statistics        lcs ON l.id = lcs.lawyer_id
-				 WHERE u.name LIKE ?
-				   AND u.email LIKE ?
-				   AND u.address LIKE ?
-				   AND ${statusWherePart}
-				 ORDER BY distance ASC, u.name ASC`,
-				[data.latitude, data.longitude, name, email, address, ...statusQueryArray]);
-		} else {
-			res = await (await this.getPool()).execute(
-				`SELECT u.id,
-				        u.name,
-				        u.email,
-				        u.phone,
-				        u.address,
-				        u.photo_path,
-				        u.gender,
-				        l.status,
-				        l.latitude,
-				        l.longitude,
-				        l.certification_link,
-				        l.rejection_reason,
-				        las.rejected_appointments,
-				        las.waiting_appointments,
-				        las.confirmed_appointments,
-				        las.total_appointments,
-				        lcs.total_cases,
-				        lcs.total_clients
-				 FROM lawyer                        l
-				 JOIN user                          u ON u.id = l.id
-				 JOIN lawyer_appointment_statistics las ON l.id = las.lawyer_id
-				 JOIN lawyer_case_statistics        lcs ON l.id = lcs.lawyer_id
-				 WHERE u.name LIKE ?
-				   AND u.email LIKE ?
-				   AND u.address LIKE ?
-				   AND ${statusWherePart}
-				 ORDER BY name ASC`, [name, email, address, ...statusQueryArray]);
+			coords = {latitude: +data.latitude, longitude: +data.longitude};
 		}
-
-		const lawyers: LawyerSearchResult[] = res.map((v) => recordToLawyerSearchResult(v, true));
-		return response(200, lawyers);
-	}
-
-	async getWaitingLawyers (params: FnParams<GetWaitingLawyersInput>):
-		Promise<EndpointResult<LawyerSearchResult[] | Message>> {
-		const data      = params.body;
-		const jwtSecret = await this.getJwtSecret();
-		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
-		if (obj.userType !== UserAccessType.Admin) {
-			return message(constants.HTTP_STATUS_UNAUTHORIZED,
-				"To get the list of waiting lawyers the user must be authenticated as an administrator.");
-		}
-
-		let res: Record<string, any>[]      = await (await this.getPool()).execute(
-			`SELECT u.id,
-			        u.name,
-			        u.email,
-			        u.phone,
-			        u.address,
-			        u.photo_path,
-			        u.gender,
-			        l.latitude,
-			        l.longitude,
-			        l.certification_link
-			 FROM lawyer l
-			 JOIN user   u
-			      ON u.id = l.id
-			 WHERE l.status = 'waiting'`);
-		const lawyers: LawyerSearchResult[] = res.map((v) => recordToLawyerSearchResult(v));
-		return response(200, lawyers);
+		const res: LawyerSearchResult[] = await this.common.searchAllLawyers({
+			address:       data.address ?? "",
+			email:         data.email ?? "",
+			name:          data.name ?? "",
+			coords:        coords,
+			status:        data.status,
+			getStatistics: true,
+			forceRefetch:  true,
+		});
+		return response(200, res);
 	}
 
 	async getLawyer (params: FnParams<GetLawyerInput>):
@@ -665,129 +478,25 @@ export class JusticeFirmRestAPIImpl
 		const getBareAppointments              = data.getBareAppointments === true;
 		const getBareCases                     = data.getBareCases === true;
 		let authToken: PrivateAuthToken | Nuly = undefined;
+		let forceRefetch                       = false;
 
 		if (getBareAppointments || getBareCases) {
-			const jwtSecret = await this.getJwtSecret();
+			const jwtSecret = await this.common.getJwtSecret();
 			const obj       = data.authToken != null ? verifyJwtToken(data.authToken.jwt, jwtSecret) : null;
 			if (obj == null || obj.userType !== UserAccessType.Admin) {
 				return message(constants.HTTP_STATUS_UNAUTHORIZED,
 					"To get the bare appointments or cases data the user must be authenticated as an administrator.");
 			}
-			authToken = obj;
+			authToken    = obj;
+			forceRefetch = true;
 		}
 
-		const pool                       = await this.getPool();
-		const res: Record<string, any>[] = await pool.execute(
-			data.getStatistics === true ?
-			`SELECT u.id,
-			        u.name,
-			        u.email,
-			        u.phone,
-			        u.address,
-			        u.photo_path,
-			        u.gender,
-			        l.latitude,
-			        l.longitude,
-			        l.certification_link,
-			        l.status,
-			        l.rejection_reason,
-			        las.rejected_appointments,
-			        las.waiting_appointments,
-			        las.confirmed_appointments,
-			        las.total_appointments,
-			        lcs.total_cases,
-			        lcs.total_clients
-			 FROM lawyer                        l
-			 JOIN user                          u ON u.id = l.id
-			 JOIN lawyer_appointment_statistics las ON l.id = las.lawyer_id
-			 JOIN lawyer_case_statistics        lcs ON l.id = lcs.lawyer_id
-			 WHERE l.id = ?;` :
-			`SELECT u.id,
-			        u.name,
-			        u.email,
-			        u.phone,
-			        u.address,
-			        u.photo_path,
-			        u.gender,
-			        l.latitude,
-			        l.longitude,
-			        l.certification_link,
-			        l.status,
-			        l.rejection_reason
-			 FROM lawyer l
-			 JOIN user   u
-			      ON u.id = l.id
-			 WHERE l.id = ?;`, [+data.id]);
-
-		if (res.length === 0) {
+		const lawyer = await this.common.getLawyerData(data.id, {
+			...data,
+			forceRefetch,
+		});
+		if (lawyer == null) {
 			return message(404, "No such lawyer found");
-		}
-
-		const lawyer: LawyerSearchResult = recordToLawyerSearchResult(res[0], data.getStatistics === true);
-		if (data.getCaseSpecializations === true) {
-			const res: Record<string, any>[] = await pool.execute(
-				`SELECT ct.id,
-				        ct.name
-				 FROM lawyer_specialization ls
-				 JOIN case_type             ct
-				      ON ct.id = ls.case_type_id
-				 WHERE ls.lawyer_id = ?;`, [BigInt(lawyer.id)]);
-			lawyer.caseSpecializations       = res.map(value => ({
-				id:   value.id.toString(),
-				name: value.name.toString(),
-			}));
-		}
-
-		if (getBareAppointments || getBareCases) {
-			assert(authToken != null && authToken.userType === UserAccessType.Admin);
-			if (getBareAppointments) {
-				const res: Record<string, any>[] = await pool.execute(
-					`SELECT a.id,
-					        a.client_id AS oth_id,
-					        cu.name     AS oth_name,
-					        a.case_id,
-					        a.status,
-					        a.opened_on,
-					        a.timestamp
-					 FROM appointment a
-					 JOIN user        cu ON a.client_id = cu.id
-					 WHERE a.lawyer_id = ?;`, [BigInt(lawyer.id)]);
-				lawyer.appointments              = res.map(value => ({
-					id:        value.id.toString(),
-					othId:     value.oth_id.toString(),
-					othName:   value.oth_name.toString(),
-					caseId:    value.case_id?.toString(),
-					timestamp: value.timestamp?.toString(),
-					openedOn:  value.opened_on.toString(),
-					status:    value.status.toString(),
-				} as AppointmentBareData));
-			}
-
-			if (getBareCases) {
-				const res: Record<string, any>[] = await pool.execute(
-					`SELECT c.id,
-					        c.client_id AS oth_id,
-					        cu.name     AS oth_name,
-					        c.type_id   AS type_id,
-					        ct.name     AS type_name,
-					        c.status,
-					        c.opened_on
-					 FROM \`case\`  c
-					 JOIN user      cu ON c.client_id = cu.id
-					 JOIN case_type ct ON c.type_id = ct.id
-					 WHERE c.lawyer_id = ?;`, [BigInt(lawyer.id)]);
-				lawyer.cases                     = res.map(value => ({
-					id:       value.id.toString(),
-					othId:    value.oth_id.toString(),
-					othName:  value.oth_name.toString(),
-					openedOn: value.opened_on.toString(),
-					status:   value.status.toString(),
-					caseType: {
-						id:   value.type_id.toString(),
-						name: value.type_name.toString(),
-					}
-				} as CaseBareData));
-			}
 		}
 
 		return response(200, lawyer);
@@ -796,32 +505,21 @@ export class JusticeFirmRestAPIImpl
 	async getLawyerStatusInformation (params: FnParams<GetLawyerStatusInput>):
 		Promise<EndpointResult<GetLawyerStatusOutput | Message>> {
 		const data = params.body;
-
-		const pool                       = await this.getPool();
-		const res: Record<string, any>[] = await pool.execute(
-			`SELECT l.status, l.rejection_reason
-			 FROM lawyer l
-			 WHERE l.id = ?;`, [+data.id]);
-
-		if (res.length === 0) {
+		const res  = await this.common.getLawyerData(data.id);
+		if (res === null) {
 			return message(404, "No such lawyer found");
 		}
-
-		const r0 = res[0];
-
-		const statusOutput: GetLawyerStatusOutput = {
-			status:          r0.status.toString(),
-			rejectionReason: r0.rejection_reason?.toString(),
-		};
-
-		return response(200, statusOutput);
+		return response(200, {
+			status:          res.status,
+			rejectionReason: res.rejectionReason,
+		});
 	}
 
 	async openAppointmentRequest (params: FnParams<OpenAppointmentRequestInput>):
 		Promise<EndpointResult<ID_T | Message>> {
 		const data: OpenAppointmentRequestInput = params.body;
 
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
 		if (obj.userType !== UserAccessType.Client) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
@@ -839,7 +537,7 @@ export class JusticeFirmRestAPIImpl
 		}
 
 		const timestamp = data.timestamp == null ? null : new Date(data.timestamp);
-		const conn      = await this.getConnection();
+		const conn      = await this.common.getConnection();
 
 		try {
 			await conn.beginTransaction();
@@ -869,7 +567,7 @@ export class JusticeFirmRestAPIImpl
 	async getAppointments (params: FnParams<GetAppointmentsInput>):
 		Promise<EndpointResult<AppointmentSparseData[] | Message>> {
 		const data      = params.body;
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 		const jwt       = verifyJwtToken(data.authToken.jwt, jwtSecret);
 		if (jwt.userType === UserAccessType.Admin) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
@@ -915,7 +613,7 @@ export class JusticeFirmRestAPIImpl
 		} else {
 			sql += " ORDER BY a.timestamp;";
 		}
-		const res: Record<string, any>[] = await (await this.getPool()).execute(sql, [jwt.id, data.withStatus]);
+		const res: Record<string, any>[] = await (await this.common.getPool()).execute(sql, [jwt.id, data.withStatus]);
 		return response(200, res.map(value => {
 			return {
 				id:          value.id.toString(),
@@ -933,75 +631,73 @@ export class JusticeFirmRestAPIImpl
 	async setLawyerStatuses (params: FnParams<SetLawyerStatusesInput>):
 		Promise<EndpointResult<Message | Nuly>> {
 		const data      = params.body;
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
 		if (obj.userType !== UserAccessType.Admin) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				"To set the statuses of lawyers the user must be authenticated as an administrator.");
 		}
 		if (data.rejected.length === 0 && data.confirmed.length === 0 && data.waiting.length === 0) return noContent;
-		const conn = await this.getConnection();
+		const conn = await this.common.getConnection();
 		try {
 			await conn.beginTransaction();
 
 			if (data.confirmed.length > 0) {
-				const sqlConfirmTuple = "?" + ",?".repeat(data.confirmed.length - 1);
 
 				const confirmRes: UpsertResult = await conn.execute(
 					`UPDATE lawyer
 					 SET status           = 'confirmed',
 					     rejection_reason = NULL
-					 WHERE id IN (${sqlConfirmTuple});`,
+					 WHERE id IN (${getSqlTupleForInOperator(data.confirmed.length)});`,
 					data.confirmed.map(BigInt)
 				);
 			}
 
 			if (data.rejected.length > 0) {
-				const rejectParams = data.rejected.map(({id, reason}) => [reason, id]);
-
 				const rejectRes = await conn.batch(
 					`UPDATE lawyer
 					 SET status           = 'rejected',
 					     rejection_reason = ?
 					 WHERE id = ?;`,
-					rejectParams
+					data.rejected.map(({id, reason}) => [reason, id])
 				);
 				console.log({rejectRes});
 			}
 
 			if (data.waiting.length > 0) {
-				const sqlWaitingTuple = "?" + ",?".repeat(data.waiting.length - 1);
-
 				const waitingRes: UpsertResult = await conn.execute(
 					`UPDATE lawyer
 					 SET status           = 'waiting',
 					     rejection_reason = NULL
-					 WHERE id IN (${sqlWaitingTuple});`,
+					 WHERE id IN (${getSqlTupleForInOperator(data.waiting.length)});`,
 					data.waiting.map(BigInt)
 				);
 			}
 
 			await conn.commit();
-
-			return noContent;
 		} catch (e) {
 			await conn.rollback();
 			throw e;
 		} finally {
 			await conn.release();
 		}
+
+		const resetIds = [...data.waiting, ...data.confirmed, ...data.rejected.map(v => v.id)];
+		await this.common.invalidateLawyerCache(resetIds);
+
+		return noContent;
 	}
 
 	async getAppointmentRequest (params: FnParams<GetByIdInput>):
 		Promise<EndpointResult<Message | AppointmentFullData | Nuly>> {
 		const data      = params.body;
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 		const jwt       = verifyJwtToken(data.authToken.jwt, jwtSecret);
 		if (jwt == null) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid auth token");
 		}
 
-		const res: Record<string, any>[] = await (await this.getPool()).execute(
+		const res: Record<string, any>[] = await (await this.common.getPool()).execute(
 			`SELECT a.id                  AS a_id,
 			        a.group_id            AS a_group_id,
 			        a.case_id             AS a_case_id,
@@ -1064,13 +760,13 @@ export class JusticeFirmRestAPIImpl
 	async setAppointmentStatus (params: FnParams<SetAppointmentStatusInput>):
 		Promise<EndpointResult<Message | Nuly>> {
 		const data      = params.body;
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 		const jwt       = verifyJwtToken(data.authToken.jwt, jwtSecret);
 		if (jwt.userType !== UserAccessType.Lawyer) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				"To set an appointment's status the user must be authenticated as a lawyer");
 		}
-		const pool = await this.getPool();
+		const pool = await this.common.getPool();
 		if (data.status === StatusEnum.Rejected) {
 			const rejectRes: UpsertResult = await pool.execute(
 				"UPDATE appointment SET status='rejected' WHERE id = ? AND lawyer_id = ?;",
@@ -1104,7 +800,7 @@ export class JusticeFirmRestAPIImpl
 	async sendPasswordResetOTP (params: FnParams<SendPasswordResetOTPInput>):
 		Promise<EndpointResult<Message | Nuly>> {
 		const email                         = params.body.email;
-		const result: Record<string, any>[] = await (await this.getPool()).execute(
+		const result: Record<string, any>[] = await (await this.common.getPool()).execute(
 			"SELECT name FROM user WHERE email = ? LIMIT 1;",
 			[email]
 		);
@@ -1186,7 +882,7 @@ The Justice Firm Foundation`;
 		}
 
 		const passwordHash            = await hash(password, saltRounds);
-		const updateRes: UpsertResult = await (await this.getPool()).execute(
+		const updateRes: UpsertResult = await (await this.common.getPool()).execute(
 			"UPDATE user u SET password_hash = ? WHERE email = ? LIMIT 1", [passwordHash, email]);
 
 		if (updateRes.affectedRows < 1) {
@@ -1204,13 +900,13 @@ The Justice Firm Foundation`;
 	async upgradeAppointmentToCase (params: FnParams<UpgradeAppointmentToCaseInput>):
 		Promise<EndpointResult<ID_T | Message>> {
 		const data      = params.body;
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 		const jwt       = verifyJwtToken(data.authToken.jwt, jwtSecret);
 		if (jwt == null || jwt.userType !== UserAccessType.Lawyer) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Auth token must be that of a lawyer");
 		}
 
-		const res: Record<string, any>[] = await (await this.getPool()).execute(
+		const res: Record<string, any>[] = await (await this.common.getPool()).execute(
 			`SELECT a.id          AS a_id,
 			        a.lawyer_id   AS l_id,
 			        a.client_id   AS c_id,
@@ -1251,7 +947,7 @@ The Justice Firm Foundation`;
 		const caseDesc = nullOrEmptyCoalesce(data.description, appointmentData.description);
 		const status   = data.status ?? CaseStatusEnum.Open;
 
-		const conn = await this.getConnection();
+		const conn = await this.common.getConnection();
 
 		try {
 			await conn.beginTransaction();
@@ -1292,7 +988,7 @@ The Justice Firm Foundation`;
 	async getCasesData (params: FnParams<GetCasesDataInput>):
 		Promise<EndpointResult<CaseSparseData[] | Message>> {
 		const data      = params.body;
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 		const jwt       = verifyJwtToken(data.authToken.jwt, jwtSecret);
 		if (jwt.userType === UserAccessType.Admin) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
@@ -1331,7 +1027,7 @@ The Justice Firm Foundation`;
 			       WHERE s.lawyer_id = ?
 			       ORDER BY s.opened_on;`;
 		}
-		const res: Record<string, any>[] = await (await this.getPool()).execute(sql, [jwt.id]);
+		const res: Record<string, any>[] = await (await this.common.getPool()).execute(sql, [jwt.id]);
 		return response(200, res.map(value => {
 			return {
 				id:          value.id.toString(),
@@ -1352,13 +1048,13 @@ The Justice Firm Foundation`;
 	async getCase (params: FnParams<GetByIdInput>):
 		Promise<EndpointResult<Message | CaseFullData>> {
 		const data      = params.body;
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 		const jwt       = verifyJwtToken(data.authToken.jwt, jwtSecret);
 		if (jwt == null) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid auth token");
 		}
 
-		const res: Record<string, any>[] = await (await this.getPool()).execute(
+		const res: Record<string, any>[] = await (await this.common.getPool()).execute(
 			`SELECT s.id                  AS s_id,
 			        s.group_id            AS s_group_id,
 			        s.type_id             AS s_type_id,
@@ -1421,7 +1117,7 @@ The Justice Firm Foundation`;
 	async uploadFile (params: FnParams<UploadFileInput>):
 		Promise<EndpointResult<Message | FileUploadToken>> {
 		const data      = params.body;
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
 		if (isNullOrEmpty(obj.id)) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Must be signed in to upload a file");
@@ -1458,11 +1154,11 @@ The Justice Firm Foundation`;
 			return message(caseAccess[0], caseAccess[1]);
 		}
 
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 		const fileData  = verifyFileJwtToken(data.file.jwt, jwtSecret);
 
 		const filePath          = shortenS3Url(fileData.path);
-		const res: UpsertResult = await (await this.getPool()).execute(
+		const res: UpsertResult = await (await this.common.getPool()).execute(
 			"INSERT INTO case_document (case_id, file_link, file_mime, file_name, description, uploaded_by_id) VALUES (?, ?, ?, ?, ?, ?)",
 			[data.caseId, filePath, fileData.mime, fileData.name, data.description, caseAccess.id]);
 
@@ -1478,7 +1174,7 @@ The Justice Firm Foundation`;
 		if (Array.isArray(caseAccess)) {
 			return message(caseAccess[0], caseAccess[1]);
 		}
-		const res: Record<string, string | number | Date>[] = await (await this.getPool()).execute(
+		const res: Record<string, string | number | Date>[] = await (await this.common.getPool()).execute(
 			`SELECT cd.id  AS case_doc_id,
 			        uploaded_on,
 			        file_link,
@@ -1517,13 +1213,13 @@ The Justice Firm Foundation`;
 	}
 
 	private async verifyCaseAccess (authToken: AuthToken, caseId: ID_T): Promise<PrivateAuthToken | [number, string]> {
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 		const jwt       = verifyJwtToken(authToken.jwt, jwtSecret);
 		if (jwt == null) {
 			return [constants.HTTP_STATUS_UNAUTHORIZED, "Invalid auth token"];
 		}
 
-		const res: Record<string, any>[] = await (await this.getPool()).execute(
+		const res: Record<string, any>[] = await (await this.common.getPool()).execute(
 			"SELECT s.lawyer_id, s.client_id FROM `case` s WHERE s.id = ?;", [BigInt(caseId)]);
 
 		if (res.length === 0) {
@@ -1551,7 +1247,7 @@ The Justice Firm Foundation`;
 			latitude:          Number(value.l_latitude),
 			longitude:         Number(value.l_longitude),
 			certificationLink: value.l_certification_link.toString(),
-			status:            value.l_status.toString(),
+			status:            nullOrEmptyCoalesce(value.l_status.toString(), StatusEnum.Waiting),
 			rejectionReason:   value.l_rejection_reason?.toString(),
 			distance:          undefined,
 		} as LawyerSearchResult;
@@ -1568,14 +1264,14 @@ The Justice Firm Foundation`;
 	}
 
 	private async getLoginResponse (email: string, password: string) {
-		const jwtSecret = await this.getJwtSecret();
+		const jwtSecret = await this.common.getJwtSecret();
 
 		const resSet: {
 			id: number | bigint,
 			password_hash: string,
 			type: UserAccessType,
 			name: string
-		}[] = await (await this.getPool()).execute(
+		}[] = await (await this.common.getPool()).execute(
 			"SELECT id, name, password_hash, type FROM user WHERE user.email = ?;",
 			[email]
 		);
@@ -1588,46 +1284,5 @@ The Justice Firm Foundation`;
 			return false;
 		}
 		return generateAuthTokenResponse(id, type, jwtSecret, name.toString());
-	}
-
-	protected async getJwtSecret () {
-		return this.jwtSecret ??= nn((await ssmClient.send(new GetParameterCommand({
-			Name:           process.env.JWT_SECRET,
-			WithDecryption: true
-		}))).Parameter?.Value);
-	}
-
-	protected async getConnection () {
-		return await (await this.getPool()).getConnection();
-	}
-
-	protected async getPool () {
-		const connectionLimit = 3;
-		if (this.pool == null) {
-			const password = await ssmClient.send(new GetParameterCommand({
-				Name:           process.env.DB_PASSWORD,
-				WithDecryption: true
-			}));
-			this.pool      = createPool({
-				host:           nn(process.env.DB_ENDPOINT),
-				port:           +nn(process.env.DB_PORT),
-				user:           nn(process.env.DB_USERNAME),
-				password:       nn(password.Parameter).Value,
-				database:       "justice_firm",
-				acquireTimeout: 2500,
-				// AWS RDS MariaDB can't create more than 5-6 for some reason
-				connectionLimit:       connectionLimit,
-				initializationTimeout: 1000,
-				leakDetectionTimeout:  3000,
-				idleTimeout:           0,
-			});
-		}
-		console.log({
-			active: this.pool.activeConnections(),
-			idle:   this.pool.idleConnections(),
-			total:  this.pool.totalConnections(),
-			connectionLimit,
-		});
-		return this.pool;
 	}
 }

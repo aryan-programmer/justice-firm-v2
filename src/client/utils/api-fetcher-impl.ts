@@ -1,5 +1,5 @@
 import {justiceFirmApiSchema} from "../../common/rest-api-schema";
-import {jfChatterBoxApiSchema} from "../../common/ws-api-schema";
+import {jfChatterBoxApiSchema} from "../../common/ws-chatter-box-api-schema";
 import {fetchImplementation} from "../../singularity/model.client";
 import {websocketClient} from "../../singularity/websocket/ws-model.client";
 

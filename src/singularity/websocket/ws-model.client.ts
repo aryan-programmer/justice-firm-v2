@@ -57,7 +57,7 @@ function sendImplementationMapper<TEndpoints extends APIEndpoints = APIEndpoints
 		return async function reFetcherFunction (this: WebSocketModelClient<TEndpoints, TEvents>, body: TReqBody) {
 			const res1 = await errorLefter(this.wsConnection, body);
 			if (shouldRetry(res1)) {
-				console.log("Retrying on WEBSOCKET ", res1, " on event ", body);
+				console.log({message: "Retrying on WEBSOCKET result and body", result: res1, body});
 				await sleep(1000);
 				return await baseFunction(this.wsConnection, body);
 			}

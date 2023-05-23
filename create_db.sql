@@ -29,7 +29,11 @@ CREATE TABLE user (
 	password_hash VARCHAR(2048)                      NOT NULL,
 	photo_path    VARCHAR(1024),
 	type          ENUM ('client', 'lawyer', 'admin') NOT NULL DEFAULT 'client',
-	gender        VARCHAR(16)                        NOT NULL
+	gender        VARCHAR(16)                        NOT NULL,
+	FULLTEXT INDEX ft_name (name),
+	FULLTEXT INDEX ft_email (email),
+	FULLTEXT INDEX ft_address (address),
+	INDEX i_type (type)
 );
 
 CREATE TABLE client (
@@ -46,7 +50,8 @@ CREATE TABLE lawyer (
 	status             ENUM ('waiting', 'rejected', 'confirmed') DEFAULT 'waiting',
 	rejection_reason   VARCHAR(1024) NULL,
 	FOREIGN KEY (id)
-		REFERENCES user (id)
+		REFERENCES user (id),
+	INDEX i_status (status)
 );
 
 CREATE TABLE administrator (

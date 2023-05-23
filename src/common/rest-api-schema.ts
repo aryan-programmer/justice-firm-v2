@@ -341,12 +341,6 @@ export const justiceFirmApiSchema = modelSchema({
 			requestBodyChecker:  lazyCheck(SearchAllLawyersInput),
 			responseBodyChecker: lazyCheck(MessageOr(LawyerSearchResults)),
 		}),
-		getWaitingLawyers:          endpoint({
-			method:              HttpMethods.POST,
-			path:                "/user/lawyer/waiting",
-			requestBodyChecker:  lazyCheck(GetWaitingLawyersInput),
-			responseBodyChecker: lazyCheck(MessageOr(LawyerSearchResults))
-		}),
 		getLawyer:                  endpoint({
 			method:              HttpMethods.POST,
 			path:                "/user/lawyer/get",

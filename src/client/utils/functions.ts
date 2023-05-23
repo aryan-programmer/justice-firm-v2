@@ -11,7 +11,7 @@ import {
 } from "../../common/utils/constants";
 import {timeFormat} from "../../common/utils/functions";
 import {Nuly, Writeable} from "../../common/utils/types";
-import {MessageData} from "../../common/ws-api-schema";
+import {MessageData} from "../../common/ws-chatter-box-api-schema";
 import {FileUploadData} from "../../server/utils/types";
 import {ModalStoreWrapper} from "../store/modalsStore";
 import {UserStore_T} from "../store/userStore";

@@ -13,23 +13,32 @@ import {
 } from "aws-cdk-lib";
 import {RestApi} from "aws-cdk-lib/aws-apigateway";
 import {AttributeType, BillingMode} from "aws-cdk-lib/aws-dynamodb";
-import {Effect, PolicyStatement, ServicePrincipal} from "aws-cdk-lib/aws-iam";
-import {Code, Function, Runtime} from "aws-cdk-lib/aws-lambda";
+import {Effect, ManagedPolicy, PolicyStatement, Role, ServicePrincipal} from "aws-cdk-lib/aws-iam";
+import {Code, Function, FunctionProps, Runtime} from "aws-cdk-lib/aws-lambda";
 import {Bucket, BucketAccessControl, BucketEncryption, HttpMethods} from "aws-cdk-lib/aws-s3";
 import {IStringParameter} from "aws-cdk-lib/aws-ssm";
 import {Construct} from 'constructs';
 import mapValues from "lodash/mapValues";
 import 'reflect-metadata';
+import {
+	CONNECTION_ID,
+	CONNECTION_KEY_ID,
+	CONNECTION_TYPE,
+	connectionsByKeyIdIndex,
+	MESSAGE_GROUP,
+	MESSAGE_TIMESTAMP
+} from "../common/infrastructure-constants";
 import {justiceFirmApiSchema} from "../common/rest-api-schema";
-import {jfChatterBoxApiSchema} from "../common/ws-api-schema";
+import {jfChatterBoxApiSchema} from "../common/ws-chatter-box-api-schema";
+import {jfNotificationsApiSchema} from "../common/ws-notifications-api-schema";
 import {EndpointSchema} from "../singularity/endpoint";
 import {ApiGatewayResourceMap} from "./api-gateway-resource-map";
-import {connectionsByGroupIndex} from "./constants";
 import {LambdaIntegrationNoPermission} from "./LambdaFunctionNoPermissions";
 
 const path = require("path");
 
-const callbackUrlParamName = "/justice-firm/ws-api/callback-url";
+const chatterBoxCallbackUrlParamName    = "/justice-firm/ws-chatter-box-api/callback-url";
+const notificationsCallbackUrlParamName = "/justice-firm/ws-notifications-api/callback-url";
 
 export class JusticeFirmStack extends Stack {
 	private readonly apiName: string;
@@ -46,8 +55,13 @@ export class JusticeFirmStack extends Stack {
 	private dbUsername: string;
 	private dbPassword: IStringParameter;
 	private jwtSecret: IStringParameter;
+	private redisEndpoint: string;
+	private redisPort: string;
+	private redisUsername: string;
+	private redisPassword: IStringParameter;
 	private wsApiStage: WebSocketStage;
-	private wsApiCallbackUrlParam: IStringParameter;
+	private wsChatterBoxApiCallbackUrlParam: IStringParameter;
+	private wsNotificationsApiCallbackUrlParam: IStringParameter;
 
 	constructor (scope: Construct, id: string, props?: StackProps) {
 		super(scope, id, props);
@@ -84,11 +98,11 @@ export class JusticeFirmStack extends Stack {
 	private makeMessagesTable () {
 		this.messagesTable = new aws_dynamodb.Table(this, "MessagesTable", {
 			partitionKey:  {
-				name: "group",
+				name: MESSAGE_GROUP,
 				type: AttributeType.STRING
 			},
 			sortKey:       {
-				name: "ts",
+				name: MESSAGE_TIMESTAMP,
 				type: AttributeType.STRING
 			},
 			removalPolicy: RemovalPolicy.DESTROY,
@@ -105,7 +119,7 @@ export class JusticeFirmStack extends Stack {
 	private makeConnectionsTable () {
 		this.connectionsTable = new aws_dynamodb.Table(this, "ConnectionsTable", {
 			partitionKey:  {
-				name: "conn",
+				name: CONNECTION_ID,
 				type: AttributeType.STRING
 			},
 			removalPolicy: RemovalPolicy.DESTROY,
@@ -114,9 +128,13 @@ export class JusticeFirmStack extends Stack {
 			writeCapacity: 3,
 		});
 		this.connectionsTable.addGlobalSecondaryIndex({
-			indexName:     connectionsByGroupIndex,
+			indexName:     connectionsByKeyIdIndex,
 			partitionKey:  {
-				name: "group",
+				name: CONNECTION_KEY_ID,
+				type: AttributeType.STRING
+			},
+			sortKey:       {
+				name: CONNECTION_TYPE,
 				type: AttributeType.STRING
 			},
 			readCapacity:  3,
@@ -150,11 +168,6 @@ export class JusticeFirmStack extends Stack {
 	}
 
 	private getConstsAndSecrets () {
-		// this.wsApiCallbackUrlParam = ssm.StringParameter.fromStringParameterName(
-		// 	this,
-		// 	`${jfChatterBoxApiSchema.name}-CallbackUrlParam`,
-		// 	callbackUrlParamName);
-
 		this.dbEndpoint = ssm.StringParameter.valueForStringParameter(this, "/justice-firm/db/endpoint");
 		this.dbPort     = ssm.StringParameter.valueForStringParameter(this, "/justice-firm/db/port");
 		this.dbUsername = ssm.StringParameter.valueForStringParameter(this, "/justice-firm/db/username");
@@ -163,35 +176,51 @@ export class JusticeFirmStack extends Stack {
 			`${this.apiName}-DbPassword`,
 			{parameterName: "/justice-firm/db/password"}
 		);
-		this.jwtSecret  = ssm.StringParameter.fromSecureStringParameterAttributes(
+
+		this.jwtSecret = ssm.StringParameter.fromSecureStringParameterAttributes(
 			this,
 			`${this.apiName}-JWTSecret`,
 			{parameterName: "/justice-firm/jwt/secret"}
 		);
+
+		this.redisEndpoint = ssm.StringParameter.valueForStringParameter(this, "/justice-firm/redis-cache/endpoint");
+		this.redisPort     = ssm.StringParameter.valueForStringParameter(this, "/justice-firm/redis-cache/port");
+		this.redisUsername = ssm.StringParameter.valueForStringParameter(this, "/justice-firm/redis-cache/username");
+		this.redisPassword = ssm.StringParameter.fromSecureStringParameterAttributes(
+			this,
+			`${this.apiName}-RedisPassword`,
+			{parameterName: "/justice-firm/redis-cache/password"}
+		);
 	}
 
 	private makeLambdaFunction () {
-		this.lambda = new Function(this, `${this.apiName}-FunnelFunction`, {
+		const props: FunctionProps = {
 			runtime:     Runtime.NODEJS_18_X,
 			handler:     `app.handler`,
 			code:        Code.fromAsset(path.resolve(__dirname, "../server/dist")),
 			timeout:     Duration.minutes(1),
 			environment: {
-				DB_ENDPOINT:                   this.dbEndpoint,
-				DB_PORT:                       this.dbPort,
-				DB_USERNAME:                   this.dbUsername,
-				DB_PASSWORD:                   this.dbPassword.parameterName,
-				S3_BUCKET:                     this.s3Bucket.bucketName,
-				JWT_SECRET:                    this.jwtSecret.parameterName,
-				PASSWORD_RESET_OTP_TABLE_NAME: this.passwordResetOtpTable.tableName,
-				CONNECTIONS_TABLE_NAME:        this.connectionsTable.tableName,
-				MESSAGES_TABLE_NAME:           this.messagesTable.tableName,
-				WS_API_CALLBACK_URL_PARAM:     callbackUrlParamName,
-				SES_SOURCE_EMAIL_ADDRESS:      "justice.firm.norepley@gmail.com",
-				NODE_OPTIONS:                  "--enable-source-maps --stack_trace_limit=200",
+				DB_ENDPOINT:                                  this.dbEndpoint,
+				DB_PORT:                                      this.dbPort,
+				DB_USERNAME:                                  this.dbUsername,
+				DB_PASSWORD:                                  this.dbPassword.parameterName,
+				REDIS_ENDPOINT:                               this.redisEndpoint,
+				REDIS_PORT:                                   this.redisPort,
+				REDIS_USERNAME:                               this.redisUsername,
+				REDIS_PASSWORD:                               this.redisPassword.parameterName,
+				S3_BUCKET:                                    this.s3Bucket.bucketName,
+				JWT_SECRET:                                   this.jwtSecret.parameterName,
+				PASSWORD_RESET_OTP_TABLE_NAME:                this.passwordResetOtpTable.tableName,
+				CONNECTIONS_TABLE_NAME:                       this.connectionsTable.tableName,
+				MESSAGES_TABLE_NAME:                          this.messagesTable.tableName,
+				WS_CHATTER_BOX_API_CALLBACK_URL_PARAM_NAME:   chatterBoxCallbackUrlParamName,
+				WS_NOTIFICATIONS_API_CALLBACK_URL_PARAM_NAME: notificationsCallbackUrlParamName,
+				SES_SOURCE_EMAIL_ADDRESS:                     "justice.firm.norepley@gmail.com",
+				NODE_OPTIONS:                                 "--enable-source-maps --stack_trace_limit=200",
 			},
 			memorySize:  1024,
-		});
+		};
+		this.lambda                = new Function(this, `${this.apiName}-FunnelFunction`, props);
 	}
 
 	private makeRestApi () {
@@ -246,15 +275,23 @@ export class JusticeFirmStack extends Stack {
 			this.wsApi.addRoute(value.path, getRouteOptions());
 		});
 
-		this.wsApiCallbackUrlParam = new ssm.StringParameter(this, `${wsApiName}-CallbackUrlParam`, {
+		this.wsChatterBoxApiCallbackUrlParam    = new ssm.StringParameter(this, `${wsApiName}-CallbackUrlParam`, {
 			stringValue:   this.wsApiStage.callbackUrl,
-			parameterName: callbackUrlParamName
+			parameterName: chatterBoxCallbackUrlParamName
 		});
+		this.wsNotificationsApiCallbackUrlParam = new ssm.StringParameter(this,
+			`${jfNotificationsApiSchema.name}-CallbackUrlParam`,
+			{
+				stringValue:   this.wsApiStage.callbackUrl,
+				parameterName: notificationsCallbackUrlParamName
+			});
 	}
 
 	private grantIamPolicies () {
-		this.wsApiCallbackUrlParam.grantRead(this.lambda);
+		this.wsNotificationsApiCallbackUrlParam.grantRead(this.lambda);
+		this.wsChatterBoxApiCallbackUrlParam.grantRead(this.lambda);
 		this.dbPassword.grantRead(this.lambda);
+		this.redisPassword.grantRead(this.lambda);
 		this.jwtSecret.grantRead(this.lambda);
 		this.s3Bucket.grantDelete(this.lambda);
 		this.s3Bucket.grantPut(this.lambda);

@@ -18,11 +18,11 @@ export const ChatAuthToken = Type.Intersect([PrivateChatAuthToken, Type.Object({
 })], {$id: "ChatAuthToken"});
 export type ChatAuthToken = Static<typeof ChatAuthToken>;
 
-export const EstablishConnectionInput = Type.Object({
+export const EstablishChatConnectionInput = Type.Object({
 	group:     ID_T,
 	authToken: AuthToken
-}, {$id: "EstablishConnectionInput"});
-export type EstablishConnectionInput = Static<typeof EstablishConnectionInput>;
+}, {$id: "EstablishChatConnectionInput"});
+export type EstablishChatConnectionInput = Static<typeof EstablishChatConnectionInput>;
 
 export const ChatGroupData = Type.Object({
 	name:   String_T,
@@ -32,10 +32,10 @@ export const ChatGroupData = Type.Object({
 }, {$id: "ChatGroupData"});
 export type ChatGroupData = Static<typeof ChatGroupData>;
 
-export const EstablishConnectionOutput = Type.Intersect([ChatGroupData, Type.Object({
+export const EstablishChatConnectionOutput = Type.Intersect([ChatGroupData, Type.Object({
 	chatAuthToken: ChatAuthToken,
-})], {$id: "EstablishConnectionOutput"});
-export type EstablishConnectionOutput = Static<typeof EstablishConnectionOutput>;
+})], {$id: "EstablishChatConnectionOutput"});
+export type EstablishChatConnectionOutput = Static<typeof EstablishChatConnectionOutput>;
 
 export const PostMessageInput = Type.Object({
 	text:          String_T,
@@ -72,8 +72,8 @@ export const jfChatterBoxApiSchema = wsModelSchema({
 		}),
 		establishConnection:       wsEndpoint({
 			path:                "establishConnection",
-			requestBodyChecker:  lazyCheck(EstablishConnectionInput),
-			responseBodyChecker: lazyCheck(MessageOr(EstablishConnectionOutput))
+			requestBodyChecker:  lazyCheck(EstablishChatConnectionInput),
+			responseBodyChecker: lazyCheck(MessageOr(EstablishChatConnectionOutput))
 		}),
 		$disconnect:               wsEndpoint({
 			path:               "$disconnect",

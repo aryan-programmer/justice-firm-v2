@@ -1,6 +1,4 @@
-import {GoneException} from "@aws-sdk/client-apigatewaymanagementapi";
 import {
-	DeleteItemCommand,
 	PutItemCommand,
 	QueryCommand,
 	QueryCommandOutput,
@@ -13,30 +11,51 @@ import {APIGatewayProxyWebsocketEventV2} from "aws-lambda/trigger/api-gateway-pr
 import {sign} from "jsonwebtoken";
 import {PrivateAuthToken} from "../common/api-types";
 import {UserAccessType} from "../common/db-types";
+import {
+	ATTACHMENT_MIME,
+	ATTACHMENT_NAME,
+	ATTACHMENT_PATH,
+	CONNECTION_ID,
+	CONNECTION_KEY_ID,
+	CONNECTION_TYPE,
+	connectionsByKeyIdIndex, ConnectionsTable_ExpressionAttributeNames,
+	ConnectionTypeOptions,
+	MESSAGE_GROUP,
+	MESSAGE_ID,
+	MESSAGE_SENDER_ID,
+	MESSAGE_TEXT,
+	MESSAGE_TIMESTAMP
+} from "../common/infrastructure-constants";
 import {nn} from "../common/utils/asserts";
+import {filterMap} from "../common/utils/filterMap";
 import {isNullOrEmpty} from "../common/utils/functions";
 import {Nuly} from "../common/utils/types";
 import {uniqId} from "../common/utils/uniq-id";
 import {
 	ChatAuthToken,
 	ChatGroupData,
-	EstablishConnectionInput,
-	EstablishConnectionOutput,
+	EstablishChatConnectionInput,
+	EstablishChatConnectionOutput,
 	GetMessagesInput,
 	jfChatterBoxApiSchema,
 	MessageData,
 	PostMessageInput,
 	PostMessageWithAttachmentInput,
 	PrivateChatAuthToken
-} from "../common/ws-api-schema";
-import {connectionsByGroupIndex} from "../infrastructure/constants";
+} from "../common/ws-chatter-box-api-schema";
 import {constants} from "../singularity/constants";
 import {EndpointResult} from "../singularity/endpoint";
 import {message, Message, noContent, response} from "../singularity/helpers";
 import {WSAPIImplementation, WSEndpointResult, WSFnParams} from "../singularity/websocket/ws-endpoint";
 import {eventsSender} from "../singularity/websocket/ws-model.server";
-import {connectionsTableName, dynamoDbClient, messagesTableName, ssmClient} from "./environment-clients";
-import {JusticeFirmRestAPIImpl} from "./rest-api-impl";
+import {CommonApiMethods} from "./common-api-methods";
+import {
+	connectionsTableName,
+	dynamoDbClient,
+	messagesTableName,
+	ssmClient,
+	WS_CHATTER_BOX_API_CALLBACK_URL_PARAM_NAME
+} from "./environment-clients";
 import {printConsumedCapacity, shortenS3Url, unShortenS3Url, verifyAndDecodeJwtToken} from "./utils/functions";
 import {FileUploadData} from "./utils/types";
 
@@ -59,15 +78,6 @@ const verifyAuthJwtToken = verifyAndDecodeJwtToken<PrivateAuthToken>;
 const verifyChatJwtToken = verifyAndDecodeJwtToken<PrivateChatAuthToken>;
 const verifyFileJwtToken = verifyAndDecodeJwtToken<FileUploadData>;
 
-const ATTACHMENT_PATH   = "apath";
-const ATTACHMENT_MIME   = "amime";
-const ATTACHMENT_NAME   = "aname";
-const MESSAGE_GROUP     = "group";
-const MESSAGE_TIMESTAMP = "ts";
-const MESSAGE_TEXT      = "text";
-const MESSAGE_SENDER_ID = "from";
-const MESSAGE_ID        = "id";
-
 const GetMessages_ProjectionExpression     = [
 	MESSAGE_TIMESTAMP, MESSAGE_TEXT, MESSAGE_SENDER_ID, MESSAGE_ID,
 	ATTACHMENT_PATH, ATTACHMENT_NAME, ATTACHMENT_MIME
@@ -85,22 +95,20 @@ const GetMessages_ExpressionAttributeNames = [
 
 let fakeOn = true ? undefined as never : eventsSender(jfChatterBoxApiSchema, {validateEventsBody: true, endpoint: ""});
 
-export class JusticeFirmWsRestAPIImpl
-	extends JusticeFirmRestAPIImpl
+export class JusticeFirmWsChatterBoxAPIImpl
 	implements WSAPIImplementation<typeof jfChatterBoxApiSchema> {
 	on: typeof fakeOn;
 
-	constructor () {
-		super();
+	constructor (private common: CommonApiMethods) {
 		this.setup().catch(ex => console.trace(ex));
 	}
 
 	async setup () {
 		if (this.on != null) return
 		const endpoint = nn((await ssmClient.send(new GetParameterCommand({
-			Name:           process.env.WS_API_CALLBACK_URL_PARAM,
+			Name:           WS_CHATTER_BOX_API_CALLBACK_URL_PARAM_NAME,
 			WithDecryption: true
-		}))).Parameter?.Value)
+		}))).Parameter?.Value);
 		this.on        = eventsSender(jfChatterBoxApiSchema, {validateEventsBody: true, endpoint});
 	}
 
@@ -110,15 +118,15 @@ export class JusticeFirmWsRestAPIImpl
 		return noContent;
 	}
 
-	async establishConnection (params: WSFnParams<EstablishConnectionInput>, event: APIGatewayProxyWebsocketEventV2)
-		: Promise<WSEndpointResult<EstablishConnectionOutput | Message>> {
+	async establishConnection (params: WSFnParams<EstablishChatConnectionInput>, event: APIGatewayProxyWebsocketEventV2)
+		: Promise<WSEndpointResult<EstablishChatConnectionOutput | Message>> {
 		const {authToken, group}    = params.body;
-		const jwtSecret             = await this.getJwtSecret();
+		const jwtSecret             = await this.common.getJwtSecret();
 		const jwt: PrivateAuthToken = await verifyAuthJwtToken(authToken.jwt, jwtSecret);
 		if (jwt.userType !== UserAccessType.Lawyer && jwt.userType !== UserAccessType.Client) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Must be a lawyer or client");
 		}
-		const resSet = await (await this.getPool()).execute(
+		const resSet = await (await this.common.getPool()).execute(
 			`
 				SELECT g.name      AS g_name,
 				       g.case_id   AS case_id,
@@ -152,11 +160,13 @@ export class JusticeFirmWsRestAPIImpl
 				`User ${jwt.id} is not authorized to access the chat group ${group}`);
 		}
 		const conn        = event.requestContext.connectionId;
+		console.log("Trying to put item in dynamo db...");
 		const putResponse = await dynamoDbClient.send(new PutItemCommand({
 			TableName:              connectionsTableName,
 			Item:                   {
-				group: {S: group},
-				conn:  {S: conn}
+				[CONNECTION_KEY_ID]: {S: group},
+				[CONNECTION_ID]:     {S: conn},
+				[CONNECTION_TYPE]:   {S: ConnectionTypeOptions.ChatGroupConnection},
 			},
 			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES
 		}));
@@ -169,25 +179,14 @@ export class JusticeFirmWsRestAPIImpl
 
 	async $disconnect (params: WSFnParams<Nuly>, event: APIGatewayProxyWebsocketEventV2):
 		Promise<EndpointResult<Nuly | Message>> {
-		await this.deleteConnection(event.requestContext.connectionId);
+		await this.common.deleteConnection(event.requestContext.connectionId);
 		return noContent;
-	}
-
-	private async deleteConnection (conn: string) {
-		const deleteResponse = await dynamoDbClient.send(new DeleteItemCommand({
-			TableName:              connectionsTableName,
-			Key:                    {
-				conn: {S: conn}
-			},
-			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES
-		}));
-		printConsumedCapacity("deleteConnection", deleteResponse);
 	}
 
 	async postMessage (params: WSFnParams<PostMessageInput>, event: APIGatewayProxyWebsocketEventV2):
 		Promise<EndpointResult<Nuly | Message>> {
 		const {chatAuthToken, text}     = params.body;
-		const jwtSecret                 = await this.getJwtSecret();
+		const jwtSecret                 = await this.common.getJwtSecret();
 		const jwt: PrivateChatAuthToken = await verifyChatJwtToken(chatAuthToken.jwt, jwtSecret);
 		const {group: groupId, user}    = jwt;
 		const now                       = Date.now();
@@ -217,7 +216,7 @@ export class JusticeFirmWsRestAPIImpl
 	async postMessageWithAttachment (params: WSFnParams<PostMessageWithAttachmentInput>, event: APIGatewayProxyWebsocketEventV2):
 		Promise<EndpointResult<Nuly | Message>> {
 		const {chatAuthToken, text, uploadedFile}  = params.body;
-		const jwtSecret                            = await this.getJwtSecret();
+		const jwtSecret                            = await this.common.getJwtSecret();
 		const jwt: PrivateChatAuthToken            = await verifyChatJwtToken(chatAuthToken.jwt, jwtSecret);
 		const file: FileUploadData                 = await verifyFileJwtToken(uploadedFile.jwt, jwtSecret);
 		const {group: groupId, user}               = jwt;
@@ -254,7 +253,7 @@ export class JusticeFirmWsRestAPIImpl
 
 	async getMessages (params: WSFnParams<GetMessagesInput>, event: APIGatewayProxyWebsocketEventV2):
 		Promise<EndpointResult<Message | MessageData[]>> {
-		const jwtSecret                 = await this.getJwtSecret();
+		const jwtSecret                 = await this.common.getJwtSecret();
 		const jwt: PrivateChatAuthToken = await verifyChatJwtToken(params.body.chatAuthToken.jwt, jwtSecret);
 		const {group, user}             = jwt;
 
@@ -301,36 +300,20 @@ export class JusticeFirmWsRestAPIImpl
 	private async sendMessageEventToGroup (group: string, messageData: MessageData) {
 		const queryResponse = await dynamoDbClient.send(new QueryCommand({
 			TableName:                 connectionsTableName,
-			IndexName:                 connectionsByGroupIndex,
-			ProjectionExpression:      "#conn",
-			KeyConditionExpression:    "#group = :needGroup",
-			ExpressionAttributeNames:  {
-				"#group": "group",
-				"#conn":  "conn",
-			},
+			IndexName:                 connectionsByKeyIdIndex,
+			ProjectionExpression:      `#${CONNECTION_ID}`,
+			KeyConditionExpression:    `#${CONNECTION_KEY_ID} = :needGroup AND #${CONNECTION_TYPE} = :needConnType`,
+			ExpressionAttributeNames:  ConnectionsTable_ExpressionAttributeNames,
 			ExpressionAttributeValues: {
-				":needGroup": {S: group}
+				":needGroup":    {S: group},
+				":needConnType": {S: ConnectionTypeOptions.ChatGroupConnection}
 			},
 			Select:                    Select.SPECIFIC_ATTRIBUTES,
 			ReturnConsumedCapacity:    ReturnConsumedCapacity.INDEXES
 		}));
 		printConsumedCapacity("postMessage: Connections", queryResponse);
-		if (queryResponse.Items == null || queryResponse.Items.length === 0)
-			return message(200, "Message sent. No active connections");
-		await Promise.all(queryResponse.Items.map(async value => {
-			const conn = value.conn;
-			if (!("S" in conn) || conn.S == null) return;
-			try {
-				await this.on.incomingMessage(messageData, conn.S);
-			} catch (ex) {
-				if (ex instanceof GoneException) {
-					console.log({GoneException: ex});
-					await this.deleteConnection(conn.S);
-				} else {
-					console.log({ex});
-				}
-			}
-		}));
+		const conns = filterMap(queryResponse.Items, value => value?.[CONNECTION_ID]?.S?.toString());
+		await this.common.onAllConnections(conns, async conn => this.on.incomingMessage(messageData, conn));
 		return message(200, "Message sent");
 	}
 }

@@ -9,6 +9,7 @@ import {Nuly} from "../../../common/utils/types";
 import {useModals} from "../../store/modalsStore";
 import {useUserStore} from "../../store/userStore";
 import {statusSelectionOptionCoalesce} from "../../utils/functions";
+import {DataTableHeader} from "../../utils/types";
 import AdminDashboardStatusSelectionCell from "./AdminDashboardStatusSelectionCell.vue";
 
 const userStore        = useUserStore();
@@ -21,13 +22,17 @@ const emit             = defineEmits<{
 	(type: 'applySuccess'): void
 }>();
 
-const dataTableHeaders = [
+type Header_T = DataTableHeader<LawyerSearchResult>;
+const baseDataTableHeaders1: Header_T[]            = [
+	{title: "ID", align: 'center', key: 'id', sortable: true},
 	{title: "Action", align: 'start', key: 'status', sortable: true},
 	{title: 'Photo', align: 'start', key: 'photoPath', sortable: false},
 	{title: 'Name & Gender', align: 'start', key: 'name', sortable: true},
 	{title: 'Contact info & Certification', align: 'start', key: 'email', sortable: true},
 	{title: 'Address', align: 'start', key: 'address', sortable: true},
 	{title: 'Rejection Reason', align: 'start', key: "rejectionReason", sortable: false},
+];
+const baseDataTableHeaders2: Header_T[]            = [
 	{title: 'Total Cases', align: 'center', key: "statistics.totalCases", sortable: true},
 	{title: 'Total Clients', align: 'center', key: "statistics.totalClients", sortable: true},
 	{title: 'Total Appointments', align: 'center', key: "statistics.totalAppointments", sortable: true},
@@ -35,6 +40,18 @@ const dataTableHeaders = [
 	{title: 'Confirmed Appointments', align: 'center', key: "statistics.confirmedAppointments", sortable: true},
 	{title: 'Waiting Appointments', align: 'center', key: "statistics.waitingAppointments", sortable: true},
 ];
+const baseDataTableHeaders: Header_T[]             = [
+	...baseDataTableHeaders1,
+	...baseDataTableHeaders2
+];
+const baseDataTableHeadersWithDistance: Header_T[] = [
+	...baseDataTableHeaders1,
+	{title: 'Distance', align: 'center', key: "distance", sortable: true},
+	...baseDataTableHeaders2
+];
+
+const isShowingDistance = computed(() => props.lawyers.some(value => "distance" in value && typeof value.distance === "number"))
+const dataTableHeaders  = computed(() => isShowingDistance.value ? baseDataTableHeadersWithDistance : baseDataTableHeaders);
 
 const formFields = reactive<{
 	statuses: Record<string | number, StatusSelectionOptions>,
@@ -128,7 +145,7 @@ $table-padding: 8px;
 
 <template>
 <v-data-table
-	:headers="dataTableHeaders"
+	:headers="dataTableHeaders as any"
 	:items="props.lawyers"
 	items-per-page="15"
 	density="compact"
@@ -184,6 +201,9 @@ $table-padding: 8px;
 		</template>
 	</v-textarea>
 	<p v-else class="text-center">Not applicable</p>
+	</template>
+	<template v-slot:item.distance="{ item }">
+	{{ (+item.raw.distance).toFixed(3) }} km
 	</template>
 </v-data-table>
 <v-btn

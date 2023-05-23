@@ -1,16 +1,21 @@
 import {justiceFirmApiSchema} from "../common/rest-api-schema";
-import {jfChatterBoxApiSchema} from "../common/ws-api-schema";
+import {jfChatterBoxApiSchema} from "../common/ws-chatter-box-api-schema";
 import {awsLambdaFunnelWrapper} from "../singularity/model.server";
 import {awsWSLambdaFunnelWrapper} from "../singularity/websocket/ws-model.server";
-import {JusticeFirmWsRestAPIImpl} from "./ws-rest-api-impl";
+import {CommonApiMethods} from "./common-api-methods";
+import {DbModelMethods} from "./db-model-methods";
+import {JusticeFirmRestAPIImpl} from "./rest-api-impl";
+import {JusticeFirmWsChatterBoxAPIImpl} from "./ws-chatter-box-api-impl";
 
 export function jfApiAwsFunnelFunctions () {
-	const obj = new JusticeFirmWsRestAPIImpl();
+	const dbModelMethods = new DbModelMethods();
+	const restAPIImpl = new JusticeFirmRestAPIImpl(dbModelMethods);
+	const wsChatterBoxApiImpl = new JusticeFirmWsChatterBoxAPIImpl(dbModelMethods);
 	return {
-		restApiImpl: awsLambdaFunnelWrapper(justiceFirmApiSchema, obj, {
+		restApiImpl: awsLambdaFunnelWrapper(justiceFirmApiSchema, restAPIImpl, {
 			validateOutputs: false
 		}),
-		wsApiImpl:   awsWSLambdaFunnelWrapper(jfChatterBoxApiSchema, obj, {
+		wsChatterBoxApiImpl:   awsWSLambdaFunnelWrapper(jfChatterBoxApiSchema, wsChatterBoxApiImpl, {
 			validateOutputs: false,
 		}),
 	};

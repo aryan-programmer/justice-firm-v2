@@ -1,7 +1,7 @@
 import {FieldContext} from "vee-validate";
 import {StatusEnum} from "../../common/db-types";
-import {Nuly} from "../../common/utils/types";
-import {MessageData} from "../../common/ws-api-schema";
+import {Nuly, Paths} from "../../common/utils/types";
+import {MessageData} from "../../common/ws-chatter-box-api-schema";
 
 export type SelectItemKey =
 	| boolean
@@ -10,13 +10,13 @@ export type SelectItemKey =
 	| ((item: Record<string, any>, fallback?: any) => any);
 
 export type DataTableHeader<TObject> = {
-	key: keyof TObject
+	key: Paths<TObject, 3>
 	value?: SelectItemKey
 	title: string
 	colspan?: number
 	rowspan?: number
 	fixed?: boolean
-	align?: 'end' | 'start'
+	align?: 'end' | 'start' | 'center'
 	width?: number
 	minWidth?: string
 	maxWidth?: string

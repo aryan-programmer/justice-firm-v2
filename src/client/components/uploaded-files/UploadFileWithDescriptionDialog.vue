@@ -4,6 +4,7 @@ import isEmpty from "lodash/isEmpty";
 import {useField, useForm} from "vee-validate";
 import * as yup from "yup";
 import {nn} from "../../../common/utils/asserts";
+import {maxDataUrlLen, maxFileSize} from "../../../common/utils/constants";
 import {isNullOrEmpty} from "../../../common/utils/functions";
 import {Nuly} from "../../../common/utils/types";
 import {useModals} from "../../store/modalsStore";
@@ -45,6 +46,10 @@ async function attachmentChange (event: Event) {
 	const file = (event.target as HTMLInputElement)?.files?.[0];
 	if (file == null) return;
 	attachmentData = await readFileAsDataUrl(file);
+	if (attachmentData.length > maxDataUrlLen) {
+		attachmentClear();
+		await error(`The file must be less than ${maxFileSize} in size.`)
+	}
 	attachmentName = file.name;
 	if (isNullOrEmpty((description.value.value as any)?.toString()))
 		description.value.value = file.name;

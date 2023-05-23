@@ -24,7 +24,19 @@ const userInfo    = computed(() => {
 	if (userStore.authToken == null) {
 		return "Anonymous user";
 	}
-	return capitalizeFirstLetter(userStore.authToken.userType) + " " + userStore.authToken.name
+	let userType: string = "";
+	switch (userStore.authToken.userType){
+	case UserAccessType.Lawyer:
+		userType = "Lawyer";
+		break;
+	case UserAccessType.Client:
+		userType = "Client";
+		break;
+	case UserAccessType.Admin:
+		userType = "Administrator";
+		break;
+	}
+	return userType + " " + userStore.authToken.name
 })
 const commonLinks = [
 	{icon: "fa-search", title: "Find Lawyer", link: "/search-lawyers"},

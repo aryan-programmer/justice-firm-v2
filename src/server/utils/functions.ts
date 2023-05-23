@@ -1,10 +1,12 @@
 import {AttributeValue, ConsumedCapacity} from "@aws-sdk/client-dynamodb";
 import {PutObjectCommand, S3Client} from "@aws-sdk/client-s3";
+import {BinaryLike} from "crypto";
 import {fileTypeFromBuffer} from "file-type";
 import {verify} from "jsonwebtoken";
 import mapValues from "lodash/mapValues";
 import {extension, lookup} from "mime-types";
 import fetch from 'node-fetch';
+import { createHash } from "node:crypto";
 import path from "path";
 import {Stream} from "stream";
 import {nn} from "../../common/utils/asserts";
@@ -145,4 +147,19 @@ export function fromDynamoDBItem (v: Record<string, AttributeValue>): Record<str
 
 export function printConsumedCapacity (text: string, queryResponse: { ConsumedCapacity?: ConsumedCapacity; }) {
 	console.log(`Consumed Capacity for ${text}: `, JSON.stringify(queryResponse.ConsumedCapacity, null, 4));
+}
+
+export function toBase64(data: WithImplicitCoercion<string>
+                               | {
+	                               [Symbol.toPrimitive](hint: 'string'): string;
+                               }){
+	return Buffer.from(data).toString('base64');
+}
+
+export function sha256(data: BinaryLike){
+	return createHash('sha256').update(data).digest('base64');
+}
+
+export function getSqlTupleForInOperator (inTupleArrayLength: number) {
+	return "?" + ",?".repeat(inTupleArrayLength - 1);
 }
