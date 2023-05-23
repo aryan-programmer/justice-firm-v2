@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {definePageMeta, justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
-import {useField, useForm} from 'vee-validate';
+import {FieldContext, useField, useForm} from 'vee-validate';
 import {LocationQueryValue} from "vue-router";
 import {useDisplay} from "vuetify";
 import * as yup from "yup";
@@ -50,7 +50,7 @@ const {handleSubmit, errors} = useForm({
 
 const name        = useField('name');
 const email       = useField('email');
-const humanStatus = useField('humanStatus');
+const humanStatus = useField('humanStatus') as FieldContext<string|Nuly>;
 const address     = useField('address');
 const latitude    = useField('latitude');
 const longitude   = useField('longitude');

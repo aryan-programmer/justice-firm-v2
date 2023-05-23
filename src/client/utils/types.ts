@@ -9,19 +9,40 @@ export type SelectItemKey =
 	| (string | number)[]
 	| ((item: Record<string, any>, fallback?: any) => any);
 
-export type DataTableHeader<TObject> = {
+export type DataTableCompareFunction<T = any> = (a: T, b: T) => number;
+export type TypedDataTableHeader<TObject> = {
 	key: Paths<TObject, 3>
 	value?: SelectItemKey
 	title: string
 	colspan?: number
 	rowspan?: number
 	fixed?: boolean
-	align?: 'end' | 'start' | 'center'
+	// v-data-table supports center alignment (I've checked),
+	// but it is not specified in the TS definitions,
+	// so TypedDataTableHeader needs to be cast to unknown then to DataTableHeader
+	// This is normal since v-data-table is a part of Vuetify Labs
+	align?: 'end' | 'start' | 'center';
 	width?: number
 	minWidth?: string
 	maxWidth?: string
 	sortable?: boolean
-	sort?: (a: any, b: any) => number
+	sort?: DataTableCompareFunction
+};
+
+// Type definition for DataTableHeader for v-data-table from Vuetify internal .ts files
+export type DataTableHeader = {
+	key: string;
+	value?: SelectItemKey;
+	title: string;
+	colspan?: number;
+	rowspan?: number;
+	fixed?: boolean;
+	align?: 'start' | 'end';
+	width?: number;
+	minWidth?: string;
+	maxWidth?: string;
+	sortable?: boolean;
+	sort?: DataTableCompareFunction;
 };
 
 export type MessageDataDisplayable = MessageData & {

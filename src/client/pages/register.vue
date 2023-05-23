@@ -3,10 +3,11 @@ import {navigateTo} from "#app";
 import {definePageMeta} from "#imports";
 import {isLeft} from "fp-ts/lib/Either";
 import isEmpty from "lodash/isEmpty";
-import {useField, useForm} from 'vee-validate';
+import {FieldContext, useField, useForm} from 'vee-validate';
 import * as yup from "yup";
 import {genderHumanVals} from "../../common/utils/constants";
 import {genderHumanToDB} from "../../common/utils/functions";
+import {Nuly} from "../../common/utils/types";
 import FormTextFieldInCol from "../components/general/FormTextFieldInCol.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
@@ -33,7 +34,7 @@ const rePassword = useField('rePassword');
 const phone      = useField('phone');
 const address    = useField('address');
 const photo      = useField('photo');
-const gender     = useField('gender');
+const gender     = useField('gender') as FieldContext<string|Nuly>;
 
 // const photoInputRef = ref();
 

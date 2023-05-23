@@ -3,7 +3,7 @@ import {computed} from "#imports";
 import {AppointmentSparseData} from "../../../common/rest-api-schema";
 import {compareDates, dateFormat, trimStr} from "../../../common/utils/functions";
 import {Nuly} from "../../../common/utils/types";
-import {DataTableHeader} from "../../utils/types";
+import {DataTableHeader, TypedDataTableHeader} from "../../utils/types";
 
 type AppointmentDataDisplayable = Omit<AppointmentSparseData, "timestamp" | "openedOn"> & {
 	timestamp?: Date | Nuly,
@@ -16,14 +16,15 @@ const props = defineProps<{
 	otherUserTitle: string,
 }>();
 
-const dataTableHeaders = computed((args): DataTableHeader<AppointmentDataDisplayable>[] => {
-	return [
+const dataTableHeaders = computed((args)  => {
+	const res : TypedDataTableHeader<AppointmentDataDisplayable>[]= [
 		{title: props.otherUserTitle, align: 'start', key: 'othName', sortable: true},
 		{title: 'Description', align: 'start', key: 'description', sortable: true},
 		{title: 'Timestamp', align: 'start', key: 'timestamp', sortable: true, sort: compareDates},
 		{title: 'Opened on', align: 'start', key: 'openedOn', sortable: true, sort: compareDates},
 		{title: 'View more', align: 'start', key: 'id', sortable: true},
 	]
+	return res as unknown as DataTableHeader[];
 });
 
 const appointments = computed(() =>

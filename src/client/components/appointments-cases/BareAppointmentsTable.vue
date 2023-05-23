@@ -3,7 +3,7 @@ import {computed} from "#imports";
 import {AppointmentBareData} from "../../../common/db-types";
 import {compareDates, dateFormat} from "../../../common/utils/functions";
 import {Nuly} from "../../../common/utils/types";
-import {DataTableHeader} from "../../utils/types";
+import {DataTableHeader, TypedDataTableHeader} from "../../utils/types";
 
 type AppointmentDataDisplayable = Omit<AppointmentBareData, "timestamp" | "openedOn"> & {
 	timestamp?: Date | Nuly,
@@ -17,8 +17,8 @@ const props = defineProps<{
 	showCaseId?: boolean
 }>();
 
-const dataTableHeaders = computed((args): DataTableHeader<AppointmentDataDisplayable>[] => {
-	const res: DataTableHeader<AppointmentDataDisplayable>[] = [
+const dataTableHeaders = computed((args) => {
+	const res: TypedDataTableHeader<AppointmentDataDisplayable>[] = [
 		{title: 'Appt. ID', align: 'start', key: 'id', sortable: true},
 		{title: props.otherUserTitle + " ID", align: 'start', key: 'othId', sortable: true},
 		{title: props.otherUserTitle, align: 'start', key: 'othName', sortable: true},
@@ -28,7 +28,7 @@ const dataTableHeaders = computed((args): DataTableHeader<AppointmentDataDisplay
 	if (props.showCaseId === true) {
 		res.push({title: 'Case ID', align: 'start', key: 'caseId', sortable: true},);
 	}
-	return res;
+	return res as unknown as DataTableHeader[];
 });
 
 const appointments = computed(() =>

@@ -9,7 +9,7 @@ import {Nuly} from "../../../common/utils/types";
 import {useModals} from "../../store/modalsStore";
 import {useUserStore} from "../../store/userStore";
 import {statusSelectionOptionCoalesce} from "../../utils/functions";
-import {DataTableHeader} from "../../utils/types";
+import {DataTableHeader, TypedDataTableHeader} from "../../utils/types";
 import AdminDashboardStatusSelectionCell from "./AdminDashboardStatusSelectionCell.vue";
 
 const userStore        = useUserStore();
@@ -22,7 +22,7 @@ const emit             = defineEmits<{
 	(type: 'applySuccess'): void
 }>();
 
-type Header_T = DataTableHeader<LawyerSearchResult>;
+type Header_T = TypedDataTableHeader<LawyerSearchResult>;
 const baseDataTableHeaders1: Header_T[]            = [
 	{title: "ID", align: 'center', key: 'id', sortable: true},
 	{title: "Action", align: 'start', key: 'status', sortable: true},
@@ -145,7 +145,7 @@ $table-padding: 8px;
 
 <template>
 <v-data-table
-	:headers="dataTableHeaders as any"
+	:headers="dataTableHeaders as unknown as DataTableHeader[]"
 	:items="props.lawyers"
 	items-per-page="15"
 	density="compact"

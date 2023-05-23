@@ -3,7 +3,7 @@ import {navigateTo} from "#app";
 import {definePageMeta, watch} from "#imports";
 import {isLeft} from "fp-ts/lib/Either";
 import isEmpty from "lodash/isEmpty";
-import {useField, useForm} from 'vee-validate';
+import {FieldContext, useField, useForm} from 'vee-validate';
 import * as yup from "yup";
 import {ClientDataResult} from "../../common/db-types";
 import {genderHumanVals} from "../../common/utils/constants";
@@ -35,7 +35,7 @@ const reNewPassword = useField('reNewPassword');
 const phone         = useField('phone');
 const address       = useField('address');
 const photo         = useField('photo');
-const gender        = useField('gender');
+const gender        = useField('gender') as FieldContext<string|Nuly>;
 
 const email = ref<string | Nuly>();
 

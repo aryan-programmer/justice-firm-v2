@@ -4,7 +4,7 @@ import {CaseType} from "../../../common/db-types";
 import {CaseSparseData} from "../../../common/rest-api-schema";
 import {compareDates, dateFormat, trimStr} from "../../../common/utils/functions";
 import {Nuly} from "../../../common/utils/types";
-import {DataTableHeader} from "../../utils/types";
+import {DataTableHeader, TypedDataTableHeader} from "../../utils/types";
 
 type CaseDataDisplayable = Omit<CaseSparseData, "openedOn"> & {
 	openedOn: Date,
@@ -21,14 +21,15 @@ function compareCaseTypeNames (a: CaseType, b: CaseType) {
 	return a.name.localeCompare(b.name);
 }
 
-const dataTableHeaders = computed((args): DataTableHeader<CaseDataDisplayable>[] => {
-	return [
+const dataTableHeaders = computed((args) => {
+	const res: TypedDataTableHeader<CaseDataDisplayable>[] = [
 		{title: props.otherUserTitle, align: 'start', key: 'othName', sortable: true},
 		{title: 'Description', align: 'start', key: 'description', sortable: true},
 		{title: 'Case Type', align: 'start', key: 'caseName', sortable: true},
 		{title: 'Opened on', align: 'start', key: 'openedOn', sortable: true, sort: compareDates},
 		{title: 'View more', align: 'start', key: 'id', sortable: true},
-	]
+	];
+	return res as unknown as DataTableHeader[];
 });
 
 const cases = computed(() =>

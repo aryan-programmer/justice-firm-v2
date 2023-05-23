@@ -2,11 +2,12 @@
 import {definePageMeta, justiceFirmApi, navigateTo, onMounted, readFileAsDataUrl} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import isEmpty from "lodash/isEmpty";
-import {useField, useForm} from 'vee-validate';
+import {FieldContext, useField, useForm} from 'vee-validate';
 import * as yup from "yup";
 import {ISchema} from "yup";
 import {genderHumanVals, getCaseTypes, maxDataUrlLen, maxFileSize} from "../../common/utils/constants";
 import {genderHumanToDB, getCurrentPosition} from "../../common/utils/functions";
+import {Nuly} from "../../common/utils/types";
 import FormTextFieldInCol from "../components/general/FormTextFieldInCol.vue";
 import {useLawyerStatusCheckerStore} from "../store/lawyerStatusCheckerStore";
 import {useModals} from "../store/modalsStore";
@@ -43,7 +44,7 @@ const photo       = useField('photo');
 const certificate = useField('certificate');
 const latitude    = useField('latitude');
 const longitude   = useField('longitude');
-const gender      = useField('gender');
+const gender      = useField('gender') as FieldContext<string|Nuly>;
 
 const modals                   = useModals();
 const userStore                = useUserStore();
