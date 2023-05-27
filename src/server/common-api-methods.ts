@@ -14,7 +14,8 @@ import {
 	DB_USERNAME,
 	dynamoDbClient,
 	JWT_SECRET_PARAMETER_NAME,
-	REDIS_ENDPOINT, REDIS_PASSWORD_PARAMETER_NAME,
+	REDIS_ENDPOINT,
+	REDIS_PASSWORD_PARAMETER_NAME,
 	REDIS_PORT,
 	REDIS_USERNAME,
 	ssmClient
@@ -78,11 +79,11 @@ export class CommonApiMethods {
 
 	async getRedisClient () {
 		if (this.redisClient == null) {
-			const password     = await ssmClient.send(new GetParameterCommand({
+			const password   = await ssmClient.send(new GetParameterCommand({
 				Name:           REDIS_PASSWORD_PARAMETER_NAME,
 				WithDecryption: true,
 			}));
-			const options      = {
+			const options    = {
 				socket:   {
 					host: REDIS_ENDPOINT,
 					port: REDIS_PORT
@@ -147,7 +148,7 @@ export class CommonApiMethods {
 			const newRes = await fn();
 			if (forceRecompute) {
 				console.log({message: `Forced recompute on ${name} with result: `, res: newRes});
-			}else{
+			} else {
 				console.log({message: `Computed ${name} with result and placing in cache.`, res: newRes});
 			}
 			if (newRes != null) {

@@ -36,6 +36,14 @@
 	margin-top: 0.5rem;
 }
 
+.v-card-actions .v-btn-ish {
+	margin-inline-start: 0.5rem;
+}
+
+.v-card-actions .v-btn-ish {
+	margin-top: 0.5rem;
+}
+
 // The multiple repetitions are for increasing the precedence of this selector
 .v-card-title.v-card-title.v-card-title {
 	// Vuetify sets
@@ -67,7 +75,7 @@
 	}
 }
 
-.mh-100vh, body, body > div {
+.mh-100vh, html, body, body > div {
 	min-height: 100vh;
 }
 
@@ -89,4 +97,12 @@
 
 pre, .pre-wrap {
 	white-space: pre-wrap;
+}
+
+.full-screen-underlay {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	right: 0;
 }

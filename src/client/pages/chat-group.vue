@@ -32,6 +32,7 @@ import {
 	PostMessageWithAttachmentInput
 } from "../../common/ws-chatter-box-api-schema";
 import ChatMessagesList from "../components/chat/ChatMessagesList.vue";
+import ChatGroupPlaceholderCard from "../components/placeholders/ChatGroupPlaceholderCard.vue";
 import UploadFileWithDescriptionDialog from "../components/uploaded-files/UploadFileWithDescriptionDialog.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
@@ -47,6 +48,7 @@ const route            = useRoute();
 const router           = useRouter();
 const chatClient       = ref<ChatWSAPIClient | Nuly>();
 const chatData         = ref<EstablishChatConnectionOutput | Nuly>();
+const isLoading        = ref<boolean>(true);
 const messageText      = ref<string>("");
 const scrollingBox     = ref<VTextarea | Nuly>();
 const canPost          = computed(() =>
@@ -60,7 +62,11 @@ watch(() => route.query, value => {
 	openConnection(value);
 }, {immediate: true});
 
-watch(chatClient, value => {
+watch(chatClient, (value, oldValue) => {
+	if (oldValue != null) {
+		oldValue.close();
+		oldValue.removeAllListeners('incomingMessage');
+	}
 	const cl = chatClient.value;
 	if (cl == null) return;
 	cl.on('incomingMessage', async message => {
@@ -147,39 +153,45 @@ async function openConnection (value: LocationQuery) {
 	}
 	await chatClient.value?.close();
 	chatClient.value = null;
-	const cl         = new ChatWSAPIClient();
-	await cl.open();
-	const res = await cl.establishConnection({group: id, authToken: nn(userStore.authToken)});
-	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
-		console.log(res);
-		await navigateTo("/");
-		await cl.close();
-		await error(`Failed to open a connection with the ID ${id}`);
-		return;
+
+	isLoading.value = true;
+	try {
+		const cl = new ChatWSAPIClient();
+		await cl.open();
+		const res = await cl.establishConnection({group: id, authToken: nn(userStore.authToken)});
+		if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
+			console.log(res);
+			await navigateTo("/");
+			await cl.close();
+			await error(`Failed to open a connection with the ID ${id}`);
+			return;
+		}
+		const establishConnBody = res.right.body;
+		chatData.value          = establishConnBody;
+		chatClient.value        = cl;
+		chatGroupId             = id;
+		const messagesRes       = await cl.getMessages({chatAuthToken: establishConnBody.chatAuthToken});
+		if (isLeft(messagesRes) || !messagesRes.right.ok || messagesRes.right.body == null || "message" in messagesRes.right.body) {
+			console.log(messagesRes);
+			await error(`Failed to get messages`);
+			return;
+		}
+		const msgs: MessageData[] = messagesRes.right.body;
+		msgs.sort((a, b) => {
+			return a.ts.localeCompare(b.ts)
+		});
+		for (const msg of msgs) {
+			pastMessages.add(msg.id);
+		}
+		messages.messages = msgs;
+		await scrollToBottom();
+	} finally {
+		isLoading.value = false;
 	}
-	const establishConnBody = res.right.body;
-	chatData.value          = establishConnBody;
-	chatClient.value        = cl;
-	chatGroupId             = id;
-	const messagesRes       = await cl.getMessages({chatAuthToken: establishConnBody.chatAuthToken});
-	if (isLeft(messagesRes) || !messagesRes.right.ok || messagesRes.right.body == null || "message" in messagesRes.right.body) {
-		console.log(messagesRes);
-		await error(`Failed to get messages`);
-		return;
-	}
-	const msgs: MessageData[] = messagesRes.right.body;
-	msgs.sort((a, b) => {
-		return a.ts.localeCompare(b.ts)
-	});
-	for (const msg of msgs) {
-		pastMessages.add(msg.id);
-	}
-	messages.messages = msgs;
-	await scrollToBottom();
 }
 </script>
 
-<style>
+<style scoped>
 .chat-group-card-parent-parent {
 	position: relative;
 	min-height: 100%;
@@ -210,8 +222,9 @@ async function openConnection (value: LocationQuery) {
 <template>
 <div class="chat-group-card-parent-parent">
 	<div class="chat-group-card-parent">
+		<ChatGroupPlaceholderCard v-if="isLoading" class="elevation-3 chat-group-card pa-2 w-100" />
 		<v-card
-			v-if="chatClient!=null && chatData!=null"
+			v-else-if="chatClient!=null && chatData!=null"
 			color="gradient--wide-matrix"
 			class="elevation-3 chat-group-card pa-2 w-100"
 		>

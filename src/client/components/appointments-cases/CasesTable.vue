@@ -5,6 +5,7 @@ import {CaseSparseData} from "../../../common/rest-api-schema";
 import {compareDates, dateFormat, trimStr} from "../../../common/utils/functions";
 import {Nuly} from "../../../common/utils/types";
 import {DataTableHeader, TypedDataTableHeader} from "../../utils/types";
+import TablePlaceholder from "../placeholders/TablePlaceholder.vue";
 
 type CaseDataDisplayable = Omit<CaseSparseData, "openedOn"> & {
 	openedOn: Date,
@@ -15,6 +16,7 @@ const props = defineProps<{
 	cases: CaseSparseData[] | Nuly,
 	class?: string,
 	otherUserTitle: string,
+	isLoading: boolean,
 }>();
 
 function compareCaseTypeNames (a: CaseType, b: CaseType) {
@@ -44,13 +46,16 @@ const cases = computed(() =>
 </script>
 
 <template>
+<v-sheet elevation="3" rounded :class="`pa-2 ${props.class??''}`" v-if="props.isLoading">
+	<TablePlaceholder :column-widths="[200,400,150,250,115]" :num-rows="5" />
+</v-sheet>
 <v-data-table
 	:headers="dataTableHeaders"
 	:items="cases"
 	items-per-page="5"
 	density="compact"
 	:class="`elevation-3 ${props.class??''}`"
-	v-if="cases.length>0">
+	v-else-if="cases.length>0">
 	<template v-slot:item.openedOn="{ item }">
 	{{ dateFormat(item.raw.openedOn) }}
 	</template>

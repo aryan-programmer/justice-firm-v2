@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {definePageMeta, justiceFirmApi, navigateTo, onMounted, readFileAsDataUrl, watch} from "#imports";
+import {definePageMeta, justiceFirmApi, navigateTo, readFileAsDataUrl, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import isEmpty from "lodash/isEmpty";
 import {FieldContext, useField, useForm} from 'vee-validate';
@@ -42,7 +42,7 @@ const reNewPassword             = useField('reNewPassword');
 const phone                     = useField('phone');
 const address                   = useField('address');
 const photo                     = useField('photo');
-const gender                    = useField('gender') as FieldContext<string|Nuly>;
+const gender                    = useField('gender') as FieldContext<string | Nuly>;
 const certificate               = useField('certificate');
 const latitude                  = useField('latitude');
 const longitude                 = useField('longitude');

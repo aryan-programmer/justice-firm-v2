@@ -7,7 +7,7 @@
 <!--});-->
 <!--</script>-->
 
-<style lang="scss">
+<style scoped lang="scss">
 .jumbotron-wrap {
 	display: flex;
 }

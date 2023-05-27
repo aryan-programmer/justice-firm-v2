@@ -13,7 +13,7 @@ import {
 } from "aws-cdk-lib";
 import {RestApi} from "aws-cdk-lib/aws-apigateway";
 import {AttributeType, BillingMode} from "aws-cdk-lib/aws-dynamodb";
-import {Effect, ManagedPolicy, PolicyStatement, Role, ServicePrincipal} from "aws-cdk-lib/aws-iam";
+import {Effect, PolicyStatement, ServicePrincipal} from "aws-cdk-lib/aws-iam";
 import {Code, Function, FunctionProps, Runtime} from "aws-cdk-lib/aws-lambda";
 import {Bucket, BucketAccessControl, BucketEncryption, HttpMethods} from "aws-cdk-lib/aws-s3";
 import {IStringParameter} from "aws-cdk-lib/aws-ssm";

@@ -26,7 +26,7 @@ function onLoad () {
 }
 </script>
 
-<style lang="scss">
+<style scoped lang="scss">
 $border-radius: 0.75rem;
 $top-margin: 4px;
 $top-half-margin: 2px;

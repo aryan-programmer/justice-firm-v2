@@ -18,7 +18,8 @@ import {
 	CONNECTION_ID,
 	CONNECTION_KEY_ID,
 	CONNECTION_TYPE,
-	connectionsByKeyIdIndex, ConnectionsTable_ExpressionAttributeNames,
+	connectionsByKeyIdIndex,
+	ConnectionsTable_ExpressionAttributeNames,
 	ConnectionTypeOptions,
 	MESSAGE_GROUP,
 	MESSAGE_ID,
@@ -26,8 +27,8 @@ import {
 	MESSAGE_TEXT,
 	MESSAGE_TIMESTAMP
 } from "../common/infrastructure-constants";
+import {filterMap} from "../common/utils/array-methods/filterMap";
 import {nn} from "../common/utils/asserts";
-import {filterMap} from "../common/utils/filterMap";
 import {isNullOrEmpty} from "../common/utils/functions";
 import {Nuly} from "../common/utils/types";
 import {uniqId} from "../common/utils/uniq-id";
@@ -159,7 +160,7 @@ export class JusticeFirmWsChatterBoxAPIImpl
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				`User ${jwt.id} is not authorized to access the chat group ${group}`);
 		}
-		const conn        = event.requestContext.connectionId;
+		const conn = event.requestContext.connectionId;
 		console.log("Trying to put item in dynamo db...");
 		const putResponse = await dynamoDbClient.send(new PutItemCommand({
 			TableName:              connectionsTableName,

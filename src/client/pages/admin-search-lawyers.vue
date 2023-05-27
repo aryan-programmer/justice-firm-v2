@@ -19,6 +19,7 @@ import {
 import {Nuly} from "../../common/utils/types";
 import AdminDashboardForm from "../components/admin-dashboard/AdminDashboardForm.vue";
 import FormTextFieldInCol from "../components/general/FormTextFieldInCol.vue";
+import FullScreenLoader from "../components/placeholders/FullScreenLoader.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 import {FormTextFieldData} from "../utils/types";
@@ -50,7 +51,7 @@ const {handleSubmit, errors} = useForm({
 
 const name        = useField('name');
 const email       = useField('email');
-const humanStatus = useField('humanStatus') as FieldContext<string|Nuly>;
+const humanStatus = useField('humanStatus') as FieldContext<string | Nuly>;
 const address     = useField('address');
 const latitude    = useField('latitude');
 const longitude   = useField('longitude');
@@ -62,8 +63,9 @@ const route                               = useRoute();
 const display                             = useDisplay();
 const {smAndDown: moveAutoFillButtonDown} = display;
 
-const lawyers  = ref<LawyerSearchResult[] | Nuly>();
-const showForm = ref<boolean>(false);
+const lawyers   = ref<LawyerSearchResult[] | Nuly>();
+const showForm  = ref<boolean>(false);
+const isLoading = ref<boolean>(false);
 
 const textFields: FormTextFieldData[] = [
 	{field: name, label: "Name", cols: 12, lg: 5, type: "text"},
@@ -82,7 +84,7 @@ async function fetchFromQuery () {
 	const longitude_   = longitude.value.value = (toNumIfNotNull(firstIfArray(query.longitude)) ?? 0);
 	if (name_ == null || address_ == null || email_ == null) return;
 
-	let body  = closeToZero(latitude_) || closeToZero(longitude_) ? {
+	let body        = closeToZero(latitude_) || closeToZero(longitude_) ? {
 		name:    name_,
 		address: address_,
 		email:   email_,
@@ -95,10 +97,12 @@ async function fetchFromQuery () {
 		latitude:  latitude_,
 		longitude: longitude_,
 	};
-	const res = await justiceFirmApi.searchAllLawyers({
+	isLoading.value = true;
+	const res       = await justiceFirmApi.searchAllLawyers({
 		...body,
 		authToken: userStore.authToken as AdminAuthToken,
 	});
+	isLoading.value = false;
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
 		await error("Failed to search lawyers");
@@ -244,7 +248,8 @@ watch(() => route.query, value => {
 >
 	<h3>Show search form</h3>
 </v-btn>
-<div v-if="lawyers != null">
+<FullScreenLoader v-if="isLoading" primary-color="#000000" />
+<div v-else-if="lawyers != null">
 	<v-divider class="my-2" />
 	<div v-if="lawyers.length > 0">
 		<div class="d-flex flex-row flex-wrap justify-space-between">

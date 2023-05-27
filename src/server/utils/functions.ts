@@ -6,7 +6,7 @@ import {verify} from "jsonwebtoken";
 import mapValues from "lodash/mapValues";
 import {extension, lookup} from "mime-types";
 import fetch from 'node-fetch';
-import { createHash } from "node:crypto";
+import {createHash} from "node:crypto";
 import path from "path";
 import {Stream} from "stream";
 import {nn} from "../../common/utils/asserts";
@@ -149,14 +149,14 @@ export function printConsumedCapacity (text: string, queryResponse: { ConsumedCa
 	console.log(`Consumed Capacity for ${text}: `, JSON.stringify(queryResponse.ConsumedCapacity, null, 4));
 }
 
-export function toBase64(data: WithImplicitCoercion<string>
-                               | {
-	                               [Symbol.toPrimitive](hint: 'string'): string;
-                               }){
+export function toBase64 (data: WithImplicitCoercion<string>
+                                | {
+	                                [Symbol.toPrimitive] (hint: 'string'): string;
+                                }) {
 	return Buffer.from(data).toString('base64');
 }
 
-export function sha256(data: BinaryLike){
+export function sha256 (data: BinaryLike) {
 	return createHash('sha256').update(data).digest('base64');
 }
 

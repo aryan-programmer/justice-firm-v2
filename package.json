@@ -94,6 +94,7 @@
 		"vee-validate": "^4.9.4",
 		"vite-plugin-checker": "^0.5.6",
 		"vite-plugin-vuetify": "^1.0.2",
+		"vue-content-loader": "^2.0.1",
 		"vue-masonry": "^0.16.0",
 		"vue-tsc": "^1.6.5",
 		"vuetify": "^3.3.0",

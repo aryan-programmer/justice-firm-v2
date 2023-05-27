@@ -27,7 +27,7 @@ const sideImage = computed(() =>
 	<v-img v-if="!sideImage" :src="props.client.photoPath" class="clamp-image-height" />
 	<v-card-text>
 		<v-row no-gutters>
-			<v-col>
+			<v-col cols="12" :md="sideImage?8:12">
 				<v-card-title class="ps-0 pt-0">
 					{{ props.client.name }}
 				</v-card-title>
@@ -37,7 +37,7 @@ const sideImage = computed(() =>
 				<pre class="pre-wrap text-body-2">Address:
 {{ props.client.address }}</pre>
 			</v-col>
-			<v-col v-if="sideImage" cols="5" class="pa-3">
+			<v-col v-if="sideImage" class="pa-3">
 				<v-img :src="props.client.photoPath" class="clamp-image-height"></v-img>
 			</v-col>
 		</v-row>

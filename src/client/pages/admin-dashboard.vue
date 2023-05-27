@@ -7,6 +7,7 @@ import {nn} from "../../common/utils/asserts";
 import {StatusEnum} from "../../common/utils/constants";
 import {Nuly} from "../../common/utils/types";
 import AdminDashboardForm from "../components/admin-dashboard/AdminDashboardForm.vue";
+import FullScreenLoader from "../components/placeholders/FullScreenLoader.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 
@@ -16,18 +17,22 @@ definePageMeta({
 
 const {message, error} = useModals();
 const userStore        = useUserStore();
-const waitingLawyers   = ref<LawyerSearchResult[] | Nuly>(null);
+
+const isLoading      = ref<boolean>(false);
+const waitingLawyers = ref<LawyerSearchResult[] | Nuly>(null);
 
 onMounted(fetchLawyers);
 
 async function fetchLawyers () {
-	const res = await justiceFirmApi.searchAllLawyers({
+	isLoading.value = true;
+	const res       = await justiceFirmApi.searchAllLawyers({
 		authToken: nn(userStore.authToken) as AdminAuthToken,
-		address: "",
-		email: "",
-		name: "",
-		status: StatusEnum.Waiting
+		address:   "",
+		email:     "",
+		name:      "",
+		status:    StatusEnum.Waiting
 	});
+	isLoading.value = false;
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		console.log(res);
 		await error(`Failed to get waiting lawyers`);
@@ -44,10 +49,11 @@ async function fetchLawyers () {
 
 <template>
 <h2>Administrator Dashboard</h2>
+<FullScreenLoader v-if="isLoading" />
 <AdminDashboardForm
 	:lawyers="waitingLawyers"
 	@apply-success="fetchLawyers"
-	v-if="waitingLawyers!=null && waitingLawyers.length>0"
+	v-else-if="waitingLawyers!=null && waitingLawyers.length>0"
 />
 <v-card v-else text="No waiting lawyers found" class="bg-gradient--gagarin-view" />
 </template>

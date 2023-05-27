@@ -2,6 +2,7 @@
 import {justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {LocationQuery} from "vue-router";
+import {useDisplay} from "vuetify";
 import {CaseDocumentData, CaseStatusEnum} from "../../common/db-types";
 import {AddCaseDocumentInput, CaseFullData} from "../../common/rest-api-schema";
 import {nn} from "../../common/utils/asserts";
@@ -11,10 +12,12 @@ import {
 	firstIfArray,
 	nullOrEmptyCoalesce
 } from "../../common/utils/functions";
+import {sleep} from "../../common/utils/sleep";
 import {Nuly} from "../../common/utils/types";
 import CaseDocumentsGrid from "../components/appointments-cases/CaseDocumentsGrid.vue";
 import ClientCard from "../components/details-cards/ClientCard.vue";
 import LawyerCard from "../components/details-cards/LawyerCard.vue";
+import CaseDetailsPlaceholderCard from "../components/placeholders/CaseDetailsPlaceholderCard.vue";
 import UploadFileWithDescriptionDialog from "../components/uploaded-files/UploadFileWithDescriptionDialog.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
@@ -24,9 +27,15 @@ const {message, error} = useModals();
 const route            = useRoute();
 const userStore        = useUserStore();
 const router           = useRouter();
+const display          = useDisplay();
+const {lg}             = display;
 
-const caseData      = ref<CaseFullData | Nuly>(null);
-const caseDocuments = ref<CaseDocumentData[] | Nuly>(null);
+const caseData          = ref<CaseFullData | Nuly>(null);
+const caseDocuments     = ref<CaseDocumentData[] | Nuly>(null);
+const caseDocumentsGrid = ref<InstanceType<typeof CaseDocumentsGrid> | Nuly>(null);
+const isLoading         = ref<boolean>(false);
+
+const isCaseDocumentsAccordionInline = computed(() => lg.value && (caseDocuments.value?.length ?? 0) < 5);
 
 watch(() => route.query, value => {
 	fetchCase(value);
@@ -34,6 +43,8 @@ watch(() => route.query, value => {
 
 async function caseDocumentsRefresh () {
 	await fetchCaseDocuments();
+	await nextTick();
+	caseDocumentsGrid.value?.masonryReload();
 }
 
 async function addCaseDocument (data: UploadFileWithDescriptionDialogEventData) {
@@ -91,7 +102,8 @@ async function fetchCase (value: LocationQuery) {
 		await error("Specify a case to view details for");
 		return;
 	}
-	const res = await justiceFirmApi.getCase({
+	isLoading.value = true;
+	const res       = await justiceFirmApi.getCase({
 		authToken: nn(userStore.authToken),
 		id,
 	});
@@ -102,11 +114,13 @@ async function fetchCase (value: LocationQuery) {
 		return;
 	}
 	caseData.value = res.right.body;
-	await fetchCaseDocuments();
+	await Promise.race([fetchCaseDocuments(), sleep(1000)]);
+	isLoading.value = false;
+	console.log(caseDocuments.value);
 }
 </script>
 
-<style lang="scss">
+<style scoped lang="scss">
 .case-details-card-parent-parent {
 	position: relative;
 	min-height: 100%;
@@ -174,8 +188,9 @@ $case-documents-expansion-title-height: 32px;
 <template>
 <div class="case-details-card-parent-parent">
 	<v-sheet elevation="3" rounded class="case-details-card-parent">
+		<CaseDetailsPlaceholderCard v-if="isLoading" class="elevation-0 w-100 case-details-card scroll-y" />
 		<v-card
-			v-if="caseData!=null"
+			v-else-if="caseData!=null"
 			color="gradient--juicy-peach"
 			class="elevation-0 w-100 case-details-card scroll-y">
 			<v-card-title>
@@ -207,39 +222,59 @@ $case-documents-expansion-title-height: 32px;
 							:side-by-side="true"
 						/>
 					</v-col>
-					<v-col lg="4" md="5" cols="12" class="align-self-stretch">
-						<p>
-							Opened on: {{ dateStringFormat(caseData.openedOn) }}<br />
-							Case Type: {{ caseData.caseType.name }}<br />
-						</p>
-						<pre class="pre-wrap text-body-2">Description:
-{{ caseData.description }}</pre>
-						<p v-if="caseData.status === CaseStatusEnum.Waiting">
-							Status:
-							<v-chip class="fw-bold" color="amber-darken-3" variant="tonal">Waiting</v-chip>
-						</p>
-						<p v-else-if="caseData.status === CaseStatusEnum.Open">
-							Status:
-							<v-chip class="fw-bold" color="green-darken-3" variant="tonal">Open</v-chip>
-						</p>
-						<p v-else-if="caseData.status === CaseStatusEnum.Closed">
-							Status:
-							<v-chip class="fw-bold" color="red-darken-2" variant="tonal">Closed</v-chip>
-						</p>
-						<div class="sticky-top d-flex">
-							<v-btn
-								:to="`/chat-group?id=${caseData.groupId}`"
-								class="mt-1 mx-auto"
-								color="teal-lighten-3"
-								density="default"
-								elevation="2"
-								rounded
-								variant="elevated">View Chat group
-							</v-btn>
-						</div>
+					<v-col :cols="isCaseDocumentsAccordionInline?4:12" class="align-self-stretch">
+						<v-row>
+							<v-col :cols="isCaseDocumentsAccordionInline?12:'auto'">
+								<p>
+									Opened on: {{ dateStringFormat(caseData.openedOn) }}<br />
+									Case Type: {{ caseData.caseType.name }}<br />
+								</p>
+								<pre class="pre-wrap text-body-2">Description: {{ caseData.description }}</pre>
+								<p v-if="caseData.status === CaseStatusEnum.Waiting">
+									Status:
+									<v-chip
+										class="fw-bold"
+										color="amber-darken-3"
+										variant="tonal"
+										density="compact">Waiting
+									</v-chip>
+								</p>
+								<p v-else-if="caseData.status === CaseStatusEnum.Open">
+									Status:
+									<v-chip
+										class="fw-bold"
+										color="green-darken-3"
+										variant="tonal"
+										density="compact">Open
+									</v-chip>
+								</p>
+								<p v-else-if="caseData.status === CaseStatusEnum.Closed">
+									Status:
+									<v-chip
+										class="fw-bold"
+										color="red-darken-2"
+										variant="tonal"
+										density="compact">Closed
+									</v-chip>
+								</p>
+								<div class="sticky-top d-flex">
+									<v-btn
+										:to="`/chat-group?id=${caseData.groupId}`"
+										:class="`mt-1 ${isCaseDocumentsAccordionInline?'mx-auto':''}`"
+										color="teal-lighten-3"
+										density="default"
+										elevation="2"
+										rounded
+										variant="elevated">View Chat group
+									</v-btn>
+								</div>
+							</v-col>
+						</v-row>
 					</v-col>
-					<v-col lg="8" md="7" cols="12">
-						<v-expansion-panels variant="popout">
+					<v-col :cols="isCaseDocumentsAccordionInline?8:12">
+						<v-expansion-panels
+							:variant="isCaseDocumentsAccordionInline?'popout':'accordion'"
+							class="w-100">
 							<v-expansion-panel class="bg-gradient--new-retrowave">
 								<v-expansion-panel-title class="case-documents-expansion-panel-title bg-gradient--premium-white">
 									<h3>View case documents</h3>
@@ -247,7 +282,7 @@ $case-documents-expansion-title-height: 32px;
 								<v-expansion-panel-text class="case-documents-expansion-panel-text">
 									<v-sheet
 										elevation="1"
-										class="case-documents-actions rounded-b-sm bg-gradient--premium-white">
+										class="case-documents-actions rounded-b-sm bg-gradient--premium-white ma-1">
 										<UploadFileWithDescriptionDialog
 											@upload-file="addCaseDocument"
 											title="Upload case document"
@@ -283,7 +318,7 @@ $case-documents-expansion-title-height: 32px;
 										</v-btn>
 									</v-sheet>
 									<div class="ma-3">
-										<CaseDocumentsGrid :documents="caseDocuments" />
+										<CaseDocumentsGrid :documents="caseDocuments" ref="caseDocumentsGrid" />
 									</div>
 								</v-expansion-panel-text>
 							</v-expansion-panel>

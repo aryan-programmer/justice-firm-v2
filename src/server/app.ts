@@ -27,7 +27,7 @@ export async function handler (
 		}
 		return await fn(event);
 	}
-	const ev = event as APIGatewayProxyWebsocketEventV2;
+	const ev       = event as APIGatewayProxyWebsocketEventV2;
 	const routeKey = ev.requestContext.routeKey;
 	const resource = wsChatterBoxApiImpl?.[routeKey];
 	if (resource == null) {

@@ -9,8 +9,8 @@ import {
 	StatusSearchOptions,
 	StatusSearchOptionsEnum
 } from "../common/db-types";
+import {filterMap} from "../common/utils/array-methods/filterMap";
 import {radiusOfEarthInKm} from "../common/utils/constants";
-import {filterMap} from "../common/utils/filterMap";
 import {deg2rad, isNullOrEmpty, nullOrEmptyCoalesce, toNumIfNotNull} from "../common/utils/functions";
 import {Nuly} from "../common/utils/types";
 import {CommonApiMethods} from "./common-api-methods";
@@ -315,6 +315,8 @@ export class DbModelMethods extends CommonApiMethods {
 			[name, email, address]);
 
 		const ids = filterMap(queryResults, value => value?.id?.toString() as string | Nuly);
+
+		if (ids.length === 0) return [];
 
 		let needToFetchIds: string[];
 		let lawyersByStatus: LawyerSearchResult[] | Nuly = null;

@@ -1,5 +1,6 @@
 import {checker} from 'vite-plugin-checker';
 import vuetify from 'vite-plugin-vuetify';
+
 const env = require('dotenv');
 env.config();
 
@@ -11,9 +12,9 @@ export default defineNuxtConfig({
 	nitro:   {
 		preset: "netlify"
 	},
-	app: {
+	app:     {
 		head: {
-			script: [{ children: "window.process = {};" }],
+			script: [{children: "window.process = {};"}],
 		},
 	},
 	modules: [
@@ -48,7 +49,7 @@ export default defineNuxtConfig({
 	},
 	css:     ["~/styles/main.scss"],
 	build:   {
-		transpile:   ['vuetify'],
+		transpile: ['vuetify'],
 	},
 	ssr:     false,
 })

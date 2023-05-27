@@ -4,7 +4,6 @@ import {computed, navigateTo} from "#imports";
 import {ref} from "vue";
 import {useDisplay} from "vuetify";
 import {UserAccessType} from "../common/db-types";
-import {capitalizeFirstLetter} from "../common/utils/functions";
 import LawyerStatusDisplayer from "./components/general/LawyerStatusDisplayer.vue";
 import ModalDisplayer from "./components/general/ModalDisplayer.vue";
 import NavItem from "./components/general/NavItem.vue";
@@ -25,7 +24,7 @@ const userInfo    = computed(() => {
 		return "Anonymous user";
 	}
 	let userType: string = "";
-	switch (userStore.authToken.userType){
+	switch (userStore.authToken.userType) {
 	case UserAccessType.Lawyer:
 		userType = "Lawyer";
 		break;
@@ -108,7 +107,7 @@ function pathCompare (link: string) {
 }
 </script>
 
-<style>
+<style scoped>
 .app-bar-title-text {
 	overflow: hidden;
 	text-overflow: ellipsis;

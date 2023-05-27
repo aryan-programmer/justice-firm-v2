@@ -11,7 +11,8 @@ import {
 import {AuthToken} from "../api-types";
 import {
 	genderDbValsToHuman,
-	genderHumanValsToDb, radiusOfEarthInKm,
+	genderHumanValsToDb,
+	radiusOfEarthInKm,
 	StatusEnum,
 	statusSearchOptionHuman_Any,
 	statusSearchOptionsDbToHuman,

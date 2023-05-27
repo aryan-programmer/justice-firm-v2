@@ -35,7 +35,7 @@ const reNewPassword = useField('reNewPassword');
 const phone         = useField('phone');
 const address       = useField('address');
 const photo         = useField('photo');
-const gender        = useField('gender') as FieldContext<string|Nuly>;
+const gender        = useField('gender') as FieldContext<string | Nuly>;
 
 const email = ref<string | Nuly>();
 

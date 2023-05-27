@@ -1,5 +1,5 @@
 import {Ref} from "@vue/reactivity";
-import {isLeft} from "fp-ts/Either";
+import {isLeft, isRight} from "fp-ts/Either";
 import {StatusEnum} from "../../common/db-types";
 import {AppointmentSparseData} from "../../common/rest-api-schema";
 import {assert, nn} from "../../common/utils/asserts";
@@ -13,6 +13,8 @@ import {timeFormat} from "../../common/utils/functions";
 import {Nuly, Writeable} from "../../common/utils/types";
 import {MessageData} from "../../common/ws-chatter-box-api-schema";
 import {FileUploadData} from "../../server/utils/types";
+import {Message} from "../../singularity/helpers";
+import {ModelResponseOrErr} from "../../singularity/model.client";
 import {ModalStoreWrapper} from "../store/modalsStore";
 import {UserStore_T} from "../store/userStore";
 import {justiceFirmApi} from "./api-fetcher-impl";
@@ -48,25 +50,38 @@ export function readFileAsDataUrl (file: File): Promise<string> {
 }
 
 export async function fetchAppointmentsIntoRefByUserType (
-	status: StatusEnum,
-	orderByOpenedOn: boolean,
-	appointmentsRef: Ref<AppointmentSparseData[] | Nuly>,
-	userStore: UserStore_T,
-	modals: ModalStoreWrapper,
+	options: {
+		status: StatusEnum,
+		orderByOpenedOn: boolean,
+		appointmentsRef: Ref<AppointmentSparseData[] | Nuly>,
+		areAppointmentsLoadingRef: Ref<boolean>;
+		userStore: UserStore_T,
+		modals: ModalStoreWrapper,
+	},
 ) {
-	const res = await justiceFirmApi.getAppointments({
+	const {
+		      status,
+		      orderByOpenedOn,
+		      appointmentsRef,
+		      areAppointmentsLoadingRef,
+		      userStore,
+		      modals,
+	      }                         = options;
+	areAppointmentsLoadingRef.value = true;
+	const res                       = await justiceFirmApi.getAppointments({
 		withStatus: status,
 		orderByOpenedOn,
 		authToken:  nn(userStore.authToken)
 	});
+	areAppointmentsLoadingRef.value = false;
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		console.log(res);
-		await modals.error(`Failed to get ${status} appointment requests`);
+		modals.error/*not-awaiting*/(`Failed to get ${status} appointment requests`);
 		return;
 	}
 	if ("message" in res.right.body) {
 		console.log(res);
-		await modals.error(`Failed to get ${status} appointment requests: ${res.right.body.message}`);
+		modals.error/*not-awaiting*/(`Failed to get ${status} appointment requests: ${res.right.body.message}`);
 		return;
 	}
 	appointmentsRef.value = res.right.body;
@@ -75,12 +90,15 @@ export async function fetchAppointmentsIntoRefByUserType (
 
 export async function fetchCasesIntoRef (
 	casesRef: Ref<AppointmentSparseData[] | Nuly>,
+	isLoadingRef: Ref<boolean>,
 	userStore: UserStore_T,
 	modals: ModalStoreWrapper,
 ) {
-	const res = await justiceFirmApi.getCasesData({
+	isLoadingRef.value = true;
+	const res          = await justiceFirmApi.getCasesData({
 		authToken: nn(userStore.authToken)
 	});
+	isLoadingRef.value = false;
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
 		console.log(res);
 		await modals.error(`Failed to get cases`);
@@ -95,17 +113,54 @@ export async function fetchCasesIntoRef (
 }
 
 export async function fetchAppointmentsByCategory (
-	waitingAppointments: Ref<AppointmentSparseData[] | Nuly>,
-	rejectedAppointments: Ref<AppointmentSparseData[] | Nuly>,
-	confirmedAppointments: Ref<AppointmentSparseData[] | Nuly>,
-	userStore: UserStore_T,
-	modals: ModalStoreWrapper,
+	options: {
+		modals: ModalStoreWrapper;
+		userStore: UserStore_T;
+		waitingAppointments: Ref<AppointmentSparseData[] | Nuly>;
+		confirmedAppointments: Ref<AppointmentSparseData[] | Nuly>;
+		rejectedAppointments: Ref<AppointmentSparseData[] | Nuly>;
+		areWaitingAppointmentsLoading: Ref<boolean>;
+		areConfirmedAppointmentsLoading: Ref<boolean>;
+		areRejectedAppointmentsLoading: Ref<boolean>;
+	}
 ) {
+	const {
+		      modals,
+		      userStore,
+		      waitingAppointments,
+		      confirmedAppointments,
+		      rejectedAppointments,
+		      areWaitingAppointmentsLoading,
+		      areConfirmedAppointmentsLoading,
+		      areRejectedAppointmentsLoading,
+	      }                              = options;
+	areRejectedAppointmentsLoading.value = true;
 	await Promise.all([
-		fetchAppointmentsIntoRefByUserType(StatusEnum.Waiting, true, waitingAppointments, userStore, modals),
-		fetchAppointmentsIntoRefByUserType(StatusEnum.Confirmed, false, confirmedAppointments, userStore, modals),
+		fetchAppointmentsIntoRefByUserType({
+			appointmentsRef:           waitingAppointments,
+			areAppointmentsLoadingRef: areWaitingAppointmentsLoading,
+			orderByOpenedOn:           true,
+			status:                    StatusEnum.Waiting,
+			modals,
+			userStore
+		}),
+		fetchAppointmentsIntoRefByUserType({
+			appointmentsRef:           confirmedAppointments,
+			areAppointmentsLoadingRef: areConfirmedAppointmentsLoading,
+			orderByOpenedOn:           false,
+			status:                    StatusEnum.Confirmed,
+			modals,
+			userStore
+		}),
 	]);
-	await fetchAppointmentsIntoRefByUserType(StatusEnum.Rejected, true, rejectedAppointments, userStore, modals);
+	await fetchAppointmentsIntoRefByUserType({
+		appointmentsRef:           rejectedAppointments,
+		areAppointmentsLoadingRef: areRejectedAppointmentsLoading,
+		orderByOpenedOn:           true,
+		status:                    StatusEnum.Rejected,
+		modals,
+		userStore
+	});
 }
 
 export function forceRipple ($el: HTMLElement) {
@@ -184,4 +239,15 @@ export function isFilePreviewable (file: FileUploadData) {
 
 export function statusSelectionOptionCoalesce (v1: StatusSelectionOptions | Nuly, v2: StatusEnum) {
 	return v1 == null || v1 === KeepAsIsEnum.KeepAsIs ? v2 : v1;
+}
+
+export function withMessageBodyIfApplicable<T> (msg: string, res: ModelResponseOrErr<T | Message>) {
+	if (isRight(res) && !res.right.ok && res.right.body != null) {
+		if ((typeof res.right.body === "object" || typeof res.right.body === "function") && "message" in res.right.body) {
+			return msg + ": " + res.right.body.message;
+		} else {
+			return msg + ": " + res.right.body;
+		}
+	}
+	return msg;
 }

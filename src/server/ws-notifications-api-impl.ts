@@ -9,8 +9,8 @@ import {
 	connectionsByKeyIdIndex,
 	ConnectionTypeOptions
 } from "../common/infrastructure-constants";
+import {filterMap} from "../common/utils/array-methods/filterMap";
 import {nn} from "../common/utils/asserts";
-import {filterMap} from "../common/utils/filterMap";
 import {Nuly} from "../common/utils/types";
 import {EstablishNotificationsConnectionInput, jfNotificationsApiSchema} from "../common/ws-notifications-api-schema";
 import {EndpointResult} from "../singularity/endpoint";

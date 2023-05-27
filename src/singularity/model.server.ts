@@ -55,7 +55,7 @@ export async function baseWrapperFunction<TReqBody,
 		}
 		return {
 			statusCode: constants.HTTP_STATUS_INTERNAL_SERVER_ERROR,
-			body:       {error: e}
+			body:       {error: e?.toString()}
 		};
 	}
 }

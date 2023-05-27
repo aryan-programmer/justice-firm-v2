@@ -17,7 +17,7 @@ export type ModelResponse<T> = {
 	body?: T;
 };
 
-export type ModelResponseOrErr<T> = Either<CheckerErrors | Error, ModelResponse<T>>;
+export type ModelResponseOrErr<T> = Either<CheckerErrors | Error | { error: any }, ModelResponse<T>>;
 
 export type APIFetchImplementation<TSchema> = TSchema extends APIModelSchema<infer T> ? {
 	[K in keyof T]: T[K] extends EndpointSchema<infer TReqBody, infer TResBody> ?
@@ -90,6 +90,9 @@ function fetchImplementationMapper<TEndpoints extends APIEndpoints = APIEndpoint
 				method: endpoint.method,
 			});
 			const origBody = response.status === constants.HTTP_STATUS_NO_CONTENT ? undefined : await response.json();
+			if (origBody != null && "error" in origBody) {
+				return left({error: origBody});
+			}
 			if (validateOutputs) {
 				const errors = endpoint.checkResponse(origBody);
 				if (errors != null && errors.length !== 0) {

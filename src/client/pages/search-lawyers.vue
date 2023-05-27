@@ -11,8 +11,10 @@ import {closeToZero, firstIfArray, getCurrentPosition, toNumIfNotNull} from "../
 import {Nuly} from "../../common/utils/types";
 import LawyerCard from "../components/details-cards/LawyerCard.vue";
 import FormTextFieldInCol from "../components/general/FormTextFieldInCol.vue";
+import LawyerPlaceholderCard from "../components/placeholders/LawyerPlaceholderCard.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
+import {withMessageBodyIfApplicable} from "../utils/functions";
 import {FormTextFieldData} from "../utils/types";
 import {optionalNumber} from "../utils/validation-schemas";
 
@@ -41,8 +43,9 @@ const display                             = useDisplay();
 const {smAndDown: moveAutoFillButtonDown} = display;
 const isAdmin                             = computed(() => userStore.authToken != null && userStore.authToken.userType === UserAccessType.Admin);
 
-const lawyers  = ref<LawyerSearchResult[] | Nuly>();
-const showForm = ref<boolean>(false);
+const isLoading = ref<boolean>(false);
+const lawyers   = ref<LawyerSearchResult[] | Nuly>();
+const showForm  = ref<boolean>(false);
 
 const textFields: FormTextFieldData[] = [
 	{field: name, label: "Name", cols: 12, lg: 6, type: "text"},
@@ -57,9 +60,13 @@ async function fetchFromQuery () {
 	const address_   = address.value.value = firstIfArray(query.address);
 	const latitude_  = latitude.value.value = (toNumIfNotNull(firstIfArray(query.latitude)) ?? 0);
 	const longitude_ = longitude.value.value = (toNumIfNotNull(firstIfArray(query.longitude)) ?? 0);
-	if (name_ == null || address_ == null || email_ == null) return;
+	if (name_ == null || address_ == null || email_ == null) {
+		isLoading.value = false;
+		showForm.value  = true;
+		return;
+	}
 
-	let body  = closeToZero(latitude_) || closeToZero(longitude_) ? {
+	let body        = closeToZero(latitude_) || closeToZero(longitude_) ? {
 		name:    name_,
 		address: address_,
 		email:   email_,
@@ -70,16 +77,18 @@ async function fetchFromQuery () {
 		latitude:  latitude_,
 		longitude: longitude_,
 	};
-	const res = await justiceFirmApi.searchLawyers(body);
+	isLoading.value = true;
+	showForm.value  = false;
+	const res       = await justiceFirmApi.searchLawyers(body);
+	isLoading.value = false;
 
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
-		await error("Failed to search lawyers");
+		await error(withMessageBodyIfApplicable("Failed to search lawyers", res));
 		return;
 	}
 
-	lawyers.value  = res.right.body;
-	showForm.value = false;
+	lawyers.value = res.right.body;
 }
 
 async function autofillLatLon () {
@@ -108,7 +117,7 @@ watch(() => route.query, value => {
 
 <template>
 <v-form
-	v-if="lawyers==null||lawyers.length===0||showForm"
+	v-if="showForm"
 	@submit.prevent="onSubmit">
 	<v-card color="gradient--plum-bath" theme="dark" density="compact">
 		<v-card-title class="text-wrap">
@@ -196,20 +205,35 @@ watch(() => route.query, value => {
 	</v-card>
 </v-form>
 <v-btn
+	v-else
 	elevation="3"
 	rounded
 	density="default"
 	variant="tonal"
 	color="green-darken-2"
 	@click="showForm = true"
-	v-else
 >
 	<h3>Show search form</h3>
 </v-btn>
-<div v-if="lawyers != null">
+<div v-if="lawyers != null || isLoading">
 	<v-divider class="my-2" />
-	<div v-if="lawyers.length > 0">
-		<h2>Found lawyers:</h2>
+	<h2>Found lawyers:</h2>
+	<div v-if="isLoading">
+		<v-row>
+			<v-col
+				v-for="i of 8"
+				cols="12"
+				sm="6"
+				md="4"
+				lg="3">
+				<LawyerPlaceholderCard :num-extra-actions="2" />
+			</v-col>
+		</v-row>
+	</div>
+	<div v-else-if="lawyers == null || lawyers.length===0">
+		<h2>No lawyers found</h2>
+	</div>
+	<div v-else>
 		<v-row>
 			<v-col
 				v-for="lawyer of lawyers"
@@ -217,7 +241,7 @@ watch(() => route.query, value => {
 				sm="6"
 				md="4"
 				lg="3">
-				<LawyerCard :lawyer="lawyer" :show-user-id="isAdmin">
+				<LawyerCard :lawyer="lawyer" :show-user-id="isAdmin" :num-extra-actions="2">
 					<template #actions>
 					<v-btn
 						:to="`/lawyer-details?id=${lawyer.id}`"
@@ -239,9 +263,6 @@ watch(() => route.query, value => {
 				</LawyerCard>
 			</v-col>
 		</v-row>
-	</div>
-	<div v-else>
-		<h2>No lawyers found</h2>
 	</div>
 </div>
 </template>

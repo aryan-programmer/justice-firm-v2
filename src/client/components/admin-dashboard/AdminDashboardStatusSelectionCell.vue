@@ -23,7 +23,7 @@ function updateModelVal (val: any) {
 }
 </script>
 
-<style>
+<style scoped>
 .no-min-w-btn {
 	background: unset;
 	min-width: 10px;

@@ -110,7 +110,7 @@ async function onApply () {
 }
 </script>
 
-<style lang="scss">
+<style scoped lang="scss">
 $table-padding: 8px;
 .v-table > .v-table__wrapper > table > tbody > tr > td, .v-table > .v-table__wrapper > table > tbody > tr > th, .v-table > .v-table__wrapper > table > thead > tr > td, .v-table > .v-table__wrapper > table > thead > tr > th, .v-table > .v-table__wrapper > table > tfoot > tr > td, .v-table > .v-table__wrapper > table > tfoot > tr > th {
 	padding-left: $table-padding !important;

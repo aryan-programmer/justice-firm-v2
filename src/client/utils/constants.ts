@@ -1,3 +1,10 @@
+export const contentLoaderSpeed                 = 2;
+export const contentLoaderPrimaryColor          = "#f3f3f3";
+export const contentLoaderSecondaryColor        = "#ecebeb";
+export const contentLoaderTextHeight            = 16;
+export const contentLoaderTextHeightWithPadding = 20;
+export const contentLoaderTextRounding          = 5;
+
 export const confirmedColor          = "green-accent-4";
 export const waitingColor            = "warning";
 export const rejectedColor           = "red-accent-3";

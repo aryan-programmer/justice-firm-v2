@@ -6,17 +6,17 @@ import {nn} from "../common/utils/asserts";
 
 export const randomNumber = require("random-number-csprng");
 
-export const region                     = nn(process.env.AWS_REGION);
-export const s3Bucket                   = nn(process.env.S3_BUCKET);
-export const passwordResetOtpTableName  = nn(process.env.PASSWORD_RESET_OTP_TABLE_NAME);
-export const connectionsTableName       = nn(process.env.CONNECTIONS_TABLE_NAME);
-export const messagesTableName          = nn(process.env.MESSAGES_TABLE_NAME);
-export const sesSourceEmailAddress      = nn(process.env.SES_SOURCE_EMAIL_ADDRESS);
-export const JWT_SECRET_PARAMETER_NAME  = nn(process.env.JWT_SECRET);
-export const DB_PASSWORD_PARAMETER_NAME = nn(process.env.DB_PASSWORD);
-export const DB_ENDPOINT                = nn(process.env.DB_ENDPOINT);
-export const DB_PORT                    = +nn(process.env.DB_PORT);
-export const DB_USERNAME                = nn(process.env.DB_USERNAME);
+export const region                        = nn(process.env.AWS_REGION);
+export const s3Bucket                      = nn(process.env.S3_BUCKET);
+export const passwordResetOtpTableName     = nn(process.env.PASSWORD_RESET_OTP_TABLE_NAME);
+export const connectionsTableName          = nn(process.env.CONNECTIONS_TABLE_NAME);
+export const messagesTableName             = nn(process.env.MESSAGES_TABLE_NAME);
+export const sesSourceEmailAddress         = nn(process.env.SES_SOURCE_EMAIL_ADDRESS);
+export const JWT_SECRET_PARAMETER_NAME     = nn(process.env.JWT_SECRET);
+export const DB_PASSWORD_PARAMETER_NAME    = nn(process.env.DB_PASSWORD);
+export const DB_ENDPOINT                   = nn(process.env.DB_ENDPOINT);
+export const DB_PORT                       = +nn(process.env.DB_PORT);
+export const DB_USERNAME                   = nn(process.env.DB_USERNAME);
 export const REDIS_PASSWORD_PARAMETER_NAME = nn(process.env.REDIS_PASSWORD);
 export const REDIS_ENDPOINT                = nn(process.env.REDIS_ENDPOINT);
 export const REDIS_PORT                    = +nn(process.env.REDIS_PORT);

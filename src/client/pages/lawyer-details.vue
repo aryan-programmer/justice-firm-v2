@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
+import {justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch, withMessageBodyIfApplicable} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {StatusEnum, UserAccessType} from "../../common/db-types";
 import {GetLawyerInput, LawyerSearchResult} from "../../common/rest-api-schema";
@@ -7,6 +7,7 @@ import {Nuly} from "../../common/utils/types";
 import BareAppointmentsDistributor from "../components/appointments-cases/BareAppointmentsDistributor.vue";
 import BareCasesTable from "../components/appointments-cases/BareCasesTable.vue";
 import LawyerCard from "../components/details-cards/LawyerCard.vue";
+import LawyerPlaceholderCard from "../components/placeholders/LawyerPlaceholderCard.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 
@@ -16,6 +17,7 @@ const route            = useRoute();
 const userStore        = useUserStore();
 const lawyer           = ref<LawyerSearchResult | Nuly>();
 const isAdmin          = computed(() => userStore.authToken != null && userStore.authToken.userType === UserAccessType.Admin);
+const isLoading        = ref<boolean>(false);
 
 watch(() => route.query.id, async value => {
 	const id = value?.toString();
@@ -37,10 +39,12 @@ watch(() => route.query.id, async value => {
 		getCaseSpecializations: true,
 		// getStatistics:          true,
 	};
+	isLoading.value            = true;
 	const res                  = await justiceFirmApi.getLawyer(body);
+	isLoading.value            = false;
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
-		await error("Failed to find a lawyer with the id " + id);
+		await error(withMessageBodyIfApplicable("Failed to find a lawyer with the id " + id, res));
 		await navigateTo("/");
 		return;
 	}
@@ -50,6 +54,9 @@ watch(() => route.query.id, async value => {
 </script>
 
 <template>
+<div v-if="isLoading">
+	<LawyerPlaceholderCard :num-extra-actions="1" side-by-side class="w-100" show-case-specializations />
+</div>
 <div v-if="lawyer!=null">
 	<LawyerCard
 		:lawyer="lawyer"

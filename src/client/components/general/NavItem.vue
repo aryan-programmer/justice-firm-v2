@@ -33,7 +33,7 @@ function onClick () {
 }
 </script>
 
-<style lang="scss">
+<style scoped lang="scss">
 .nav-link {
 	text-decoration: none;
 	cursor: pointer;

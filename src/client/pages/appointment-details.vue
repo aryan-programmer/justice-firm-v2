@@ -11,6 +11,7 @@ import {Nuly} from "../../common/utils/types";
 import CaseUpgradeDialog from "../components/appointments-cases/UpgradeAppointmentToCaseDialog.vue";
 import ClientCard from "../components/details-cards/ClientCard.vue";
 import LawyerCard from "../components/details-cards/LawyerCard.vue";
+import AppointmentDetailsPlaceholderCard from "../components/placeholders/AppointmentDetailsPlaceholderCard.vue";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 
@@ -23,6 +24,7 @@ const userStore           = useUserStore();
 const route               = useRoute();
 const router              = useRouter();
 const appointment         = ref<AppointmentFullData | Nuly>(null);
+const isLoading           = ref<boolean>(false);
 const rejectDialogOpen    = ref<boolean>(false);
 const confirmDialogOpen   = ref<boolean>(false);
 const appointmentDateTime = ref("");
@@ -59,10 +61,12 @@ async function fetchAppointment (value: LocationQuery) {
 		await error("Specify an appointment to view details for");
 		return;
 	}
-	const res = await justiceFirmApi.getAppointmentRequest({
+	isLoading.value = true;
+	const res       = await justiceFirmApi.getAppointmentRequest({
 		authToken: nn(userStore.authToken),
 		id,
 	});
+	isLoading.value = false;
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
 		await navigateTo("/");
@@ -107,6 +111,7 @@ async function commonSendRes (params: SetAppointmentStatusInput, mode: string) {
 </script>
 
 <template>
+<AppointmentDetailsPlaceholderCard v-if="isLoading" />
 <v-card v-if="appointment!=null" color="gradient--perfect-white" class="w-100 elevation-3">
 	<v-card-title>
 		<h3>Appointment details</h3>

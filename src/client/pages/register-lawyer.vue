@@ -44,7 +44,7 @@ const photo       = useField('photo');
 const certificate = useField('certificate');
 const latitude    = useField('latitude');
 const longitude   = useField('longitude');
-const gender      = useField('gender') as FieldContext<string|Nuly>;
+const gender      = useField('gender') as FieldContext<string | Nuly>;
 
 const modals                   = useModals();
 const userStore                = useUserStore();

@@ -4,6 +4,7 @@ import {AppointmentSparseData} from "../../../common/rest-api-schema";
 import {compareDates, dateFormat, trimStr} from "../../../common/utils/functions";
 import {Nuly} from "../../../common/utils/types";
 import {DataTableHeader, TypedDataTableHeader} from "../../utils/types";
+import TablePlaceholder from "../placeholders/TablePlaceholder.vue";
 
 type AppointmentDataDisplayable = Omit<AppointmentSparseData, "timestamp" | "openedOn"> & {
 	timestamp?: Date | Nuly,
@@ -14,10 +15,11 @@ const props = defineProps<{
 	appointments: AppointmentSparseData[] | Nuly,
 	class?: string,
 	otherUserTitle: string,
+	isLoading: boolean,
 }>();
 
-const dataTableHeaders = computed((args)  => {
-	const res : TypedDataTableHeader<AppointmentDataDisplayable>[]= [
+const dataTableHeaders = computed((args) => {
+	const res: TypedDataTableHeader<AppointmentDataDisplayable>[] = [
 		{title: props.otherUserTitle, align: 'start', key: 'othName', sortable: true},
 		{title: 'Description', align: 'start', key: 'description', sortable: true},
 		{title: 'Timestamp', align: 'start', key: 'timestamp', sortable: true, sort: compareDates},
@@ -39,13 +41,16 @@ const appointments = computed(() =>
 </script>
 
 <template>
+<v-sheet elevation="3" rounded :class="`pa-2 ${props.class??''}`" v-if="props.isLoading">
+	<TablePlaceholder :column-widths="[150,350,250,250,115]" :num-rows="5" />
+</v-sheet>
 <v-data-table
 	:headers="dataTableHeaders"
 	:items="appointments"
 	items-per-page="5"
 	density="compact"
 	:class="`elevation-3 ${props.class??''}`"
-	v-if="appointments.length>0">
+	v-else-if="appointments.length>0">
 	<template v-slot:item.timestamp="{ item }">
 	{{ dateFormat(item.raw.timestamp) }}
 	</template>
