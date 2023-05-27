@@ -165,7 +165,7 @@ $case-documents-expansion-title-height: 32px;
 	padding: 0px !important;
 	margin: 0px !important;
 
-	.v-expansion-panel-text__wrapper {
+	:deep(.v-expansion-panel-text__wrapper) {
 		padding: 0px !important;
 		margin: 0px !important;
 	}
@@ -282,7 +282,7 @@ $case-documents-expansion-title-height: 32px;
 								<v-expansion-panel-text class="case-documents-expansion-panel-text">
 									<v-sheet
 										elevation="1"
-										class="case-documents-actions rounded-b-sm bg-gradient--premium-white ma-1">
+										class="case-documents-actions rounded-b-sm bg-gradient--premium-white mx-1">
 										<UploadFileWithDescriptionDialog
 											@upload-file="addCaseDocument"
 											title="Upload case document"
