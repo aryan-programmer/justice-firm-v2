@@ -17,5 +17,6 @@ export function jfApiAwsFunnelFunctions () {
 		wsChatterBoxApiImpl: awsWSLambdaFunnelWrapper(jfChatterBoxApiSchema, wsChatterBoxApiImpl, {
 			validateOutputs: false,
 		}),
+		dbModelMethods
 	};
 }

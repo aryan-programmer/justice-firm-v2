@@ -4,7 +4,8 @@ import {HttpMethods} from "../singularity/httpMethods";
 
 import {jfApiAwsFunnelFunctions} from "./api-impl";
 
-const {restApiImpl, wsChatterBoxApiImpl} = jfApiAwsFunnelFunctions();
+const {restApiImpl, wsChatterBoxApiImpl, dbModelMethods} = jfApiAwsFunnelFunctions();
+dbModelMethods.getPool().then((v) => console.log("Got pool: ", v));
 
 export async function handler (
 	event: APIGatewayProxyEvent | APIGatewayProxyWebsocketEventV2):

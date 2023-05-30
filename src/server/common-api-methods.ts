@@ -1,13 +1,15 @@
 import {GoneException} from "@aws-sdk/client-apigatewaymanagementapi";
 import {DeleteItemCommand, ReturnConsumedCapacity} from "@aws-sdk/client-dynamodb";
 import {GetParameterCommand} from "@aws-sdk/client-ssm";
-import {createPool, Pool, PoolConnection} from "mariadb";
+import {Pool, PoolClient, QueryResult} from "pg";
 import {createClient} from "redis";
 import {CONNECTION_ID} from "../common/infrastructure-constants";
-import {nn} from "../common/utils/asserts";
+import {assert, nn} from "../common/utils/asserts";
 import {Nuly} from "../common/utils/types";
+import {uniqId} from "../common/utils/uniq-id";
 import {
 	connectionsTableName,
+	DB_DATABASE_NAME,
 	DB_ENDPOINT,
 	DB_PASSWORD_PARAMETER_NAME,
 	DB_PORT,
@@ -21,7 +23,7 @@ import {
 	ssmClient
 } from "./environment-clients";
 import {cacheExpiryTimeMs} from "./utils/constants";
-import {printConsumedCapacity} from "./utils/functions";
+import {printConsumedCapacity, repeatedNTimesWithDelimiter, repeatedQuestionMarks} from "./utils/functions";
 import {RedisCacheTagger} from "./utils/redis-cache-tagging";
 
 const fakeRedisClient = true ? undefined as never : createClient({
@@ -30,8 +32,196 @@ const fakeRedisClient = true ? undefined as never : createClient({
 	password: "",
 });
 
+export type UpsertResult = {
+	affectedRows: number;
+	insertId?: number | bigint;
+	result: QueryResult
+};
+
+export type SelectResult = Record<string, any>[];
+
+function wrapWithQuotesIfNot (s: string) {
+	if (s.startsWith("\"")) return s;
+	assert(!s.includes("\""), "Invalid identifier name");
+	return `"${s}"`;
+}
+
+function queryPreprocessing (queryText: string) {
+	const parts = queryText.split("?");
+	if (parts.length === 1) return parts[0];
+	let res = "";
+	let i   = 0;
+	for (const part of parts) {
+		if (i === 0) res += part;
+		else res += "$" + i + part;
+		i++;
+	}
+	res = res.replace(/\s\s+/g, ' ');
+	return res;
+}
+
+async function execQuery<I extends any[] = any[]> (
+	runner: Pool | PoolClient,
+	queryText: string,
+	values?: I,
+	idColumn: string = "id"
+): Promise<SelectResult | UpsertResult> {
+	let isSelect = false;
+	let getId    = false;
+	if (queryText.startsWith("SELECT")) {
+		isSelect = true;
+	} else if (queryText.startsWith("INSERT") && !queryText.includes("RETURNING")) {
+		queryText = queryText.replace(";", "") + " RETURNING " + idColumn + ";";
+		getId     = true;
+	}
+	queryText = queryPreprocessing(queryText);
+	const res = await runner.query(queryText, values);
+	if (isSelect) {
+		return res.rows as Record<string, any>[];
+	} else {
+		return {
+			affectedRows: res.rowCount,
+			result:       res,
+			insertId:     getId ? BigInt(((res.rows[0] as Record<string, any>)[idColumn].toString() ?? "0") as string) : undefined
+		};
+	}
+}
+
+export class PoolConnectionPatch {
+	constructor (public client: PoolClient) {
+	}
+
+	async beginTransaction () {
+		return await this.client.query("BEGIN");
+	}
+
+	async commit () {
+		return await this.client.query("COMMIT");
+	}
+
+	async rollback () {
+		return await this.client.query("ROLLBACK");
+	}
+
+	async release () {
+		await this.client.release();
+	}
+
+	async execute<I extends any[] = any[]> (
+		queryText: string,
+		values?: I,
+		idColumn: string = "id"
+	): Promise<UpsertResult> {
+		queryText = queryText.trim();
+		if (queryText.startsWith("SELECT")) {
+			throw new Error("Execute queries can not start with SELECT");
+		}
+		return (await execQuery(this.client, queryText, values, idColumn)) as UpsertResult;
+	}
+
+	async query<I extends any[] = any[]> (
+		queryText: string,
+		values?: I,
+		idColumn: string = "id"
+	): Promise<SelectResult> {
+		queryText = queryText.trim();
+		if (!queryText.startsWith("SELECT")) {
+			throw new Error("Queries must start with SELECT");
+		}
+		return (await execQuery(this.client, queryText, values, idColumn)) as SelectResult;
+	}
+
+	async batchInsert<I extends any[][] = any[][]> (
+		tableName: string,
+		columnNames: string[],
+		values: I
+	) {
+		if (values.length === 0) return;
+		assert(values.every(v => v.length === columnNames.length),
+			"The number of values in each row to insert must match the number of columns");
+		tableName               = wrapWithQuotesIfNot(tableName);
+		columnNames             = columnNames.map(wrapWithQuotesIfNot)
+		const valuesPlaceholder = repeatedNTimesWithDelimiter(
+			`(${repeatedQuestionMarks(columnNames.length)})`,
+			',',
+			values.length
+		);
+		let insertQuery         = `INSERT INTO ${tableName} (${columnNames.join(",")}) VALUES ${valuesPlaceholder};`;
+		insertQuery             = queryPreprocessing(insertQuery);
+		const flatValues        = values.flat(1);
+		console.log({insertQuery, flatValues});
+		return await this.client.query(insertQuery, flatValues);
+	}
+
+	async batchUpdate (
+		tableName: string,
+		idName: string,
+		idType: string,
+		columnNames: string[],
+		columnTypes: string[],
+		values: {
+			id: any,
+			values: any[]
+		}[]
+	) {
+		if (values.length === 0) return;
+		assert(values.every(v => v.values.length === columnNames.length),
+			"The number of values in each row to insert must match the number of columns");
+		const origTableName       = wrapWithQuotesIfNot("orig_" + uniqId());
+		const tempTableName       = wrapWithQuotesIfNot("temp_vals_" + uniqId());
+		tableName                 = wrapWithQuotesIfNot(tableName);
+		idName                    = wrapWithQuotesIfNot(idName);
+		columnNames               = columnNames.map(wrapWithQuotesIfNot);
+		const valuesPlaceholders  = "VALUES " + repeatedNTimesWithDelimiter(
+			`(?::${idType.toUpperCase()}, ${columnTypes.map(v => `?::${v.toUpperCase()}`)})`,
+			',',
+			values.length
+		);
+		const columnsForSetClause = columnNames.map(v => `${v}=${tempTableName}.${v}`).join(",");
+		let updateQuery           =
+			    `UPDATE ${tableName} AS ${origTableName}
+			     SET ${columnsForSetClause}
+			     FROM (${valuesPlaceholders}) AS ${tempTableName}(${idName}, ${columnNames.join(",")})
+			     WHERE ${tempTableName}.${idName} = ${origTableName}.${idName};`;
+		updateQuery               = queryPreprocessing(updateQuery);
+		const flatValues          = values.flatMap(v => [v.id, ...v.values]);
+		console.log({updateQuery, flatValues});
+		return await this.client.query(updateQuery, flatValues);
+	}
+}
+
+export class PoolPatch {
+	constructor (public pool: Pool) {
+	}
+
+	async execute<I extends any[] = any[]> (
+		queryText: string,
+		values?: I,
+		idColumn: string = "id"
+	): Promise<UpsertResult> {
+		queryText = queryText.trim();
+		if (queryText.startsWith("SELECT")) {
+			throw new Error("Execute queries can not start with SELECT");
+		}
+		return (await execQuery(this.pool, queryText, values, idColumn)) as UpsertResult;
+	}
+
+	async query<I extends any[] = any[]> (
+		queryText: string,
+		values?: I,
+		idColumn: string = "id"
+	): Promise<SelectResult> {
+		queryText = queryText.trim();
+		if (!queryText.startsWith("SELECT")) {
+			throw new Error("Queries must start with SELECT");
+		}
+		return (await execQuery(this.pool, queryText, values, idColumn)) as SelectResult;
+	}
+}
+
 export class CommonApiMethods {
 	private pool: Pool | Nuly                            = null;
+	private poolPatch: PoolPatch | Nuly                  = null;
 	private jwtSecret: string | Nuly                     = null;
 	private redisCacheTagger: RedisCacheTagger | Nuly    = null;
 	private redisClient: (typeof fakeRedisClient) | Nuly = null;
@@ -43,38 +233,43 @@ export class CommonApiMethods {
 		}))).Parameter?.Value);
 	}
 
-	async getConnection (): Promise<PoolConnection> {
-		return await (await this.getPool()).getConnection();
+	async getConnection () {
+		return new PoolConnectionPatch(await (await this.getPool()).pool.connect());
 	}
 
-	async getPool (): Promise<Pool> {
-		const connectionLimit = 3;
+	async getPool (): Promise<PoolPatch> {
+		const connectionLimit = 5;
 		if (this.pool == null) {
 			const password = await ssmClient.send(new GetParameterCommand({
 				Name:           DB_PASSWORD_PARAMETER_NAME,
 				WithDecryption: true,
 			}));
-			return this.pool = createPool({
-				host:           DB_ENDPOINT,
-				port:           DB_PORT,
-				user:           DB_USERNAME,
-				password:       nn(password.Parameter).Value,
-				database:       "justice_firm",
-				acquireTimeout: 2500,
-				// AWS RDS MariaDB can't create more than 5-6 for some reason
-				connectionLimit:       connectionLimit,
-				initializationTimeout: 1000,
-				leakDetectionTimeout:  3000,
-				idleTimeout:           0,
+			this.pool      = new Pool({
+				host:              DB_ENDPOINT,
+				port:              DB_PORT,
+				user:              DB_USERNAME,
+				password:          nn(password.Parameter).Value,
+				database:          DB_DATABASE_NAME,
+				min:               1,
+				max:               connectionLimit,
+				maxUses:           connectionLimit,
+				idleTimeoutMillis: 60000,
+				allowExitOnIdle:   false,
+				keepAlive:         true,
+				ssl:               true,
 			});
 		}
+		if (this.poolPatch == null) {
+			this.poolPatch = new PoolPatch(this.pool!);
+		}
 		console.log({
-			active: this.pool.activeConnections(),
-			idle:   this.pool.idleConnections(),
-			total:  this.pool.totalConnections(),
+			waiting: this.pool!.waitingCount,
+			idle:    this.pool!.idleCount,
+			total:   this.pool!.totalCount,
 			connectionLimit,
+			pool:    this.pool,
 		});
-		return this.pool;
+		return this.poolPatch!;
 	}
 
 	async getRedisClient () {

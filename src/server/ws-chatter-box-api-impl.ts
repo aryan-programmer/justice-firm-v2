@@ -127,7 +127,7 @@ export class JusticeFirmWsChatterBoxAPIImpl
 		if (jwt.userType !== UserAccessType.Lawyer && jwt.userType !== UserAccessType.Client) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Must be a lawyer or client");
 		}
-		const resSet = await (await this.common.getPool()).execute(
+		const resSet = await (await this.common.getPool()).query(
 			`
 				SELECT g.name      AS g_name,
 				       g.case_id   AS case_id,
@@ -135,11 +135,11 @@ export class JusticeFirmWsChatterBoxAPIImpl
 				       c.name      AS c_name,
 				       g.lawyer_id AS l_id,
 				       l.name      AS l_name
-				FROM \`group\` g
-				JOIN user      c ON c.id = g.client_id
-				JOIN user      l ON l.id = g.lawyer_id
+				FROM "justice_firm"."group" g
+				JOIN "justice_firm"."user"  c ON c.id = g.client_id
+				JOIN "justice_firm"."user"  l ON l.id = g.lawyer_id
 				WHERE g.id = ?`,
-			[group]);
+			[BigInt(group)]);
 		if (resSet.length === 0) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, `No group with id ${group} exists`);
 		}

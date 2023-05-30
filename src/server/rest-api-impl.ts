@@ -4,7 +4,6 @@ import {DeleteItemCommand, PutItemCommand, ReturnConsumedCapacity, ReturnValue} 
 import {SendEmailCommand} from "@aws-sdk/client-ses";
 import {compareSync, hash} from "bcryptjs";
 import {sign} from "jsonwebtoken";
-import {PoolConnection, UpsertResult} from "mariadb";
 import {AuthToken, ClientAuthToken, ConstrainedAuthToken, LawyerAuthToken, PrivateAuthToken} from "../common/api-types";
 import {
 	CaseDocumentData,
@@ -54,6 +53,7 @@ import {constants} from "../singularity/constants";
 import {EndpointResult, FnParams} from "../singularity/endpoint";
 import {message, Message, noContent, response} from "../singularity/helpers";
 import {APIImplementation} from "../singularity/schema";
+import {PoolConnectionPatch, UpsertResult} from "./common-api-methods";
 import {DbModelMethods} from "./db-model-methods";
 import {
 	dynamoDbClient,
@@ -68,8 +68,8 @@ import {
 import {otpExpiryTimeMs, saltRounds} from "./utils/constants";
 import {
 	getMimeTypeFromUrlServerSide,
-	getSqlTupleForInOperator,
 	printConsumedCapacity,
+	repeatedQuestionMarks,
 	shortenS3Url,
 	unShortenS3Url,
 	uploadDataUrlToS3,
@@ -152,7 +152,8 @@ export class JusticeFirmRestAPIImpl
 			await conn.beginTransaction();
 
 			const userInsertRes: UpsertResult = await conn.execute(
-				"INSERT INTO user(name, email, phone, address, password_hash, photo_path, gender, type) VALUES (?, ?, ?, ?, ?, ?, ?, 'lawyer');",
+				`INSERT INTO "justice_firm"."user"(name, email, phone, address, password_hash, photo_path, gender, type)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, 'lawyer');`,
 				[data.name, data.email, data.phone, data.address, passwordHash, photoRes.url, data.gender]
 			);
 
@@ -195,7 +196,7 @@ export class JusticeFirmRestAPIImpl
 		}
 
 		const pool                       = await this.common.getPool();
-		const res: Record<string, any>[] = await pool.execute(
+		const res: Record<string, any>[] = await pool.query(
 			`SELECT u.id,
 			        u.name,
 			        u.email,
@@ -203,8 +204,8 @@ export class JusticeFirmRestAPIImpl
 			        u.address,
 			        u.photo_path,
 			        u.gender
-			 FROM user u
-			 WHERE u.id = ?;`, [+obj.id]);
+			 FROM "justice_firm"."user" u
+			 WHERE u.id = ?;`, [BigInt(obj.id)]);
 
 		if (res.length === 0) {
 			return message(404, "No such user found");
@@ -256,7 +257,9 @@ export class JusticeFirmRestAPIImpl
 		const id = BigInt(obj.id);
 
 		const userUpdateRes: UpsertResult = await (await this.common.getPool()).execute(
-			`UPDATE user SET ${updateQuerySets} WHERE id = ?;`,
+			`UPDATE "justice_firm"."user"
+			 SET ${updateQuerySets}
+			 WHERE id = ?;`,
 			[...updateQueryParams, id]
 		);
 
@@ -331,14 +334,18 @@ export class JusticeFirmRestAPIImpl
 
 			const userUpdateQuerySets         = userUpdateQueryPieces.join(", ");
 			const userUpdateRes: UpsertResult = await conn.execute(
-				`UPDATE user SET ${userUpdateQuerySets} WHERE id = ?;`,
+				`UPDATE "justice_firm"."user"
+				 SET ${userUpdateQuerySets}
+				 WHERE id = ?;`,
 				[...userUpdateQueryParams, lawyerId]
 			);
 			console.log({userUpdateRes});
 
 			const lawyerUpdateQuerySets         = lawyerUpdateQueryPieces.join(", ");
 			const lawyerUpdateRes: UpsertResult = await conn.execute(
-				`UPDATE lawyer SET ${lawyerUpdateQuerySets} WHERE id = ?;`,
+				`UPDATE lawyer
+				 SET ${lawyerUpdateQuerySets}
+				 WHERE id = ?;`,
 				[...lawyerUpdateQueryParams, lawyerId]
 			);
 			console.log({lawyerUpdateRes});
@@ -346,7 +353,9 @@ export class JusticeFirmRestAPIImpl
 			if (data.specializationTypes != null && data.specializationTypes.length > 0) {
 				// TODO: Come up with a better system
 				const deleteSpecializationsResult: UpsertResult = await conn.execute(
-					`DELETE FROM lawyer_specialization WHERE lawyer_id = ?;`,
+					`DELETE
+					 FROM lawyer_specialization
+					 WHERE lawyer_id = ?;`,
 					[lawyerId]
 				);
 				const insertSpecializationsResult               = await this.insertSpecializationTypesWithConnection(
@@ -396,7 +405,7 @@ export class JusticeFirmRestAPIImpl
 			await conn.beginTransaction();
 
 			const userInsertRes: UpsertResult = await conn.execute(
-				"INSERT INTO user(name, email, phone, address, password_hash, photo_path, gender, type) VALUES (?, ?, ?, ?, ?, ?, ?, 'client');",
+				`INSERT INTO "justice_firm"."user"(name, email, phone, address, password_hash, photo_path, gender, type) VALUES (?, ?, ?, ?, ?, ?, ?, 'client');`,
 				[data.name, data.email, data.phone, data.address, passwordHash, photoRes.url, data.gender]
 			);
 
@@ -542,10 +551,10 @@ export class JusticeFirmRestAPIImpl
 		try {
 			await conn.beginTransaction();
 
-			let lawyerId                             = data.lawyerId;
-			let clientId                             = data.authToken.id;
+			let lawyerId                             = BigInt(data.lawyerId);
+			let clientId                             = BigInt(data.authToken.id);
 			const groupInsertRes: UpsertResult       = await conn.execute(
-				"INSERT INTO `group`(client_id, lawyer_id) VALUES (?, ?);",
+				`INSERT INTO "justice_firm"."group"(client_id, lawyer_id) VALUES (?, ?);`,
 				[clientId, lawyerId]
 			);
 			const groupId                            = nn(groupInsertRes.insertId);
@@ -555,7 +564,7 @@ export class JusticeFirmRestAPIImpl
 			);
 
 			await conn.commit();
-			return response(200, appointmentInsertRes.insertId.toString());
+			return response(200, nn(appointmentInsertRes.insertId).toString());
 		} catch (e) {
 			await conn.rollback();
 			throw e;
@@ -576,44 +585,47 @@ export class JusticeFirmRestAPIImpl
 
 		let sql: string;
 		if (jwt.userType === UserAccessType.Client) {
-			sql = `SELECT a.id,
-			              l.id   AS oth_id,
-			              l.name AS oth_name,
-			              a.description,
-			              a.case_id,
-			              a.group_id,
-			              a.timestamp,
-			              a.opened_on
-			       FROM appointment a
-			       JOIN user        c
-			            ON c.id = a.client_id
-			       JOIN user        l
-			            ON l.id = a.lawyer_id
-			       WHERE c.id = ?
-				     AND a.status = ?`;
+			sql =
+				`SELECT a.id,
+				        l.id   AS oth_id,
+				        l.name AS oth_name,
+				        a.description,
+				        a.case_id,
+				        a.group_id,
+				        a.timestamp,
+				        a.opened_on
+				 FROM appointment           a
+				 JOIN "justice_firm"."user" c
+				      ON c.id = a.client_id
+				 JOIN "justice_firm"."user" l
+				      ON l.id = a.lawyer_id
+				 WHERE c.id = ?
+				   AND a.status = ?`;
 		} else {
-			sql = `SELECT a.id,
-			              c.id   AS oth_id,
-			              c.name AS oth_name,
-			              a.description,
-			              a.case_id,
-			              a.group_id,
-			              a.timestamp,
-			              a.opened_on
-			       FROM appointment a
-			       JOIN user        c
-			            ON c.id = a.client_id
-			       JOIN user        l
-			            ON l.id = a.lawyer_id
-			       WHERE l.id = ?
-				     AND a.status = ?`;
+			sql =
+				`SELECT a.id,
+				        c.id   AS oth_id,
+				        c.name AS oth_name,
+				        a.description,
+				        a.case_id,
+				        a.group_id,
+				        a.timestamp,
+				        a.opened_on
+				 FROM appointment           a
+				 JOIN "justice_firm"."user" c
+				      ON c.id = a.client_id
+				 JOIN "justice_firm"."user" l
+				      ON l.id = a.lawyer_id
+				 WHERE l.id = ?
+				   AND a.status = ?`;
 		}
 		if (data.orderByOpenedOn === true) {
 			sql += " ORDER BY a.opened_on;";
 		} else {
 			sql += " ORDER BY a.timestamp;";
 		}
-		const res: Record<string, any>[] = await (await this.common.getPool()).execute(sql, [jwt.id, data.withStatus]);
+		const res: Record<string, any>[] = await (await this.common.getPool())
+			.query(sql, [BigInt(jwt.id), data.withStatus]);
 		return response(200, res.map(value => {
 			return {
 				id:          value.id.toString(),
@@ -648,18 +660,22 @@ export class JusticeFirmRestAPIImpl
 					`UPDATE lawyer
 					 SET status           = 'confirmed',
 					     rejection_reason = NULL
-					 WHERE id IN (${getSqlTupleForInOperator(data.confirmed.length)});`,
+					 WHERE id IN (${repeatedQuestionMarks(data.confirmed.length)});`,
 					data.confirmed.map(BigInt)
 				);
 			}
 
 			if (data.rejected.length > 0) {
-				const rejectRes = await conn.batch(
-					`UPDATE lawyer
-					 SET status           = 'rejected',
-					     rejection_reason = ?
-					 WHERE id = ?;`,
-					data.rejected.map(({id, reason}) => [reason, id])
+				const rejectRes = await conn.batchUpdate(
+					"lawyer",
+					"id",
+					"BIGINT",
+					["status", "rejection_reason"],
+					["lawyer_status", "text"],
+					data.rejected.map(({id, reason}) => ({
+						id:     BigInt(id),
+						values: ["rejected", reason]
+					}))
 				);
 				console.log({rejectRes});
 			}
@@ -669,7 +685,7 @@ export class JusticeFirmRestAPIImpl
 					`UPDATE lawyer
 					 SET status           = 'waiting',
 					     rejection_reason = NULL
-					 WHERE id IN (${getSqlTupleForInOperator(data.waiting.length)});`,
+					 WHERE id IN (${repeatedQuestionMarks(data.waiting.length)});`,
 					data.waiting.map(BigInt)
 				);
 			}
@@ -697,7 +713,7 @@ export class JusticeFirmRestAPIImpl
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid auth token");
 		}
 
-		const res: Record<string, any>[] = await (await this.common.getPool()).execute(
+		const res: Record<string, any>[] = await (await this.common.getPool()).query(
 			`SELECT a.id                  AS a_id,
 			        a.group_id            AS a_group_id,
 			        a.case_id             AS a_case_id,
@@ -724,12 +740,12 @@ export class JusticeFirmRestAPIImpl
 			        ll.certification_link AS l_certification_link,
 			        ll.status             AS l_status,
 			        ll.rejection_reason   AS l_rejection_reason
-			 FROM appointment a
-			 JOIN user        c
+			 FROM appointment           a
+			 JOIN "justice_firm"."user" c
 			      ON c.id = a.client_id
-			 JOIN user        lu
+			 JOIN "justice_firm"."user" lu
 			      ON lu.id = a.lawyer_id
-			 JOIN lawyer      ll
+			 JOIN lawyer                ll
 			      ON lu.id = ll.id
 			 WHERE a.id = ?;`, [BigInt(data.id)]);
 
@@ -766,32 +782,34 @@ export class JusticeFirmRestAPIImpl
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				"To set an appointment's status the user must be authenticated as a lawyer");
 		}
-		const pool = await this.common.getPool();
+		const pool          = await this.common.getPool();
+		const lawyerId      = BigInt(jwt.id);
+		const appointmentId = BigInt(data.appointmentId);
 		if (data.status === StatusEnum.Rejected) {
 			const rejectRes: UpsertResult = await pool.execute(
 				"UPDATE appointment SET status='rejected' WHERE id = ? AND lawyer_id = ?;",
-				[data.appointmentId, jwt.id]
+				[appointmentId, lawyerId]
 			);
 			if (rejectRes.affectedRows === 0) {
 				return message(constants.HTTP_STATUS_BAD_REQUEST,
-					`Either the appointment with the id ${data.appointmentId} doesn't exist or you do not have access to edit it.`);
+					`Either the appointment with the id ${appointmentId} doesn't exist or you do not have access to edit it.`);
 			}
 		} else {
 			let confirmRes: UpsertResult;
 			if (data.timestamp == null) {
 				confirmRes = await pool.execute(
 					"UPDATE appointment SET status='confirmed' WHERE id = ? AND lawyer_id = ?;",
-					[data.appointmentId, jwt.id]
+					[appointmentId, lawyerId]
 				);
 			} else {
 				confirmRes = await pool.execute(
 					"UPDATE appointment SET status='confirmed', timestamp=? WHERE id = ? AND lawyer_id = ?;",
-					[new Date(data.timestamp), data.appointmentId, jwt.id]
+					[new Date(data.timestamp), appointmentId, lawyerId]
 				);
 			}
 			if (confirmRes.affectedRows === 0) {
 				return message(constants.HTTP_STATUS_BAD_REQUEST,
-					`Either the appointment with the id ${data.appointmentId} doesn't exist or you do not have access to edit it.`);
+					`Either the appointment with the id ${appointmentId} doesn't exist or you do not have access to edit it.`);
 			}
 		}
 		return noContent;
@@ -800,8 +818,8 @@ export class JusticeFirmRestAPIImpl
 	async sendPasswordResetOTP (params: FnParams<SendPasswordResetOTPInput>):
 		Promise<EndpointResult<Message | Nuly>> {
 		const email                         = params.body.email;
-		const result: Record<string, any>[] = await (await this.common.getPool()).execute(
-			"SELECT name FROM user WHERE email = ? LIMIT 1;",
+		const result: Record<string, any>[] = await (await this.common.getPool()).query(
+			`SELECT name FROM "justice_firm"."user" WHERE email = ? LIMIT 1;`,
 			[email]
 		);
 		if (result.length === 0) {
@@ -883,7 +901,7 @@ The Justice Firm Foundation`;
 
 		const passwordHash            = await hash(password, saltRounds);
 		const updateRes: UpsertResult = await (await this.common.getPool()).execute(
-			"UPDATE user u SET password_hash = ? WHERE email = ? LIMIT 1", [passwordHash, email]);
+			`UPDATE "justice_firm"."user" u SET password_hash = ? WHERE email = ?;`, [passwordHash, email]);
 
 		if (updateRes.affectedRows < 1) {
 			console.error("SHOULD NEVER GET HERE: OTP was sent to an email address not used to sign up a user.");
@@ -906,7 +924,7 @@ The Justice Firm Foundation`;
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Auth token must be that of a lawyer");
 		}
 
-		const res: Record<string, any>[] = await (await this.common.getPool()).execute(
+		const res: Record<string, any>[] = await (await this.common.getPool()).query(
 			`SELECT a.id          AS a_id,
 			        a.lawyer_id   AS l_id,
 			        a.client_id   AS c_id,
@@ -921,30 +939,23 @@ The Justice Firm Foundation`;
 		}
 
 		const value    = res[0];
-		const lawyerId = value.l_id.toString();
-		const clientId = value.c_id.toString();
+		const lawyerId = BigInt(value.l_id.toString());
+		const clientId = BigInt(value.c_id.toString());
 
-		const appointmentData: Pick<AppointmentFullData, "id" | "description" | "caseId" | "groupId"> = {
-			id:          value.a_id.toString(),
-			description: value.a_description.toString(),
-			caseId:      value.a_case_id?.toString(),
-			groupId:     value.a_group_id.toString(),
-			// timestamp:   value.a_timestamp?.toString(),
-			// openedOn:    value.a_opened_on.toString(),
-			// status:      value.a_status.toString(),
-		};
+		const groupId       = BigInt(value.a_group_id.toString());
+		const appointmentId = BigInt(value.a_id.toString());
 
-		if (jwt.id !== lawyerId) {
+		if (BigInt(jwt.id) !== lawyerId) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				"You are not authorized to promote this appointment to a case.");
 		}
 
-		if (!isNullOrEmpty(appointmentData.caseId)) {
+		if (!isNullOrEmpty(value.a_case_id?.toString())) {
 			return message(constants.HTTP_STATUS_BAD_REQUEST,
 				"This appointment has already been promoted to a case.");
 		}
 
-		const caseDesc = nullOrEmptyCoalesce(data.description, appointmentData.description);
+		const caseDesc = nullOrEmptyCoalesce(data.description, value.a_description.toString());
 		const status   = data.status ?? CaseStatusEnum.Open;
 
 		const conn = await this.common.getConnection();
@@ -953,26 +964,27 @@ The Justice Firm Foundation`;
 			await conn.beginTransaction();
 
 			const caseInsertRes: UpsertResult = await conn.execute(
-				"INSERT INTO `case` (client_id, lawyer_id, type_id, group_id, description, status) VALUES (?,?,?,?,?,?);",
-				[clientId, lawyerId, data.type, appointmentData.groupId, caseDesc, status]
+				`INSERT INTO "justice_firm"."case" (client_id, lawyer_id, type_id, group_id, description, status)
+				 VALUES (?, ?, ?, ?, ?, ?);`,
+				[clientId, lawyerId, data.type, groupId, caseDesc, status]
 			);
 			const caseId                      = nn(caseInsertRes.insertId);
 
 			if (isNullOrEmpty(data.groupName)) {
 				await conn.execute(
-					"UPDATE `group` SET case_id = ? WHERE id = ?",
-					[caseId, appointmentData.groupId]
+					`UPDATE "justice_firm"."group" SET case_id = ? WHERE id = ?`,
+					[caseId, groupId]
 				);
 			} else {
 				await conn.execute(
-					"UPDATE `group` SET case_id = ?, name = ? WHERE id = ?",
-					[caseId, data.groupName, appointmentData.groupId]
+					`UPDATE "justice_firm"."group" SET case_id = ?, NAME = ? WHERE id = ?`,
+					[caseId, data.groupName, groupId]
 				);
 			}
 
 			const appointmentUpdateRes = await conn.execute(
 				"UPDATE appointment SET case_id = ? WHERE id = ?",
-				[caseId, appointmentData.id]
+				[caseId, appointmentId]
 			);
 
 			await conn.commit();
@@ -1006,11 +1018,11 @@ The Justice Firm Foundation`;
 			              s.group_id,
 			              s.opened_on,
 			              s.status
-			       FROM \`case\`  s
-			       JOIN user      l ON l.id = s.lawyer_id
-			       JOIN case_type ct ON ct.id = s.type_id
+			       FROM "justice_firm"."case" s
+			       JOIN "justice_firm"."user" l ON l.id = s.lawyer_id
+			       JOIN case_type             ct ON ct.id = s.type_id
 			       WHERE s.client_id = ?
-			       ORDER BY s.opened_on;`;
+			       ORDER BY S.opened_on;`;
 		} else {
 			sql = `SELECT s.id,
 			              c.id    AS oth_id,
@@ -1021,13 +1033,14 @@ The Justice Firm Foundation`;
 			              s.group_id,
 			              s.opened_on,
 			              s.status
-			       FROM \`case\`  s
-			       JOIN user      c ON c.id = s.client_id
-			       JOIN case_type ct ON ct.id = s.type_id
+			       FROM "justice_firm"."case" s
+			       JOIN "justice_firm"."user" c ON c.id = s.client_id
+			       JOIN case_type             ct ON ct.id = s.type_id
 			       WHERE s.lawyer_id = ?
-			       ORDER BY s.opened_on;`;
+			       ORDER BY S.opened_on;`;
 		}
-		const res: Record<string, any>[] = await (await this.common.getPool()).execute(sql, [jwt.id]);
+		const res: Record<string, any>[] = await (await this.common.getPool())
+			.query(sql, [BigInt(jwt.id)]);
 		return response(200, res.map(value => {
 			return {
 				id:          value.id.toString(),
@@ -1054,7 +1067,7 @@ The Justice Firm Foundation`;
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid auth token");
 		}
 
-		const res: Record<string, any>[] = await (await this.common.getPool()).execute(
+		const res: Record<string, any>[] = await (await this.common.getPool()).query(
 			`SELECT s.id                  AS s_id,
 			        s.group_id            AS s_group_id,
 			        s.type_id             AS s_type_id,
@@ -1081,11 +1094,11 @@ The Justice Firm Foundation`;
 			        ll.certification_link AS l_certification_link,
 			        ll.status             AS l_status,
 			        ll.rejection_reason   AS l_rejection_reason
-			 FROM \`case\`  s
-			 JOIN user      c ON c.id = s.client_id
-			 JOIN user      lu ON lu.id = s.lawyer_id
-			 JOIN lawyer    ll ON lu.id = ll.id
-			 JOIN case_type ct ON s.type_id = ct.id
+			 FROM "justice_firm"."case" s
+			 JOIN "justice_firm"."user" c ON c.id = s.client_id
+			 JOIN "justice_firm"."user" lu ON lu.id = s.lawyer_id
+			 JOIN lawyer                ll ON lu.id = ll.id
+			 JOIN case_type             ct ON s.type_id = ct.id
 			 WHERE s.id = ?;`, [BigInt(data.id)]);
 
 		if (res.length === 0) {
@@ -1160,9 +1173,9 @@ The Justice Firm Foundation`;
 		const filePath          = shortenS3Url(fileData.path);
 		const res: UpsertResult = await (await this.common.getPool()).execute(
 			"INSERT INTO case_document (case_id, file_link, file_mime, file_name, description, uploaded_by_id) VALUES (?, ?, ?, ?, ?, ?)",
-			[data.caseId, filePath, fileData.mime, fileData.name, data.description, caseAccess.id]);
+			[BigInt(data.caseId), filePath, fileData.mime, fileData.name, data.description, caseAccess.id]);
 
-		const caseDocumentId = res.insertId.toString();
+		const caseDocumentId = nn(res.insertId).toString();
 
 		return response(constants.HTTP_STATUS_OK, caseDocumentId);
 	}
@@ -1174,7 +1187,7 @@ The Justice Firm Foundation`;
 		if (Array.isArray(caseAccess)) {
 			return message(caseAccess[0], caseAccess[1]);
 		}
-		const res: Record<string, string | number | Date>[] = await (await this.common.getPool()).execute(
+		const res: Record<string, string | number | Date>[] = await (await this.common.getPool()).query(
 			`SELECT cd.id  AS case_doc_id,
 			        uploaded_on,
 			        file_link,
@@ -1183,10 +1196,10 @@ The Justice Firm Foundation`;
 			        description,
 			        uploaded_by_id,
 			        u.name AS uploaded_by_name
-			 FROM case_document cd
-			 JOIN user          u ON cd.uploaded_by_id = u.id
+			 FROM case_document         cd
+			 JOIN "justice_firm"."user" u ON cd.uploaded_by_id = u.id
 			 WHERE case_id = ?;`,
-			[data.caseId]
+			[BigInt(data.caseId)]
 		);
 		const caseDocuments                                 = res?.map((value): CaseDocumentData => {
 			return {
@@ -1207,9 +1220,9 @@ The Justice Firm Foundation`;
 		return response(200, caseDocuments);
 	}
 
-	private async insertSpecializationTypesWithConnection (specializationTypes: Array<ID_T>, userId: number | bigint, conn: PoolConnection) {
-		let params = specializationTypes.map(value => ([userId, value]));
-		return await conn.batch("INSERT INTO lawyer_specialization(lawyer_id, case_type_id) VALUES (?, ?);", params);
+	private async insertSpecializationTypesWithConnection (specializationTypes: Array<ID_T>, userId: number | bigint, conn: PoolConnectionPatch) {
+		let params = specializationTypes.map(value => ([BigInt(userId), value] as [bigint, string]));
+		return await conn.batchInsert("lawyer_specialization", ["lawyer_id", "case_type_id"], params);
 	}
 
 	private async verifyCaseAccess (authToken: AuthToken, caseId: ID_T): Promise<PrivateAuthToken | [number, string]> {
@@ -1219,8 +1232,8 @@ The Justice Firm Foundation`;
 			return [constants.HTTP_STATUS_UNAUTHORIZED, "Invalid auth token"];
 		}
 
-		const res: Record<string, any>[] = await (await this.common.getPool()).execute(
-			"SELECT s.lawyer_id, s.client_id FROM `case` s WHERE s.id = ?;", [BigInt(caseId)]);
+		const res: Record<string, any>[] = await (await this.common.getPool()).query(
+			`SELECT s.lawyer_id, s.client_id FROM "justice_firm"."case" S WHERE S.id = ?;`, [BigInt(caseId)]);
 
 		if (res.length === 0) {
 			return [400, "No such case found"];
@@ -1266,20 +1279,20 @@ The Justice Firm Foundation`;
 	private async getLoginResponse (email: string, password: string) {
 		const jwtSecret = await this.common.getJwtSecret();
 
-		const resSet: {
-			id: number | bigint,
-			password_hash: string,
-			type: UserAccessType,
-			name: string
-		}[] = await (await this.common.getPool()).execute(
-			"SELECT id, name, password_hash, type FROM user WHERE user.email = ?;",
+		const resSet = await (await this.common.getPool()).query(
+			`SELECT id, name, password_hash, type FROM "justice_firm"."user" WHERE email = ?;`,
 			[email]
 		);
 
 		if (resSet.length === 0) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Email not used to sign up a user");
 		}
-		const {password_hash: passwordHash, id, type, name} = resSet[0];
+		const {password_hash: passwordHash, id, type, name} = resSet[0] as {
+			id: number | bigint,
+			password_hash: string,
+			type: UserAccessType,
+			name: string
+		};
 		if (!compareSync(password, passwordHash.toString())) {
 			return false;
 		}

@@ -8,7 +8,7 @@ const props = defineProps<{
 </script>
 
 <template>
-<div class="full-screen-underlay d-flex align-center justify-center" :style="`z-index: ${props.zIndex??-1}`">
+<div class="full-screen-underlay d-flex align-center justify-center" :style="`z-index: ${props.zIndex??1000}`">
 	<Loader :primary-color="props.primaryColor" />
 </div>
 </template>

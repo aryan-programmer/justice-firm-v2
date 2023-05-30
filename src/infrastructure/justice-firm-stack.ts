@@ -53,6 +53,7 @@ export class JusticeFirmStack extends Stack {
 	private dbEndpoint: string;
 	private dbPort: string;
 	private dbUsername: string;
+	private dbDatabaseName: string;
 	private dbPassword: IStringParameter;
 	private jwtSecret: IStringParameter;
 	private redisEndpoint: string;
@@ -168,10 +169,11 @@ export class JusticeFirmStack extends Stack {
 	}
 
 	private getConstsAndSecrets () {
-		this.dbEndpoint = ssm.StringParameter.valueForStringParameter(this, "/justice-firm/db/endpoint");
-		this.dbPort     = ssm.StringParameter.valueForStringParameter(this, "/justice-firm/db/port");
-		this.dbUsername = ssm.StringParameter.valueForStringParameter(this, "/justice-firm/db/username");
-		this.dbPassword = ssm.StringParameter.fromSecureStringParameterAttributes(
+		this.dbEndpoint     = ssm.StringParameter.valueForStringParameter(this, "/justice-firm/db/endpoint");
+		this.dbPort         = ssm.StringParameter.valueForStringParameter(this, "/justice-firm/db/port");
+		this.dbUsername     = ssm.StringParameter.valueForStringParameter(this, "/justice-firm/db/username");
+		this.dbDatabaseName = ssm.StringParameter.valueForStringParameter(this, "/justice-firm/db/database-name");
+		this.dbPassword     = ssm.StringParameter.fromSecureStringParameterAttributes(
 			this,
 			`${this.apiName}-DbPassword`,
 			{parameterName: "/justice-firm/db/password"}
@@ -203,6 +205,7 @@ export class JusticeFirmStack extends Stack {
 				DB_ENDPOINT:                                  this.dbEndpoint,
 				DB_PORT:                                      this.dbPort,
 				DB_USERNAME:                                  this.dbUsername,
+				DB_DATABASE_NAME:                             this.dbDatabaseName,
 				DB_PASSWORD:                                  this.dbPassword.parameterName,
 				REDIS_ENDPOINT:                               this.redisEndpoint,
 				REDIS_PORT:                                   this.redisPort,

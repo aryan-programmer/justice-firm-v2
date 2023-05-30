@@ -15,7 +15,7 @@ import {deg2rad, isNullOrEmpty, nullOrEmptyCoalesce, toNumIfNotNull} from "../co
 import {Nuly} from "../common/utils/types";
 import {CommonApiMethods} from "./common-api-methods";
 import {cacheExpiryTimeMs} from "./utils/constants";
-import {getSqlTupleForInOperator} from "./utils/functions";
+import {repeatedQuestionMarks} from "./utils/functions";
 
 const baseLawyerColumns = "u.id, u.name, u.email, u.phone, u.address, u.photo_path, u.gender, l.latitude, l.longitude, l.certification_link, l.status, l.rejection_reason";
 
@@ -129,7 +129,7 @@ export class DbModelMethods extends CommonApiMethods {
 		}) {
 		const client                        = await this.getRedisClient();
 		const invalidateCaseSpecializations = options?.invalidateCaseSpecializations === true;
-		if (invalidateCaseSpecializations && typeof id === "string") {
+		if (!invalidateCaseSpecializations && typeof id === "string") {
 			await client.del(LAWYER_DATA(id));
 		} else {
 			const vs             = typeof id === "string" ? [id] : id;
@@ -165,12 +165,13 @@ export class DbModelMethods extends CommonApiMethods {
 		forceRefetch ??= false;
 		const pool = await this.getPool();
 
+		const bid = BigInt(id);
 		const lawyer: LawyerSearchResult | Nuly = await this.cacheResult(LAWYER_DATA(id), async () => {
-			const res: Record<string, any>[] = await pool.execute(
+			const res: Record<string, any>[] = await pool.query(
 				`SELECT ${baseLawyerColumns}
-				 FROM lawyer l
-				 JOIN user   u ON u.id = l.id
-				 WHERE l.id = ?;`, [id]);
+				 FROM lawyer                l
+				 JOIN "justice_firm"."user" u ON u.id = l.id
+				 WHERE l.id = ?;`, [bid]);
 			if (res.length === 0) {
 				return null;
 			}
@@ -183,13 +184,13 @@ export class DbModelMethods extends CommonApiMethods {
 
 		if (getCaseSpecializations) {
 			lawyer.caseSpecializations = await this.cacheResult(LAWYER_CASE_SPECIALIZATIONS(id), async () => {
-				const res: Record<string, any>[] = await pool.execute(
+				const res: Record<string, any>[] = await pool.query(
 					`SELECT ct.id,
 					        ct.name
 					 FROM lawyer_specialization ls
 					 JOIN case_type             ct
 					      ON ct.id = ls.case_type_id
-					 WHERE ls.lawyer_id = ?;`, [id]);
+					 WHERE ls.lawyer_id = ?;`, [bid]);
 				return res.map(value => ({
 					id:   value.id.toString(),
 					name: value.name.toString(),
@@ -199,7 +200,7 @@ export class DbModelMethods extends CommonApiMethods {
 
 		if (getStatistics) {
 			lawyer.statistics = await this.NOT_CACHE_RESULT(`lawyer:${id}:statistics`, async () => {
-				const res: Record<string, any>[] = await pool.execute(
+				const res: Record<string, any>[] = await pool.query(
 					`SELECT las.rejected_appointments,
 					        las.waiting_appointments,
 					        las.confirmed_appointments,
@@ -208,7 +209,7 @@ export class DbModelMethods extends CommonApiMethods {
 					        lcs.total_clients
 					 FROM lawyer_appointment_statistics las
 					 JOIN lawyer_case_statistics        lcs ON las.lawyer_id = lcs.lawyer_id
-					 WHERE las.lawyer_id = ?;`, [id]);
+					 WHERE las.lawyer_id = ?;`, [bid]);
 				if (res.length === 0) {
 					return null;
 				}
@@ -218,7 +219,7 @@ export class DbModelMethods extends CommonApiMethods {
 
 		if (getBareAppointments) {
 			lawyer.appointments = await this.NOT_CACHE_RESULT(LAWYER_BARE_APPOINTMENTS(id), async () => {
-				const res: Record<string, any>[] = await pool.execute(
+				const res: Record<string, any>[] = await pool.query(
 					`SELECT a.id,
 					        a.client_id AS oth_id,
 					        cu.name     AS oth_name,
@@ -227,7 +228,7 @@ export class DbModelMethods extends CommonApiMethods {
 					        a.opened_on,
 					        a.timestamp
 					 FROM appointment a
-					 JOIN user        cu ON a.client_id = cu.id
+					 JOIN "justice_firm"."user"        cu ON a.client_id = cu.id
 					 WHERE a.lawyer_id = ?;`, [BigInt(lawyer.id)]);
 				return res.map(value => ({
 					id:        value.id.toString(),
@@ -243,7 +244,7 @@ export class DbModelMethods extends CommonApiMethods {
 
 		if (getBareCases) {
 			lawyer.cases = await this.NOT_CACHE_RESULT(LAWYER_BARE_CASES(id), async () => {
-				const res: Record<string, any>[] = await pool.execute(
+				const res: Record<string, any>[] = await pool.query(
 					`SELECT c.id,
 					        c.client_id AS oth_id,
 					        cu.name     AS oth_name,
@@ -251,9 +252,9 @@ export class DbModelMethods extends CommonApiMethods {
 					        ct.name     AS type_name,
 					        c.status,
 					        c.opened_on
-					 FROM \`case\`  c
-					 JOIN user      cu ON c.client_id = cu.id
-					 JOIN case_type ct ON c.type_id = ct.id
+					 FROM "justice_firm"."case" c
+					 JOIN "justice_firm"."user" cu ON c.client_id = cu.id
+					 JOIN case_type             ct ON c.type_id = ct.id
 					 WHERE c.lawyer_id = ?;`, [BigInt(lawyer.id)]);
 				return res.map(value => ({
 					id:       value.id.toString(),
@@ -311,7 +312,7 @@ export class DbModelMethods extends CommonApiMethods {
 	   AND MATCH (email) AGAINST ( ? IN BOOLEAN MODE )
 	   AND MATCH (address) AGAINST ( ? IN BOOLEAN MODE );`*/
 		const queryResults: Record<string, any>[] = await pool.query(
-			"SELECT id FROM user WHERE name LIKE ? AND email LIKE ? AND address LIKE ? AND type = 'lawyer'",
+			`SELECT id FROM "justice_firm"."user" WHERE name LIKE ? AND email LIKE ? AND address LIKE ? AND type = 'lawyer'`,
 			[name, email, address]);
 
 		const ids = filterMap(queryResults, value => value?.id?.toString() as string | Nuly);
@@ -343,11 +344,11 @@ export class DbModelMethods extends CommonApiMethods {
 		console.log(needToFetchIds.length, needToFetchIds);
 		if (needToFetchIds.length > 0) {
 			const {statusWherePart, statusQueryArray}  = getSqlWhereAndClauseFromStatus(status);
-			const sqlRes: Record<string, any>[]        = await pool.execute(
+			const sqlRes: Record<string, any>[]        = await pool.query(
 				`SELECT ${baseLawyerColumns}
 				 FROM lawyer l
-				 JOIN user   u ON u.id = l.id
-				 WHERE l.id IN (${getSqlTupleForInOperator(needToFetchIds.length)})
+				 JOIN "justice_firm"."user"   u ON u.id = l.id
+				 WHERE l.id IN (${repeatedQuestionMarks(needToFetchIds.length)})
 				   AND ${statusWherePart};`,
 				[...needToFetchIds.map(BigInt), ...statusQueryArray]);
 			const lawyersFromSql: LawyerSearchResult[] = sqlRes.map((v) => DbModelMethods.recordToLawyerSearchResult(v));
@@ -396,7 +397,7 @@ export class DbModelMethods extends CommonApiMethods {
 				        lcs.total_clients
 				 FROM lawyer_appointment_statistics las
 				 JOIN lawyer_case_statistics        lcs ON las.lawyer_id = lcs.lawyer_id
-				 WHERE lcs.lawyer_id IN (${getSqlTupleForInOperator(lawyersByStatus.length)})`,
+				 WHERE lcs.lawyer_id IN (${repeatedQuestionMarks(lawyersByStatus.length)})`,
 				lawyersByStatus.map(value => BigInt(value.id)));
 			for (let i = 0; i < lawyersByStatus.length; i++) {
 				const lawyer: LawyerSearchResult = lawyersByStatus[i];

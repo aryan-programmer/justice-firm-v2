@@ -2,6 +2,7 @@ import {EventEmitter} from "eventemitter3";
 import {Either, isLeft, left, right} from "fp-ts/lib/Either";
 import isBlob from "is-blob";
 import WebSocketAsPromised from "websocket-as-promised";
+import {isNullOrEmpty} from "../../common/utils/functions";
 import {sleep} from "../../common/utils/sleep";
 import {constants} from "../constants";
 import {APIEndpoints, Endpoint, EndpointSchema,} from "../endpoint";
@@ -153,9 +154,10 @@ export function websocketClient<TEndpoints extends APIEndpoints = APIEndpoints,
 				packMessage:      data => JSON.stringify(data),
 				unpackMessage:    data => {
 					if (typeof data === "string") {
-						return JSON.parse(data);
+						// console.log(data);
+						return isNullOrEmpty(data) ? null : JSON.parse(data);
 					} else if (isBlob(data)) {
-						return data.text().then(v => JSON.parse(v))
+						return data.text().then(v => isNullOrEmpty(v) ? null : JSON.parse(v))
 					}
 					return Buffer.from(data).toJSON();
 				}
@@ -165,7 +167,10 @@ export function websocketClient<TEndpoints extends APIEndpoints = APIEndpoints,
 		async open () {
 			const value = await this.wsConnection.open();
 			this.wsConnection.onMessage.addListener(ev => {
-				const data: Record<string, any> = typeof ev === "string" ? JSON.parse(ev) : ev;
+				const data: Record<string, any> =
+					      typeof ev === "string" ?
+					      isNullOrEmpty(ev) ? null : JSON.parse(ev) :
+					      ev;
 				if (data == null || !("event" in data) || typeof data.event !== "string") return;
 				const eventName = data.event;
 				if (validateEventsData) {

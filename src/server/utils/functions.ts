@@ -160,6 +160,10 @@ export function sha256 (data: BinaryLike) {
 	return createHash('sha256').update(data).digest('base64');
 }
 
-export function getSqlTupleForInOperator (inTupleArrayLength: number) {
-	return "?" + ",?".repeat(inTupleArrayLength - 1);
+export function repeatedNTimesWithDelimiter (s: string, delim: string, n: number) {
+	return s + (delim + s).repeat(n - 1);
+}
+
+export function repeatedQuestionMarks (n: number) {
+	return "?" + ",?".repeat(n - 1);
 }
