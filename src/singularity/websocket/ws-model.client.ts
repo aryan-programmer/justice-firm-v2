@@ -151,7 +151,7 @@ export function websocketClient<TEndpoints extends APIEndpoints = APIEndpoints,
 			this.wsConnection = new WebSocketAsPromised(baseUrl, {
 				attachRequestId:  (data, requestId) => Object.assign({[WS_SEND_REQUEST_ID]: requestId}, data),
 				extractRequestId: data => data?.[WS_SEND_REQUEST_ID],
-				packMessage:      data => JSON.stringify(data),
+				packMessage:      data => JSON.stringify(data, null, 0),
 				unpackMessage:    data => {
 					if (typeof data === "string") {
 						// console.log(data);
@@ -167,6 +167,7 @@ export function websocketClient<TEndpoints extends APIEndpoints = APIEndpoints,
 		async open () {
 			const value = await this.wsConnection.open();
 			this.wsConnection.onMessage.addListener(ev => {
+				// console.log(ev);
 				const data: Record<string, any> =
 					      typeof ev === "string" ?
 					      isNullOrEmpty(ev) ? null : JSON.parse(ev) :

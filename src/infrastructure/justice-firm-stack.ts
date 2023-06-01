@@ -14,17 +14,18 @@ import {
 import {RestApi} from "aws-cdk-lib/aws-apigateway";
 import {AttributeType, BillingMode} from "aws-cdk-lib/aws-dynamodb";
 import {Effect, PolicyStatement, ServicePrincipal} from "aws-cdk-lib/aws-iam";
-import {Code, Function, FunctionProps, Runtime} from "aws-cdk-lib/aws-lambda";
+import {Code, Function, FunctionProps, IFunction, Runtime} from "aws-cdk-lib/aws-lambda";
 import {Bucket, BucketAccessControl, BucketEncryption, HttpMethods} from "aws-cdk-lib/aws-s3";
+import {Topic} from "aws-cdk-lib/aws-sns";
+import {LambdaSubscription} from "aws-cdk-lib/aws-sns-subscriptions";
 import {IStringParameter} from "aws-cdk-lib/aws-ssm";
 import {Construct} from 'constructs';
 import mapValues from "lodash/mapValues";
 import 'reflect-metadata';
 import {
+	CONNECTION_GROUP_ID,
 	CONNECTION_ID,
-	CONNECTION_KEY_ID,
-	CONNECTION_TYPE,
-	connectionsByKeyIdIndex,
+	connectionsByGroupIdIndex,
 	MESSAGE_GROUP,
 	MESSAGE_TIMESTAMP
 } from "../common/infrastructure-constants";
@@ -43,13 +44,17 @@ const notificationsCallbackUrlParamName = "/justice-firm/ws-notifications-api/ca
 export class JusticeFirmStack extends Stack {
 	private readonly apiName: string;
 
-	private lambda: Function;
+	private apiFunnelLambda: Function;
+	private eventAndNotifsLambda: Function;
 	private s3Bucket: Bucket;
 	private passwordResetOtpTable: aws_dynamodb.Table;
 	private connectionsTable: aws_dynamodb.Table;
 	private messagesTable: aws_dynamodb.Table;
 	private api: RestApi;
-	private wsApi: WebSocketApi;
+	private jfChatterBoxWsApi: WebSocketApi;
+	private jfChatterBoxWsApiStage: WebSocketStage;
+	private jfNotificationsWsApi: WebSocketApi;
+	private jfNotificationsWsApiStage: WebSocketStage;
 	private dbEndpoint: string;
 	private dbPort: string;
 	private dbUsername: string;
@@ -60,9 +65,9 @@ export class JusticeFirmStack extends Stack {
 	private redisPort: string;
 	private redisUsername: string;
 	private redisPassword: IStringParameter;
-	private wsApiStage: WebSocketStage;
 	private wsChatterBoxApiCallbackUrlParam: IStringParameter;
 	private wsNotificationsApiCallbackUrlParam: IStringParameter;
+	private eventsSnsTopic: Topic;
 
 	constructor (scope: Construct, id: string, props?: StackProps) {
 		super(scope, id, props);
@@ -72,10 +77,13 @@ export class JusticeFirmStack extends Stack {
 		this.makeMessagesTable();
 		this.makeConnectionsTable();
 		this.makePasswordResetOtpTable();
+		this.makeEventsSnsTopic();
 		this.getConstsAndSecrets();
-		this.makeLambdaFunction();
+		this.makeLambdaFunctions();
 		this.makeRestApi();
-		this.makeWebSocketApi();
+		this.makeChatterBoxWebSocketApi();
+		this.makeNotificationsWebSocketApi();
+		this.addEventsSnsTopicSubscriptions();
 		this.grantIamPolicies();
 	}
 
@@ -129,15 +137,15 @@ export class JusticeFirmStack extends Stack {
 			writeCapacity: 3,
 		});
 		this.connectionsTable.addGlobalSecondaryIndex({
-			indexName:     connectionsByKeyIdIndex,
-			partitionKey:  {
-				name: CONNECTION_KEY_ID,
+			indexName:    connectionsByGroupIdIndex,
+			partitionKey: {
+				name: CONNECTION_GROUP_ID,
 				type: AttributeType.STRING
 			},
-			sortKey:       {
-				name: CONNECTION_TYPE,
-				type: AttributeType.STRING
-			},
+			// sortKey:       {
+			// 	name: CONNECTION_TYPE,
+			// 	type: AttributeType.STRING
+			// },
 			readCapacity:  3,
 			writeCapacity: 3,
 		});
@@ -168,6 +176,13 @@ export class JusticeFirmStack extends Stack {
 		});
 	}
 
+	private makeEventsSnsTopic () {
+		const snsTopicId    = `${this.apiName}-EventsSNSTopic`;
+		this.eventsSnsTopic = new Topic(this, snsTopicId, {
+			displayName: snsTopicId,
+		});
+	}
+
 	private getConstsAndSecrets () {
 		this.dbEndpoint     = ssm.StringParameter.valueForStringParameter(this, "/justice-firm/db/endpoint");
 		this.dbPort         = ssm.StringParameter.valueForStringParameter(this, "/justice-firm/db/port");
@@ -195,35 +210,57 @@ export class JusticeFirmStack extends Stack {
 		);
 	}
 
-	private makeLambdaFunction () {
-		const props: FunctionProps = {
-			runtime:     Runtime.NODEJS_18_X,
-			handler:     `app.handler`,
-			code:        Code.fromAsset(path.resolve(__dirname, "../server/dist")),
+	private makeLambdaFunctions () {
+		const commonEnvironment = {
+			REDIS_ENDPOINT:         this.redisEndpoint,
+			REDIS_PORT:             this.redisPort,
+			REDIS_USERNAME:         this.redisUsername,
+			REDIS_PASSWORD:         this.redisPassword.parameterName,
+			S3_BUCKET:              this.s3Bucket.bucketName,
+			JWT_SECRET:             this.jwtSecret.parameterName,
+			CONNECTIONS_TABLE_NAME: this.connectionsTable.tableName,
+			MESSAGES_TABLE_NAME:    this.messagesTable.tableName,
+			EVENTS_SNS_TOPIC_ARN:   this.eventsSnsTopic.topicArn,
+			NODE_OPTIONS:           "--enable-source-maps --stack_trace_limit=200",
+		};
+
+		const eventListenerLambdaProps: FunctionProps = {
+			runtime: Runtime.NODEJS_18_X,
+			handler: `app.handler`,
+			// architecture: Architecture.ARM_64,
+			code:        Code.fromAsset(path.resolve(__dirname, "../server/dist/events-and-notifications-apis")),
 			timeout:     Duration.minutes(1),
 			environment: {
-				DB_ENDPOINT:                                  this.dbEndpoint,
-				DB_PORT:                                      this.dbPort,
-				DB_USERNAME:                                  this.dbUsername,
-				DB_DATABASE_NAME:                             this.dbDatabaseName,
-				DB_PASSWORD:                                  this.dbPassword.parameterName,
-				REDIS_ENDPOINT:                               this.redisEndpoint,
-				REDIS_PORT:                                   this.redisPort,
-				REDIS_USERNAME:                               this.redisUsername,
-				REDIS_PASSWORD:                               this.redisPassword.parameterName,
-				S3_BUCKET:                                    this.s3Bucket.bucketName,
-				JWT_SECRET:                                   this.jwtSecret.parameterName,
-				PASSWORD_RESET_OTP_TABLE_NAME:                this.passwordResetOtpTable.tableName,
-				CONNECTIONS_TABLE_NAME:                       this.connectionsTable.tableName,
-				MESSAGES_TABLE_NAME:                          this.messagesTable.tableName,
-				WS_CHATTER_BOX_API_CALLBACK_URL_PARAM_NAME:   chatterBoxCallbackUrlParamName,
+				...commonEnvironment,
 				WS_NOTIFICATIONS_API_CALLBACK_URL_PARAM_NAME: notificationsCallbackUrlParamName,
-				SES_SOURCE_EMAIL_ADDRESS:                     "justice.firm.norepley@gmail.com",
-				NODE_OPTIONS:                                 "--enable-source-maps --stack_trace_limit=200",
 			},
 			memorySize:  1024,
 		};
-		this.lambda                = new Function(this, `${this.apiName}-FunnelFunction`, props);
+
+		const funnelLambdaProps: FunctionProps = {
+			runtime: Runtime.NODEJS_18_X,
+			handler: `app.handler`,
+			// architecture: Architecture.ARM_64,
+			code:        Code.fromAsset(path.resolve(__dirname, "../server/dist/rest-ws-apis")),
+			timeout:     Duration.minutes(1),
+			environment: {
+				...commonEnvironment,
+				DB_ENDPOINT:                                this.dbEndpoint,
+				DB_PORT:                                    this.dbPort,
+				DB_USERNAME:                                this.dbUsername,
+				DB_DATABASE_NAME:                           this.dbDatabaseName,
+				DB_PASSWORD:                                this.dbPassword.parameterName,
+				SES_SOURCE_EMAIL_ADDRESS:                   "justice.firm.norepley@gmail.com",
+				PASSWORD_RESET_OTP_TABLE_NAME:              this.passwordResetOtpTable.tableName,
+				WS_CHATTER_BOX_API_CALLBACK_URL_PARAM_NAME: chatterBoxCallbackUrlParamName,
+			},
+			memorySize:  1024,
+		};
+
+		this.eventAndNotifsLambda = new Function(this,
+			`${this.apiName}-EventAndNotificationsFunction`,
+			eventListenerLambdaProps);
+		this.apiFunnelLambda      = new Function(this, `${this.apiName}-FunnelFunction`, funnelLambdaProps);
 	}
 
 	private makeRestApi () {
@@ -236,7 +273,7 @@ export class JusticeFirmStack extends Stack {
 			},
 		});
 
-		const lambdaIntegration = new LambdaIntegrationNoPermission(this.lambda, {proxy: true});
+		const lambdaIntegration = new LambdaIntegrationNoPermission(this.apiFunnelLambda, {proxy: true});
 		const resourceMap       = new ApiGatewayResourceMap(this.api.root);
 
 		mapValues(justiceFirmApiSchema.endpoints, <TReq, TRes> (value: EndpointSchema<TReq, TRes>) => {
@@ -244,71 +281,114 @@ export class JusticeFirmStack extends Stack {
 		});
 
 		// See: https://github.com/aws/aws-cdk/issues/9327#issuecomment-858372987
-		this.lambda.addPermission(`${this.apiName}-APIGWPermissions`, {
+		this.apiFunnelLambda.addPermission(`${this.apiName}-APIGWPermissions`, {
 			action:    'lambda:InvokeFunction',
 			principal: new ServicePrincipal('apigateway.amazonaws.com'),
 			sourceArn: this.api.arnForExecuteApi()
 		});
 	}
 
-	private makeWebSocketApi () {
-		const wsApiName = jfChatterBoxApiSchema.name;
-		const lambda    = this.lambda;
+	private makeChatterBoxWebSocketApi () {
+		const wsChatterBoxApiName = jfChatterBoxApiSchema.name;
 
-		function getRouteOptions (): WebSocketRouteOptions {
+		function getRouteOptions (routeName: string, lambda: IFunction): WebSocketRouteOptions {
 			return {
-				integration:    new WebSocketLambdaIntegration(`${wsApiName}-LambdaIntegration`, lambda),
+				integration:    new WebSocketLambdaIntegration(`${wsChatterBoxApiName}-${routeName}-LambdaIntegration`,
+					lambda),
 				returnResponse: true,
 			};
 		}
 
-		this.wsApi      = new WebSocketApi(this, wsApiName, {
-			apiName:                wsApiName,
-			connectRouteOptions:    getRouteOptions(),
-			disconnectRouteOptions: getRouteOptions(),
+		this.jfChatterBoxWsApi      = new WebSocketApi(this, wsChatterBoxApiName, {
+			apiName:                wsChatterBoxApiName,
+			connectRouteOptions:    getRouteOptions("$connect", this.apiFunnelLambda),
+			disconnectRouteOptions: getRouteOptions("$disconnect", this.apiFunnelLambda),
 		});
-		this.wsApiStage = new WebSocketStage(this, `${wsApiName}-ProdStage`, {
-			webSocketApi: this.wsApi,
+		this.jfChatterBoxWsApiStage = new WebSocketStage(this, `${wsChatterBoxApiName}-ProdStage`, {
+			webSocketApi: this.jfChatterBoxWsApi,
 			stageName:    'prod',
 			autoDeploy:   true,
 		});
 
 		mapValues(jfChatterBoxApiSchema.endpoints, <TReq, TRes> (value: EndpointSchema<TReq, TRes>) => {
 			if (value.path === "$connect" || value.path === "$disconnect") return;
-			this.wsApi.addRoute(value.path, getRouteOptions());
+			this.jfChatterBoxWsApi.addRoute(value.path, getRouteOptions(value.path, this.apiFunnelLambda));
 		});
 
-		this.wsChatterBoxApiCallbackUrlParam    = new ssm.StringParameter(this, `${wsApiName}-CallbackUrlParam`, {
-			stringValue:   this.wsApiStage.callbackUrl,
-			parameterName: chatterBoxCallbackUrlParamName
-		});
-		this.wsNotificationsApiCallbackUrlParam = new ssm.StringParameter(this,
-			`${jfNotificationsApiSchema.name}-CallbackUrlParam`,
+		this.wsChatterBoxApiCallbackUrlParam = new ssm.StringParameter(this,
+			`${wsChatterBoxApiName}-CallbackUrlParam`,
 			{
-				stringValue:   this.wsApiStage.callbackUrl,
+				stringValue:   this.jfChatterBoxWsApiStage.callbackUrl,
+				parameterName: chatterBoxCallbackUrlParamName
+			});
+	}
+
+	private makeNotificationsWebSocketApi () {
+		const wsNotificationsApiName = jfNotificationsApiSchema.name;
+		const lambda                 = this.eventAndNotifsLambda;
+
+		function getRouteOptions (routeName: string): WebSocketRouteOptions {
+			return {
+				integration:    new WebSocketLambdaIntegration(`${wsNotificationsApiName}-${routeName}-LambdaIntegration`,
+					lambda),
+				returnResponse: true,
+			};
+		}
+
+		this.jfNotificationsWsApi      = new WebSocketApi(this, wsNotificationsApiName, {
+			apiName:                wsNotificationsApiName,
+			connectRouteOptions:    getRouteOptions("$connect"),
+			disconnectRouteOptions: getRouteOptions("$disconnect"),
+		});
+		this.jfNotificationsWsApiStage = new WebSocketStage(this, `${wsNotificationsApiName}-ProdStage`, {
+			webSocketApi: this.jfNotificationsWsApi,
+			stageName:    'prod',
+			autoDeploy:   true,
+		});
+
+		mapValues(jfNotificationsApiSchema.endpoints, <TReq, TRes> (value: EndpointSchema<TReq, TRes>) => {
+			if (value.path === "$connect" || value.path === "$disconnect") return;
+			this.jfNotificationsWsApi.addRoute(value.path, getRouteOptions(value.path));
+		});
+
+		this.wsNotificationsApiCallbackUrlParam = new ssm.StringParameter(this,
+			`${wsNotificationsApiName}-CallbackUrlParam`,
+			{
+				stringValue:   this.jfNotificationsWsApiStage.callbackUrl,
 				parameterName: notificationsCallbackUrlParamName
 			});
 	}
 
+	private addEventsSnsTopicSubscriptions () {
+		this.eventsSnsTopic.addSubscription(new LambdaSubscription(this.eventAndNotifsLambda, {}));
+	}
+
 	private grantIamPolicies () {
-		this.wsNotificationsApiCallbackUrlParam.grantRead(this.lambda);
-		this.wsChatterBoxApiCallbackUrlParam.grantRead(this.lambda);
-		this.dbPassword.grantRead(this.lambda);
-		this.redisPassword.grantRead(this.lambda);
-		this.jwtSecret.grantRead(this.lambda);
-		this.s3Bucket.grantDelete(this.lambda);
-		this.s3Bucket.grantPut(this.lambda);
-		this.s3Bucket.grantPutAcl(this.lambda);
-		this.s3Bucket.grantReadWrite(this.lambda);
-		this.messagesTable.grantReadWriteData(this.lambda);
-		this.passwordResetOtpTable.grantReadWriteData(this.lambda);
-		this.connectionsTable.grantReadWriteData(this.lambda);
-		this.wsApi.grantManageConnections(this.lambda);
+		this.wsChatterBoxApiCallbackUrlParam.grantRead(this.apiFunnelLambda);
+		this.dbPassword.grantRead(this.apiFunnelLambda);
+		this.redisPassword.grantRead(this.apiFunnelLambda);
+		this.jwtSecret.grantRead(this.apiFunnelLambda);
+		this.s3Bucket.grantDelete(this.apiFunnelLambda);
+		this.s3Bucket.grantPut(this.apiFunnelLambda);
+		this.s3Bucket.grantPutAcl(this.apiFunnelLambda);
+		this.s3Bucket.grantReadWrite(this.apiFunnelLambda);
+		this.messagesTable.grantReadWriteData(this.apiFunnelLambda);
+		this.passwordResetOtpTable.grantReadWriteData(this.apiFunnelLambda);
+		this.connectionsTable.grantReadWriteData(this.apiFunnelLambda);
+		this.eventsSnsTopic.grantPublish(this.apiFunnelLambda);
+		this.jfChatterBoxWsApi.grantManageConnections(this.apiFunnelLambda);
 		this.addSesPolicy();
+
+		this.wsNotificationsApiCallbackUrlParam.grantRead(this.eventAndNotifsLambda);
+		this.redisPassword.grantRead(this.eventAndNotifsLambda);
+		this.jwtSecret.grantRead(this.eventAndNotifsLambda);
+		this.messagesTable.grantReadWriteData(this.eventAndNotifsLambda);
+		this.connectionsTable.grantReadWriteData(this.eventAndNotifsLambda);
+		this.jfNotificationsWsApi.grantManageConnections(this.eventAndNotifsLambda);
 	}
 
 	private addSesPolicy () {
-		this.lambda.addToRolePolicy(
+		this.apiFunnelLambda.addToRolePolicy(
 			new PolicyStatement({
 				effect:    Effect.ALLOW,
 				actions:   [

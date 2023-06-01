@@ -4,6 +4,7 @@ import {CaseType} from "../../../common/db-types";
 import {CaseSparseData} from "../../../common/rest-api-schema";
 import {compareDates, dateFormat, trimStr} from "../../../common/utils/functions";
 import {Nuly} from "../../../common/utils/types";
+import {strToDate} from "../../../server/common/utils/date-to-str";
 import {DataTableHeader, TypedDataTableHeader} from "../../utils/types";
 import TablePlaceholder from "../placeholders/TablePlaceholder.vue";
 
@@ -39,7 +40,7 @@ const cases = computed(() =>
 		return {
 			...val,
 			caseName:    val.caseType.name,
-			openedOn:    new Date(val.openedOn),
+			openedOn:    strToDate(val.openedOn),
 			description: trimStr(val.description),
 		} as CaseDataDisplayable;
 	}) ?? []);

@@ -86,7 +86,7 @@ function fetchImplementationMapper<TEndpoints extends APIEndpoints = APIEndpoint
 			}
 
 			const response = await fetch(endpointPath, {
-				body:   JSON.stringify(body),
+				body:   JSON.stringify(body, null, 0),
 				method: endpoint.method,
 			});
 			const origBody = response.status === constants.HTTP_STATUS_NO_CONTENT ? undefined : await response.json();

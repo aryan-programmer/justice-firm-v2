@@ -59,37 +59,34 @@ let commonOptions: BuildOptions = {
 	metafile,
 };
 
-// let apiImplOptions: BuildOptions = {
-// 	...commonOptions,
-// 	entryPoints: /**/[path.resolve(sourcePath, "api-impl.ts")],
-// 	outfile: /*     */path.resolve(buildPath, "api-impl/nodejs/api-impl.js"),
-// };
-
-// const s = "./api-impl/nodejs/api-impl.js";
-let apiAppOptions: BuildOptions = {
+let apiAppOptions: BuildOptions           = {
 	...commonOptions,
-	entryPoints: /**/ [path.resolve(sourcePath, "app.ts")],
-	outfile: /*     */path.resolve(buildPath, "app.js"),
-	absWorkingDir:    __dirname,
-	// external: ["src/server/api-impl", s],
-	// alias: {
-	// 	"src/server/api-impl": s
-	// },
+	entryPoints:   [path.resolve(sourcePath, "./rest-ws-apis/app.ts")],
+	outfile:       path.resolve(buildPath, "./rest-ws-apis/app.js"),
+	absWorkingDir: __dirname,
+};
+let snsEventListenerOptions: BuildOptions = {
+	...commonOptions,
+	entryPoints:   [path.resolve(sourcePath, "./events-and-notifications-apis/app.ts")],
+	outfile:       path.resolve(buildPath, "./events-and-notifications-apis/app.js"),
+	absWorkingDir: __dirname,
 };
 
 (async () => {
 	if (watch) {
-		// let apiImplContext = await esbuild.context(apiImplOptions);
 		let apiAppContext = await esbuild.context(apiAppOptions);
-		// console.log("Watching src/server/api-impl.ts");
-		console.log("Watching src/server/app.ts");
-		// await apiImplContext.watch();
+		console.log("Watching src/server/rest-ws-apis/app.ts");
 		await apiAppContext.watch();
+
+		let snsEventListenerContext = await esbuild.context(snsEventListenerOptions);
+		console.log("Watching src/server/events-and-notifications-apis/app.ts");
+		await snsEventListenerContext.watch();
 	} else {
-		// await esbuild.build(apiImplOptions);
-		const res = await esbuild.build(apiAppOptions);
+		const restWsApiRes        = await esbuild.build(apiAppOptions);
+		const snsEventListenerRes = await esbuild.build(snsEventListenerOptions);
 		if (metafile) {
-			fs.writeFileSync('server-build-metafile.json', JSON.stringify(res.metafile));
+			fs.writeFileSync('./server-build-metafiles/rest-ws-apis.json', JSON.stringify(restWsApiRes.metafile));
+			fs.writeFileSync('./server-build-metafiles/events-and-notifications-apis.json', JSON.stringify(snsEventListenerRes.metafile));
 		}
 		process.exit(0);
 	}

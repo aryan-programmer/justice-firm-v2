@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {FileUploadData} from "../../../server/utils/types";
+import {FileUploadData} from "../../../server/common/utils/types";
 import {isFilePreviewable} from "../../utils/functions";
 import FileDownloadButton from "./FileDownloadButton.vue";
 import FilePreview from "./FilePreview.vue";

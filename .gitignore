@@ -136,3 +136,4 @@ scratch/scratch.sql
 /server-build-metafile.json
 /.output/
 /scratch/
+/server-build-metafiles/

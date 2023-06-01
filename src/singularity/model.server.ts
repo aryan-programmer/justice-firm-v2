@@ -1,7 +1,7 @@
 import {APIGatewayProxyEvent, APIGatewayProxyResult} from "aws-lambda";
 import {Nuly, PromiseOr} from "../common/utils/types";
 import {constants} from "./constants";
-import {APIEndpoints, Endpoint, EndpointResult, FnParams, PromiseOrEndpointResult,} from "./endpoint";
+import {APIEndpoints, Endpoint, EndpointResult, FnParams, PromiseOrEndpointResult} from "./endpoint";
 import {APIAwsFunnelWrapper, APIImplementation, APIModelSchema} from "./schema";
 import {TypeCheckError} from "./types";
 
@@ -67,12 +67,11 @@ function awsWrapGetter<TEndpoints extends APIEndpoints = APIEndpoints> (
 	const {validateOutputs = true} = options ?? {};
 	return function awsWrap<TReqBody, TResBody> (endpoint: Endpoint<TReqBody, TResBody>, key: string) {
 		const implFn = async (params: FnParams<TReqBody>, event: APIGatewayProxyEvent): Promise<EndpointResult<TResBody>> => {
-			console.log("Calling implFn: ", key, {params, event});
-			const res = await impl[key](
+			// console.log("Calling implFn: ", key, {params, event});
+			// console.log("implFn result: ", res);
+			return await impl[key](
 				params,
 				event) as PromiseOrEndpointResult<TResBody>;
-			// console.log("implFn result: ", res);
-			return res;
 		};
 		return async function transformerFunction (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
 			const res: {
@@ -94,7 +93,7 @@ function awsWrapGetter<TEndpoints extends APIEndpoints = APIEndpoints> (
 					"Access-Control-Allow-Methods": "*",
 					...res.headers
 				},
-				body:    JSON.stringify(res.body)
+				body:    JSON.stringify(res.body, null, 0)
 			}
 		}
 	}

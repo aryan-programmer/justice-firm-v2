@@ -3,6 +3,7 @@ import {computed} from "#imports";
 import {AppointmentSparseData} from "../../../common/rest-api-schema";
 import {compareDates, dateFormat, trimStr} from "../../../common/utils/functions";
 import {Nuly} from "../../../common/utils/types";
+import {strToDate} from "../../../server/common/utils/date-to-str";
 import {DataTableHeader, TypedDataTableHeader} from "../../utils/types";
 import TablePlaceholder from "../placeholders/TablePlaceholder.vue";
 
@@ -34,8 +35,8 @@ const appointments = computed(() =>
 		return {
 			...val,
 			description: trimStr(val.description),
-			openedOn:    new Date(val.openedOn)!,
-			timestamp:   val.timestamp == null ? null : new Date(val.timestamp),
+			openedOn:    strToDate(val.openedOn)!,
+			timestamp:   val.timestamp == null ? null : strToDate(val.timestamp),
 		} as AppointmentDataDisplayable;
 	}) ?? []);
 </script>

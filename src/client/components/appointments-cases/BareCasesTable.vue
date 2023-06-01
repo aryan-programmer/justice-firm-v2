@@ -3,6 +3,7 @@ import {computed} from "#imports";
 import {CaseBareData, CaseType} from "../../../common/db-types";
 import {compareDates, dateFormat} from "../../../common/utils/functions";
 import {Nuly} from "../../../common/utils/types";
+import {strToDate} from "../../../server/common/utils/date-to-str";
 import {DataTableHeader, TypedDataTableHeader} from "../../utils/types";
 
 type CaseDataDisplayable = Omit<CaseBareData, "openedOn"> & {
@@ -36,7 +37,7 @@ const cases = computed(() =>
 		return {
 			...val,
 			caseName: val.caseType.name,
-			openedOn: new Date(val.openedOn),
+			openedOn: strToDate(val.openedOn),
 		} as CaseDataDisplayable;
 	}) ?? []);
 </script>

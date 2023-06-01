@@ -3,6 +3,7 @@ import {computed} from "#imports";
 import {AppointmentBareData} from "../../../common/db-types";
 import {compareDates, dateFormat} from "../../../common/utils/functions";
 import {Nuly} from "../../../common/utils/types";
+import {strToDate} from "../../../server/common/utils/date-to-str";
 import {DataTableHeader, TypedDataTableHeader} from "../../utils/types";
 
 type AppointmentDataDisplayable = Omit<AppointmentBareData, "timestamp" | "openedOn"> & {
@@ -35,8 +36,8 @@ const appointments = computed(() =>
 	props.appointments?.map((val: AppointmentBareData) => {
 		return {
 			...val,
-			openedOn:  new Date(val.openedOn)!,
-			timestamp: val.timestamp == null ? null : new Date(val.timestamp),
+			openedOn:  strToDate(val.openedOn)!,
+			timestamp: val.timestamp == null ? null : strToDate(val.timestamp),
 		} as AppointmentDataDisplayable;
 	}) ?? []);
 </script>

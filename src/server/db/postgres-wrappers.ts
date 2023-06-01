@@ -1,36 +1,7 @@
-import {GoneException} from "@aws-sdk/client-apigatewaymanagementapi";
-import {DeleteItemCommand, ReturnConsumedCapacity} from "@aws-sdk/client-dynamodb";
-import {GetParameterCommand} from "@aws-sdk/client-ssm";
 import {Pool, PoolClient, QueryResult} from "pg";
-import {createClient} from "redis";
-import {CONNECTION_ID} from "../common/infrastructure-constants";
-import {assert, nn} from "../common/utils/asserts";
-import {Nuly} from "../common/utils/types";
-import {uniqId} from "../common/utils/uniq-id";
-import {
-	connectionsTableName,
-	DB_DATABASE_NAME,
-	DB_ENDPOINT,
-	DB_PASSWORD_PARAMETER_NAME,
-	DB_PORT,
-	DB_USERNAME,
-	dynamoDbClient,
-	JWT_SECRET_PARAMETER_NAME,
-	REDIS_ENDPOINT,
-	REDIS_PASSWORD_PARAMETER_NAME,
-	REDIS_PORT,
-	REDIS_USERNAME,
-	ssmClient
-} from "./environment-clients";
-import {cacheExpiryTimeMs} from "./utils/constants";
-import {printConsumedCapacity, repeatedNTimesWithDelimiter, repeatedQuestionMarks} from "./utils/functions";
-import {RedisCacheTagger} from "./utils/redis-cache-tagging";
-
-const fakeRedisClient = true ? undefined as never : createClient({
-	url:      `${REDIS_ENDPOINT}:${REDIS_PORT}`,
-	username: REDIS_USERNAME,
-	password: "",
-});
+import {assert} from "../../common/utils/asserts";
+import {uniqId} from "../../common/utils/uniq-id";
+import {repeatedNTimesWithDelimiter, repeatedQuestionMarks} from "../common/utils/functions";
 
 export type UpsertResult = {
 	affectedRows: number;
@@ -86,6 +57,7 @@ async function execQuery<I extends any[] = any[]> (
 		};
 	}
 }
+
 
 export class PoolConnectionPatch {
 	constructor (public client: PoolClient) {
@@ -216,156 +188,5 @@ export class PoolPatch {
 			throw new Error("Queries must start with SELECT");
 		}
 		return (await execQuery(this.pool, queryText, values, idColumn)) as SelectResult;
-	}
-}
-
-export class CommonApiMethods {
-	private pool: Pool | Nuly                            = null;
-	private poolPatch: PoolPatch | Nuly                  = null;
-	private jwtSecret: string | Nuly                     = null;
-	private redisCacheTagger: RedisCacheTagger | Nuly    = null;
-	private redisClient: (typeof fakeRedisClient) | Nuly = null;
-
-	async getJwtSecret (): Promise<string> {
-		return this.jwtSecret ??= nn((await ssmClient.send(new GetParameterCommand({
-			Name:           JWT_SECRET_PARAMETER_NAME,
-			WithDecryption: true
-		}))).Parameter?.Value);
-	}
-
-	async getConnection () {
-		return new PoolConnectionPatch(await (await this.getPool()).pool.connect());
-	}
-
-	async getPool (): Promise<PoolPatch> {
-		const connectionLimit = 5;
-		if (this.pool == null) {
-			const password = await ssmClient.send(new GetParameterCommand({
-				Name:           DB_PASSWORD_PARAMETER_NAME,
-				WithDecryption: true,
-			}));
-			this.pool      = new Pool({
-				host:              DB_ENDPOINT,
-				port:              DB_PORT,
-				user:              DB_USERNAME,
-				password:          nn(password.Parameter).Value,
-				database:          DB_DATABASE_NAME,
-				min:               1,
-				max:               connectionLimit,
-				maxUses:           connectionLimit,
-				idleTimeoutMillis: 60000,
-				allowExitOnIdle:   false,
-				keepAlive:         true,
-				ssl:               true,
-			});
-		}
-		if (this.poolPatch == null) {
-			this.poolPatch = new PoolPatch(this.pool!);
-		}
-		console.log({
-			waiting: this.pool!.waitingCount,
-			idle:    this.pool!.idleCount,
-			total:   this.pool!.totalCount,
-			connectionLimit,
-			pool:    this.pool,
-		});
-		return this.poolPatch!;
-	}
-
-	async getRedisClient () {
-		if (this.redisClient == null) {
-			const password   = await ssmClient.send(new GetParameterCommand({
-				Name:           REDIS_PASSWORD_PARAMETER_NAME,
-				WithDecryption: true,
-			}));
-			const options    = {
-				socket:   {
-					host: REDIS_ENDPOINT,
-					port: REDIS_PORT
-				},
-				username: REDIS_USERNAME,
-				password: nn(password.Parameter).Value,
-			};
-			this.redisClient = createClient(options);
-			await this.redisClient!.connect();
-			return this.redisClient;
-		}
-		return this.redisClient;
-	}
-
-	async getRedisCacheTagger () {
-		return this.redisCacheTagger ??= new RedisCacheTagger(await this.getRedisClient());
-	}
-
-	async deleteConnection (conn: string) {
-		const deleteResponse = await dynamoDbClient.send(new DeleteItemCommand({
-			TableName:              connectionsTableName,
-			Key:                    {
-				[CONNECTION_ID]: {S: conn}
-			},
-			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES
-		}));
-		printConsumedCapacity("deleteConnection", deleteResponse);
-	}
-
-	async onAllConnections (conns: string[], predicate: (conn: string) => Promise<void>) {
-		if (conns.length === 0) return;
-		await Promise.all(conns.map(async conn => {
-			try {
-				await predicate(conn);
-			} catch (ex) {
-				if (ex instanceof GoneException) {
-					console.log({GoneException: ex});
-					await this.deleteConnection(conn);
-				} else {
-					console.log({ex});
-				}
-			}
-		}));
-	}
-
-	async cacheResult<T> (
-		name: string,
-		fn: () => Promise<T>,
-		options?: {
-			expiryTimeMs?: number | Nuly,
-			forceRecompute?: boolean | Nuly,
-		}
-	): Promise<T> {
-		let {expiryTimeMs, forceRecompute} = options ?? {};
-
-		expiryTimeMs ??= cacheExpiryTimeMs;
-		forceRecompute ??= false;
-		const cache = await this.getRedisClient();
-		const key   = name;
-		let res: string | null;
-		if (forceRecompute || (res = await cache.get(key)) == null) {
-			const newRes = await fn();
-			if (forceRecompute) {
-				console.log({message: `Forced recompute on ${name} with result: `, res: newRes});
-			} else {
-				console.log({message: `Computed ${name} with result and placing in cache.`, res: newRes});
-			}
-			if (newRes != null) {
-				const str = JSON.stringify(newRes, undefined, 0);
-				await cache.set(key, str, expiryTimeMs != null ? {
-					PX: expiryTimeMs
-				} : {});
-			}
-			return newRes;
-		}
-		console.log("Obtained ", name, " from cache ", res);
-		return JSON.parse(res) as T;
-	}
-
-	NOT_CACHE_RESULT<T> (
-		name: string,
-		fn: () => Promise<T>,
-		options?: {
-			expiryTimeMs?: number | Nuly,
-			forceRecompute?: boolean | Nuly,
-		}
-	): Promise<T> {
-		return fn();
 	}
 }

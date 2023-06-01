@@ -1,6 +1,7 @@
 import {ApiGatewayManagementApiClient, PostToConnectionCommand} from "@aws-sdk/client-apigatewaymanagementapi";
 import {APIGatewayProxyStructuredResultV2, APIGatewayProxyWebsocketEventV2} from "aws-lambda/trigger/api-gateway-proxy";
-import {region} from "../../server/environment-clients";
+import {region} from "../../server/common/environment-clients";
+import {constants} from "../constants";
 import {APIEndpoints, Endpoint, FnParams, getErrorPathPrepender} from "../endpoint";
 import {baseWrapperFunction, EarlyExitResponseError, errorsToResponse} from "../model.server";
 import {
@@ -36,12 +37,13 @@ function awsWrapGetter<TEndpoints extends APIEndpoints = APIEndpoints, TEvents e
 			const response = await baseWrapperFunction(implFn, validateOutputs, event, event.body, endpoint, key);
 			return {
 				...response,
+				statusCode: response.statusCode === constants.HTTP_STATUS_NO_CONTENT ? constants.HTTP_STATUS_OK : response.statusCode,
+				body:       JSON.stringify((response as any).___RES_KEEP_BODY___, null, 0),
 				// @ts-ignore
 				___RES_KEEP_BODY___: undefined as never,
-				body:                JSON.stringify((response as any).___RES_KEEP_BODY___)
-			}
-		}
-	}
+			};
+		};
+	};
 }
 
 export function awsWSLambdaFunnelWrapper<TEndpoints extends APIEndpoints = APIEndpoints, TEvents extends WSEvents = WSEvents> (
@@ -84,7 +86,7 @@ export function eventsSender<TEndpoints extends APIEndpoints = APIEndpoints,
 				event: eventName,
 				...body
 			};
-			const postData = JSON.stringify(eventBody);
+			const postData = JSON.stringify(eventBody, null, 0);
 			await manager.send(new PostToConnectionCommand({
 				Data:         encoder.encode(postData),
 				ConnectionId: connId

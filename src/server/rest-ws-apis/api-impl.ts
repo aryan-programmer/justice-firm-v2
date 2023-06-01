@@ -1,13 +1,13 @@
-import {justiceFirmApiSchema} from "../common/rest-api-schema";
-import {jfChatterBoxApiSchema} from "../common/ws-chatter-box-api-schema";
-import {awsLambdaFunnelWrapper} from "../singularity/model.server";
-import {awsWSLambdaFunnelWrapper} from "../singularity/websocket/ws-model.server";
-import {DbModelMethods} from "./db-model-methods";
+import {justiceFirmApiSchema} from "../../common/rest-api-schema";
+import {jfChatterBoxApiSchema} from "../../common/ws-chatter-box-api-schema";
+import {awsLambdaFunnelWrapper} from "../../singularity/model.server";
+import {awsWSLambdaFunnelWrapper} from "../../singularity/websocket/ws-model.server";
+import {PostgresDbModel} from "../db/postgres-db-model";
 import {JusticeFirmRestAPIImpl} from "./rest-api-impl";
 import {JusticeFirmWsChatterBoxAPIImpl} from "./ws-chatter-box-api-impl";
 
 export function jfApiAwsFunnelFunctions () {
-	const dbModelMethods      = new DbModelMethods();
+	const dbModelMethods      = new PostgresDbModel();
 	const restAPIImpl         = new JusticeFirmRestAPIImpl(dbModelMethods);
 	const wsChatterBoxApiImpl = new JusticeFirmWsChatterBoxAPIImpl(dbModelMethods);
 	return {

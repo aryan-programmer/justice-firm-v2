@@ -12,7 +12,8 @@ import {
 import {timeFormat} from "../../common/utils/functions";
 import {Nuly, Writeable} from "../../common/utils/types";
 import {MessageData} from "../../common/ws-chatter-box-api-schema";
-import {FileUploadData} from "../../server/utils/types";
+import {strToDate} from "../../server/common/utils/date-to-str";
+import {FileUploadData} from "../../server/common/utils/types";
 import {Message} from "../../singularity/helpers";
 import {ModelResponseOrErr} from "../../singularity/model.client";
 import {ModalStoreWrapper} from "../store/modalsStore";
@@ -206,7 +207,7 @@ export function messageDataToDisplayable (
 			first:      prev == null || prev.from !== msg.from,
 			last:       next == null || next.from !== msg.from,
 			isMe:       msg.from === myId,
-			timeString: timeFormat(new Date(+msg.ts))!
+			timeString: timeFormat(strToDate(msg.ts))!
 		}
 	});
 	res.sort((a, b) => a.tsInt - b.tsInt);

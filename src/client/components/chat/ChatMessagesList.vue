@@ -3,6 +3,7 @@ import {computed} from "#imports";
 import _ from "lodash";
 import {getDateTimeHeader, getDayFromMs} from "../../../common/utils/functions";
 import {MessageData} from "../../../common/ws-chatter-box-api-schema";
+import {strToDate} from "../../../server/common/utils/date-to-str";
 import {useUserStore} from "../../store/userStore";
 import {messageDataToDisplayable} from "../../utils/functions";
 import ChatMessageBox from "./ChatMessageBox.vue";
@@ -20,7 +21,7 @@ const messageGroups = computed(() => {
 			return getDayFromMs(+value.ts);
 		})
 		.map(value => ({
-			header:   getDateTimeHeader(new Date(+value[0].ts)),
+			header:   getDateTimeHeader(strToDate(value[0].ts)),
 			sortKey:  getDayFromMs(+value[0].ts),
 			messages: messageDataToDisplayable(value, userStore)
 		}))

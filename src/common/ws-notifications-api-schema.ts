@@ -2,6 +2,8 @@ import {Static, Type} from "@sinclair/typebox";
 import {lazyCheck, MessageOr} from "../singularity/helpers";
 import {wsEndpoint, wsModelSchema} from "../singularity/websocket/ws-endpoint";
 import {AuthToken} from "./api-types";
+import {NotificationMessageData} from "./notification-types";
+import {ArrayOf} from "./utils/functions";
 import {Nuly} from "./utils/types";
 
 export const EstablishNotificationsConnectionInput = Type.Object({
@@ -9,11 +11,13 @@ export const EstablishNotificationsConnectionInput = Type.Object({
 }, {$id: "EstablishNotificationsConnectionInput"});
 export type EstablishNotificationsConnectionInput = Static<typeof EstablishNotificationsConnectionInput>;
 
-export const Notification = Type.Any({$id: "Notification"});
-export type Notification = Static<typeof Notification>;
+export const GetNotificationsInput = Type.Object({
+	authToken: AuthToken,
+}, {$id: "GetNotificationsInput"});
+export type GetNotificationsInput = Static<typeof GetNotificationsInput>;
 
 export const jfNotificationsApiSchema = wsModelSchema({
-	name:      "JFNotificationsBoxApi",
+	name:      "JFNotificationsApi",
 	endpoints: {
 		$connect:            wsEndpoint({
 			path:               "$connect",
@@ -24,12 +28,17 @@ export const jfNotificationsApiSchema = wsModelSchema({
 			requestBodyChecker:  lazyCheck(EstablishNotificationsConnectionInput),
 			responseBodyChecker: lazyCheck(MessageOr(Nuly))
 		}),
+		getNotifications:    wsEndpoint({
+			path:               "getNotifications",
+			requestBodyChecker: lazyCheck(GetNotificationsInput),
+			responseBodyChecker: lazyCheck(MessageOr(ArrayOf(NotificationMessageData)))
+		}),
 		$disconnect:         wsEndpoint({
 			path:               "$disconnect",
 			requestBodyChecker: lazyCheck(Nuly),
 		}),
 	},
 	events:    {
-		notification: lazyCheck(Notification),
+		notification: lazyCheck(NotificationMessageData),
 	}
 })

@@ -1,6 +1,6 @@
 import {RedisCommandArgument, RedisModules} from "@redis/client/dist/lib/commands";
 import {RedisClientType, RedisFunctions, RedisScripts} from "redis";
-import {Nuly} from "../../common/utils/types";
+import {Nuly} from "../../../common/utils/types";
 import {cacheExpiryTimeMs} from "./constants";
 
 export type RedisCacheTaggerOptions = {

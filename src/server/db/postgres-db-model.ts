@@ -1,3 +1,5 @@
+import {GetParameterCommand} from "@aws-sdk/client-ssm";
+import {Pool} from "pg";
 import {
 	AppointmentBareData,
 	CaseBareData,
@@ -8,32 +10,31 @@ import {
 	StatusEnum,
 	StatusSearchOptions,
 	StatusSearchOptionsEnum
-} from "../common/db-types";
-import {filterMap} from "../common/utils/array-methods/filterMap";
-import {radiusOfEarthInKm} from "../common/utils/constants";
-import {deg2rad, isNullOrEmpty, nullOrEmptyCoalesce, toNumIfNotNull} from "../common/utils/functions";
-import {Nuly} from "../common/utils/types";
-import {CommonApiMethods} from "./common-api-methods";
-import {cacheExpiryTimeMs} from "./utils/constants";
-import {repeatedQuestionMarks} from "./utils/functions";
+} from "../../common/db-types";
+import {filterMap} from "../../common/utils/array-methods/filterMap";
+import {nn} from "../../common/utils/asserts";
+import {radiusOfEarthInKm} from "../../common/utils/constants";
+import {deg2rad, isNullOrEmpty, nullOrEmptyCoalesce, toNumIfNotNull} from "../../common/utils/functions";
+import {Nuly} from "../../common/utils/types";
+import {ssmClient} from "../common/environment-clients";
+import {RedisCacheModel} from "../common/redis-cache-model";
+import {
+	LAWYER_BARE_APPOINTMENTS,
+	LAWYER_BARE_CASES,
+	LAWYER_CASE_SPECIALIZATIONS,
+	LAWYER_DATA
+} from "../common/redis-cache-tag-names";
+import {cacheExpiryTimeMs} from "../common/utils/constants";
+import {repeatedQuestionMarks} from "../common/utils/functions";
+import {PoolConnectionPatch, PoolPatch} from "./postgres-wrappers";
+
+export const DB_PASSWORD_PARAMETER_NAME = nn(process.env.DB_PASSWORD);
+export const DB_ENDPOINT                = nn(process.env.DB_ENDPOINT);
+export const DB_DATABASE_NAME           = nn(process.env.DB_DATABASE_NAME);
+export const DB_PORT                    = +nn(process.env.DB_PORT);
+export const DB_USERNAME                = nn(process.env.DB_USERNAME);
 
 const baseLawyerColumns = "u.id, u.name, u.email, u.phone, u.address, u.photo_path, u.gender, l.latitude, l.longitude, l.certification_link, l.status, l.rejection_reason";
-
-function LAWYER_DATA (id: string) {
-	return `lawyer:${id}`;
-}
-
-function LAWYER_CASE_SPECIALIZATIONS (id: string) {
-	return `lawyer:${id}:case-specializations`;
-}
-
-function LAWYER_BARE_APPOINTMENTS (id: string) {
-	return `lawyer:${id}:bare-appointments`;
-}
-
-function LAWYER_BARE_CASES (id: string) {
-	return `lawyer:${id}:bare-cases`;
-}
 
 function retTrue () {
 	return true
@@ -117,28 +118,51 @@ function getSqlWhereAndClauseFromStatus (status: StatusSearchOptions): {
 	}
 }
 
-export class DbModelMethods extends CommonApiMethods {
+export class PostgresDbModel extends RedisCacheModel {
+	private pool: Pool | Nuly           = null;
+	private poolPatch: PoolPatch | Nuly = null;
+
 	constructor () {
 		super();
 	}
 
-	public async invalidateLawyerCache (
-		id: string | string[],
-		options?: {
-			invalidateCaseSpecializations?: boolean | Nuly,
-		}) {
-		const client                        = await this.getRedisClient();
-		const invalidateCaseSpecializations = options?.invalidateCaseSpecializations === true;
-		if (!invalidateCaseSpecializations && typeof id === "string") {
-			await client.del(LAWYER_DATA(id));
-		} else {
-			const vs             = typeof id === "string" ? [id] : id;
-			const args: string[] = vs.map(LAWYER_DATA);
-			if (invalidateCaseSpecializations) {
-				args.push(...vs.map(LAWYER_CASE_SPECIALIZATIONS))
-			}
-			await client.del(args);
+	public async getConnection () {
+		return new PoolConnectionPatch(await (await this.getPool()).pool.connect());
+	}
+
+	public async getPool (): Promise<PoolPatch> {
+		const connectionLimit = 5;
+		if (this.pool == null) {
+			const password = await ssmClient.send(new GetParameterCommand({
+				Name:           DB_PASSWORD_PARAMETER_NAME,
+				WithDecryption: true,
+			}));
+			this.pool      = new Pool({
+				host:              DB_ENDPOINT,
+				port:              DB_PORT,
+				user:              DB_USERNAME,
+				password:          nn(password.Parameter).Value,
+				database:          DB_DATABASE_NAME,
+				min:               1,
+				max:               connectionLimit,
+				maxUses:           connectionLimit,
+				idleTimeoutMillis: 60000,
+				allowExitOnIdle:   false,
+				keepAlive:         true,
+				ssl:               true,
+			});
 		}
+		if (this.poolPatch == null) {
+			this.poolPatch = new PoolPatch(this.pool!);
+		}
+		console.log({
+			waiting: this.pool!.waitingCount,
+			idle:    this.pool!.idleCount,
+			total:   this.pool!.totalCount,
+			// connectionLimit,
+			// pool:    this.pool,
+		});
+		return this.poolPatch!;
 	}
 
 	public async getLawyerData (
@@ -165,7 +189,7 @@ export class DbModelMethods extends CommonApiMethods {
 		forceRefetch ??= false;
 		const pool = await this.getPool();
 
-		const bid = BigInt(id);
+		const bid                               = BigInt(id);
 		const lawyer: LawyerSearchResult | Nuly = await this.cacheResult(LAWYER_DATA(id), async () => {
 			const res: Record<string, any>[] = await pool.query(
 				`SELECT ${baseLawyerColumns}
@@ -175,7 +199,7 @@ export class DbModelMethods extends CommonApiMethods {
 			if (res.length === 0) {
 				return null;
 			}
-			return DbModelMethods.recordToLawyerSearchResult(res[0], false);
+			return PostgresDbModel.recordToLawyerSearchResult(res[0], false);
 		}, {forceRecompute: forceRefetch});
 
 		if (lawyer == null) {
@@ -213,7 +237,7 @@ export class DbModelMethods extends CommonApiMethods {
 				if (res.length === 0) {
 					return null;
 				}
-				return DbModelMethods.recordToLawyerStatistics(res[0]);
+				return PostgresDbModel.recordToLawyerStatistics(res[0]);
 			}, {forceRecompute: forceRefetch});
 		}
 
@@ -227,8 +251,8 @@ export class DbModelMethods extends CommonApiMethods {
 					        a.status,
 					        a.opened_on,
 					        a.timestamp
-					 FROM appointment a
-					 JOIN "justice_firm"."user"        cu ON a.client_id = cu.id
+					 FROM appointment           a
+					 JOIN "justice_firm"."user" cu ON a.client_id = cu.id
 					 WHERE a.lawyer_id = ?;`, [BigInt(lawyer.id)]);
 				return res.map(value => ({
 					id:        value.id.toString(),
@@ -312,7 +336,12 @@ export class DbModelMethods extends CommonApiMethods {
 	   AND MATCH (email) AGAINST ( ? IN BOOLEAN MODE )
 	   AND MATCH (address) AGAINST ( ? IN BOOLEAN MODE );`*/
 		const queryResults: Record<string, any>[] = await pool.query(
-			`SELECT id FROM "justice_firm"."user" WHERE name LIKE ? AND email LIKE ? AND address LIKE ? AND type = 'lawyer'`,
+			`SELECT id
+			 FROM "justice_firm"."user"
+			 WHERE name LIKE ?
+			   AND email LIKE ?
+			   AND address LIKE ?
+			   AND type = 'lawyer'`,
 			[name, email, address]);
 
 		const ids = filterMap(queryResults, value => value?.id?.toString() as string | Nuly);
@@ -346,12 +375,12 @@ export class DbModelMethods extends CommonApiMethods {
 			const {statusWherePart, statusQueryArray}  = getSqlWhereAndClauseFromStatus(status);
 			const sqlRes: Record<string, any>[]        = await pool.query(
 				`SELECT ${baseLawyerColumns}
-				 FROM lawyer l
-				 JOIN "justice_firm"."user"   u ON u.id = l.id
+				 FROM lawyer                l
+				 JOIN "justice_firm"."user" u ON u.id = l.id
 				 WHERE l.id IN (${repeatedQuestionMarks(needToFetchIds.length)})
 				   AND ${statusWherePart};`,
 				[...needToFetchIds.map(BigInt), ...statusQueryArray]);
-			const lawyersFromSql: LawyerSearchResult[] = sqlRes.map((v) => DbModelMethods.recordToLawyerSearchResult(v));
+			const lawyersFromSql: LawyerSearchResult[] = sqlRes.map((v) => PostgresDbModel.recordToLawyerSearchResult(v));
 			const multi                                = await cache.multi();
 			for (const lawyer of lawyersFromSql) {
 				multi.set(LAWYER_DATA(lawyer.id), JSON.stringify(lawyer, null, 0), {
@@ -401,7 +430,7 @@ export class DbModelMethods extends CommonApiMethods {
 				lawyersByStatus.map(value => BigInt(value.id)));
 			for (let i = 0; i < lawyersByStatus.length; i++) {
 				const lawyer: LawyerSearchResult = lawyersByStatus[i];
-				lawyer.statistics                = DbModelMethods.recordToLawyerStatistics(statsRes[i]);
+				lawyer.statistics                = PostgresDbModel.recordToLawyerStatistics(statsRes[i]);
 			}
 		}
 
@@ -423,7 +452,7 @@ export class DbModelMethods extends CommonApiMethods {
 	public static recordToLawyerSearchResult (value: Record<string, any>, extractStatistics: boolean = false) {
 		const stats: LawyerStatistics | Nuly = extractStatistics ? this.recordToLawyerStatistics(value) : undefined;
 		return {
-			...DbModelMethods.recordToClientData(value),
+			...PostgresDbModel.recordToClientData(value),
 			latitude:          Number(value.latitude),
 			longitude:         Number(value.longitude),
 			certificationLink: value.certification_link.toString(),

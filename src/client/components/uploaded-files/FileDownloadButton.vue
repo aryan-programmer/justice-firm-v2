@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed, getFontAwesomeIconFromMIME} from "#imports";
 import {Nuly} from "../../../common/utils/types";
-import {FileUploadData} from "../../../server/utils/types";
+import {FileUploadData} from "../../../server/common/utils/types";
 
 const props = defineProps<{
 	file: FileUploadData,

@@ -1,5 +1,5 @@
 import {Static, Type} from "@sinclair/typebox";
-import {FileUploadToken} from "../server/utils/types";
+import {FileUploadToken} from "../server/common/utils/types";
 import {endpoint} from "../singularity/endpoint";
 import {lazyCheck, MessageOr} from "../singularity/helpers";
 import {HttpMethods} from "../singularity/httpMethods";

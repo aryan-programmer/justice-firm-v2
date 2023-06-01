@@ -1,5 +1,5 @@
 import {Static, Type} from "@sinclair/typebox";
-import {FileUploadData} from "../server/utils/types";
+import {FileUploadData} from "../server/common/utils/types";
 import {StatusEnum, StatusSearchOptionsEnum, ValidEmail, ValidPhone} from "./utils/constants";
 import {ArrayOf, Optional} from "./utils/functions";
 import {Number_T, OptionalString_T, String_T} from "./utils/types";

@@ -9,10 +9,10 @@ import fetch from 'node-fetch';
 import {createHash} from "node:crypto";
 import path from "path";
 import {Stream} from "stream";
-import {nn} from "../../common/utils/asserts";
-import {badFileNameChars, isIterable} from "../../common/utils/constants";
-import {Nuly} from "../../common/utils/types";
-import {uniqId} from "../../common/utils/uniq-id";
+import {nn} from "../../../common/utils/asserts";
+import {badFileNameChars, isIterable} from "../../../common/utils/constants";
+import {Nuly} from "../../../common/utils/types";
+import {uniqId} from "../../../common/utils/uniq-id";
 import {S3_BUCKET_DATA_URL} from "./constants";
 
 export async function streamToBuffer (stream: Stream): Promise<Buffer> {

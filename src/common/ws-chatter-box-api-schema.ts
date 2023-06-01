@@ -1,5 +1,5 @@
 import {Static, Type} from "@sinclair/typebox";
-import {FileUploadData, FileUploadToken} from "../server/utils/types";
+import {FileUploadData, FileUploadToken} from "../server/common/utils/types";
 import {lazyCheck, MessageOr} from "../singularity/helpers";
 import {wsEndpoint, wsModelSchema} from "../singularity/websocket/ws-endpoint";
 import {AuthToken} from "./api-types";

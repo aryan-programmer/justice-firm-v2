@@ -1,10 +1,19 @@
 // noinspection JSUnusedGlobalSymbols
 
 import {DeleteItemCommand, PutItemCommand, ReturnConsumedCapacity, ReturnValue} from "@aws-sdk/client-dynamodb";
-import {SendEmailCommand} from "@aws-sdk/client-ses";
+import {S3Client} from "@aws-sdk/client-s3";
+import {SendEmailCommand, SESClient} from "@aws-sdk/client-ses";
 import {compareSync, hash} from "bcryptjs";
 import {sign} from "jsonwebtoken";
-import {AuthToken, ClientAuthToken, ConstrainedAuthToken, LawyerAuthToken, PrivateAuthToken} from "../common/api-types";
+import {pq} from "~~/src/server/common/background-promise-queue";
+import {ssEventsPublisher} from "~~/src/server/rest-ws-apis/ss-events-publisher";
+import {
+	AuthToken,
+	ClientAuthToken,
+	ConstrainedAuthToken,
+	LawyerAuthToken,
+	PrivateAuthToken,
+} from "../../common/api-types";
 import {
 	CaseDocumentData,
 	CaseStatusEnum,
@@ -12,8 +21,8 @@ import {
 	ID_T,
 	LawyerSearchResult,
 	StatusEnum,
-	UserAccessType
-} from "../common/db-types";
+	UserAccessType,
+} from "../../common/db-types";
 import {
 	AddCaseDocumentInput,
 	AppointmentFullData,
@@ -43,29 +52,19 @@ import {
 	UpdateLawyerProfileInput,
 	UpdateProfileInput,
 	UpgradeAppointmentToCaseInput,
-	UploadFileInput
-} from "../common/rest-api-schema";
-import {nn} from "../common/utils/asserts";
-import {invalidImageMimeTypeMessage, otpMaxNum, otpMinNum, validImageMimeTypes} from "../common/utils/constants";
-import {isNullOrEmpty, nullOrEmptyCoalesce} from "../common/utils/functions";
-import {Nuly} from "../common/utils/types";
-import {constants} from "../singularity/constants";
-import {EndpointResult, FnParams} from "../singularity/endpoint";
-import {message, Message, noContent, response} from "../singularity/helpers";
-import {APIImplementation} from "../singularity/schema";
-import {PoolConnectionPatch, UpsertResult} from "./common-api-methods";
-import {DbModelMethods} from "./db-model-methods";
-import {
-	dynamoDbClient,
-	passwordResetOtpTableName,
-	randomNumber,
-	region,
-	s3Bucket,
-	s3Client,
-	sesClient,
-	sesSourceEmailAddress
-} from "./environment-clients";
-import {otpExpiryTimeMs, saltRounds} from "./utils/constants";
+	UploadFileInput,
+} from "../../common/rest-api-schema";
+import {nn} from "../../common/utils/asserts";
+import {invalidImageMimeTypeMessage, otpMaxNum, otpMinNum, validImageMimeTypes} from "../../common/utils/constants";
+import {isNullOrEmpty, nullOrEmptyCoalesce} from "../../common/utils/functions";
+import {Nuly} from "../../common/utils/types";
+import {constants} from "../../singularity/constants";
+import {EndpointResult, FnParams} from "../../singularity/endpoint";
+import {message, Message, noContent, response} from "../../singularity/helpers";
+import {APIImplementation} from "../../singularity/schema";
+import {dynamoDbClient, randomNumber, region, s3Bucket} from "../common/environment-clients";
+import {otpExpiryTimeMs, saltRounds} from "../common/utils/constants";
+import {dateToDynamoDbStr, strToDate} from "../common/utils/date-to-str";
 import {
 	getMimeTypeFromUrlServerSide,
 	printConsumedCapacity,
@@ -73,15 +72,23 @@ import {
 	shortenS3Url,
 	unShortenS3Url,
 	uploadDataUrlToS3,
-	verifyAndDecodeJwtToken
-} from "./utils/functions";
-import {FileUploadData, FileUploadToken} from "./utils/types";
+	verifyAndDecodeJwtToken,
+} from "../common/utils/functions";
+import {FileUploadData, FileUploadToken} from "../common/utils/types";
+import {PostgresDbModel} from "../db/postgres-db-model";
+import {PoolConnectionPatch, UpsertResult} from "../db/postgres-wrappers";
+
+export const passwordResetOtpTableName = nn(process.env.PASSWORD_RESET_OTP_TABLE_NAME);
+export const sesSourceEmailAddress     = nn(process.env.SES_SOURCE_EMAIL_ADDRESS);
+
+export const s3Client  = new S3Client({region});
+export const sesClient = new SESClient({region});
 
 function generateAuthTokenResponse<T extends UserAccessType> (
 	userId: number | bigint,
 	userType: T,
 	jwtSecret: string,
-	userName: string | undefined = undefined
+	userName: string | undefined = undefined,
 ): EndpointResult<ConstrainedAuthToken<T>> {
 	const expiryDate                     = null;
 	const privateToken: PrivateAuthToken = {
@@ -103,7 +110,7 @@ const verifyFileJwtToken = verifyAndDecodeJwtToken<FileUploadData>;
 
 export class JusticeFirmRestAPIImpl
 	implements APIImplementation<typeof justiceFirmApiSchema> {
-	constructor (private common: DbModelMethods) {
+	constructor (private common: PostgresDbModel) {
 		// this.getLawyerData = function (this: JusticeFirmRestAPIImpl, ...args) {
 		// 	return this.common.cacheResult("getLawyerData-" + JSON.stringify(args),
 		// 		() => this.getLawyerData(...args)
@@ -118,7 +125,7 @@ export class JusticeFirmRestAPIImpl
 		const photoMimeType = await getMimeTypeFromUrlServerSide(data.photoData);
 
 		if (!validImageMimeTypes.includes(photoMimeType)) {
-			return message(constants.HTTP_STATUS_BAD_REQUEST, invalidImageMimeTypeMessage)
+			return message(constants.HTTP_STATUS_BAD_REQUEST, invalidImageMimeTypeMessage);
 		}
 
 		const certificateMimeType = await getMimeTypeFromUrlServerSide(data.certificationData);
@@ -130,7 +137,7 @@ export class JusticeFirmRestAPIImpl
 			dataUrl:     data.photoData,
 			name:        data.name,
 			prefix:      "lawyers/photos/",
-			contentType: photoMimeType
+			contentType: photoMimeType,
 		});
 		const certificationResP = uploadDataUrlToS3({
 			s3Client,
@@ -154,14 +161,14 @@ export class JusticeFirmRestAPIImpl
 			const userInsertRes: UpsertResult = await conn.execute(
 				`INSERT INTO "justice_firm"."user"(name, email, phone, address, password_hash, photo_path, gender, type)
 				 VALUES (?, ?, ?, ?, ?, ?, ?, 'lawyer');`,
-				[data.name, data.email, data.phone, data.address, passwordHash, photoRes.url, data.gender]
+				[data.name, data.email, data.phone, data.address, passwordHash, photoRes.url, data.gender],
 			);
 
 			const userId = nn(userInsertRes.insertId);
 
 			const lawyerInsertRes: UpsertResult = await conn.execute(
 				"INSERT INTO lawyer(id, latitude, longitude, certification_link, status) VALUES (?, ?, ?, ?, 'waiting');",
-				[userId, data.latitude, data.longitude, certificationRes.url]
+				[userId, data.latitude, data.longitude, certificationRes.url],
 			);
 
 			if (data.specializationTypes.length > 0) {
@@ -211,7 +218,7 @@ export class JusticeFirmRestAPIImpl
 			return message(404, "No such user found");
 		}
 
-		return response(200, DbModelMethods.recordToClientData(res[0]));
+		return response(200, PostgresDbModel.recordToClientData(res[0]));
 	}
 
 	async updateProfile (params: FnParams<UpdateProfileInput>):
@@ -237,7 +244,7 @@ export class JusticeFirmRestAPIImpl
 			const photoMimeType = await getMimeTypeFromUrlServerSide(data.photoData);
 
 			if (!validImageMimeTypes.includes(photoMimeType)) {
-				return message(constants.HTTP_STATUS_BAD_REQUEST, invalidImageMimeTypeMessage)
+				return message(constants.HTTP_STATUS_BAD_REQUEST, invalidImageMimeTypeMessage);
 			}
 			const photoRes = await uploadDataUrlToS3({
 				s3Client,
@@ -246,7 +253,7 @@ export class JusticeFirmRestAPIImpl
 				dataUrl:     data.photoData,
 				name:        data.name,
 				prefix:      "clients/photos/",
-				contentType: photoMimeType
+				contentType: photoMimeType,
 			});
 			updateQueryPieces.push("photo_path = ?");
 			updateQueryParams.push(photoRes.url);
@@ -260,7 +267,7 @@ export class JusticeFirmRestAPIImpl
 			`UPDATE "justice_firm"."user"
 			 SET ${updateQuerySets}
 			 WHERE id = ?;`,
-			[...updateQueryParams, id]
+			[...updateQueryParams, id],
 		);
 
 		console.log({userUpdateRes});
@@ -294,7 +301,7 @@ export class JusticeFirmRestAPIImpl
 			const photoMimeType = await getMimeTypeFromUrlServerSide(data.photoData);
 
 			if (!validImageMimeTypes.includes(photoMimeType)) {
-				return message(constants.HTTP_STATUS_BAD_REQUEST, invalidImageMimeTypeMessage)
+				return message(constants.HTTP_STATUS_BAD_REQUEST, invalidImageMimeTypeMessage);
 			}
 			const photoRes = await uploadDataUrlToS3({
 				s3Client,
@@ -303,7 +310,7 @@ export class JusticeFirmRestAPIImpl
 				dataUrl:     data.photoData,
 				name:        data.name,
 				prefix:      "lawyers/photos/",
-				contentType: photoMimeType
+				contentType: photoMimeType,
 			});
 			userUpdateQueryPieces.push("photo_path = ?");
 			userUpdateQueryParams.push(photoRes.url);
@@ -325,19 +332,25 @@ export class JusticeFirmRestAPIImpl
 			lawyerUpdateQueryParams.push(certificationRes.url);
 		}
 
+		const invalidateCaseSpecializations = data.specializationTypes != null && data.specializationTypes.length > 0;
+
+		pq.add(
+			this.common.invalidateLawyerCache(obj.id, {invalidateCaseSpecializations}),
+			"invalidateLawyerCache",
+		);
+		const lawyerId = BigInt(obj.id);
+
 		const conn = await this.common.getConnection();
 		try {
 			await conn.beginTransaction();
 			await conn.commit();
-
-			const lawyerId = BigInt(obj.id);
 
 			const userUpdateQuerySets         = userUpdateQueryPieces.join(", ");
 			const userUpdateRes: UpsertResult = await conn.execute(
 				`UPDATE "justice_firm"."user"
 				 SET ${userUpdateQuerySets}
 				 WHERE id = ?;`,
-				[...userUpdateQueryParams, lawyerId]
+				[...userUpdateQueryParams, lawyerId],
 			);
 			console.log({userUpdateRes});
 
@@ -346,36 +359,37 @@ export class JusticeFirmRestAPIImpl
 				`UPDATE lawyer
 				 SET ${lawyerUpdateQuerySets}
 				 WHERE id = ?;`,
-				[...lawyerUpdateQueryParams, lawyerId]
+				[...lawyerUpdateQueryParams, lawyerId],
 			);
 			console.log({lawyerUpdateRes});
 
-			if (data.specializationTypes != null && data.specializationTypes.length > 0) {
+			if (invalidateCaseSpecializations && data.specializationTypes != null) {
 				// TODO: Come up with a better system
 				const deleteSpecializationsResult: UpsertResult = await conn.execute(
 					`DELETE
 					 FROM lawyer_specialization
 					 WHERE lawyer_id = ?;`,
-					[lawyerId]
+					[lawyerId],
 				);
 				const insertSpecializationsResult               = await this.insertSpecializationTypesWithConnection(
 					data.specializationTypes,
 					lawyerId,
 					conn);
 				console.log({deleteSpecializationsResult, insertSpecializationsResult});
-
-				await this.common.invalidateLawyerCache(obj.id, {invalidateCaseSpecializations: true});
-			} else {
-				await this.common.invalidateLawyerCache(obj.id);
 			}
-
-			return generateAuthTokenResponse(lawyerId, UserAccessType.Lawyer, jwtSecret, data.name);
 		} catch (e) {
 			await conn.rollback();
 			throw e;
 		} finally {
 			await conn.release();
 		}
+
+		pq.add(ssEventsPublisher.lawyerProfileUpdate({
+			ids: [lawyerId.toString()],
+			invalidateCaseSpecializations,
+		}));
+
+		return generateAuthTokenResponse(lawyerId, UserAccessType.Lawyer, jwtSecret, data.name);
 	}
 
 	async registerClient (params: FnParams<RegisterClientInput>):
@@ -388,7 +402,7 @@ export class JusticeFirmRestAPIImpl
 		const photoMimeType = await getMimeTypeFromUrlServerSide(data.photoData);
 
 		if (!validImageMimeTypes.includes(photoMimeType)) {
-			return message(constants.HTTP_STATUS_BAD_REQUEST, invalidImageMimeTypeMessage)
+			return message(constants.HTTP_STATUS_BAD_REQUEST, invalidImageMimeTypeMessage);
 		}
 		const photoRes = await uploadDataUrlToS3({
 			s3Client,
@@ -397,23 +411,24 @@ export class JusticeFirmRestAPIImpl
 			dataUrl:     data.photoData,
 			name:        data.name,
 			prefix:      "clients/photos/",
-			contentType: photoMimeType
+			contentType: photoMimeType,
 		});
 
-		const conn = await this.common.getConnection()
+		const conn = await this.common.getConnection();
 		try {
 			await conn.beginTransaction();
 
 			const userInsertRes: UpsertResult = await conn.execute(
-				`INSERT INTO "justice_firm"."user"(name, email, phone, address, password_hash, photo_path, gender, type) VALUES (?, ?, ?, ?, ?, ?, ?, 'client');`,
-				[data.name, data.email, data.phone, data.address, passwordHash, photoRes.url, data.gender]
+				`INSERT INTO "justice_firm"."user"(name, email, phone, address, password_hash, photo_path, gender, type)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, 'client');`,
+				[data.name, data.email, data.phone, data.address, passwordHash, photoRes.url, data.gender],
 			);
 
 			const userId = nn(userInsertRes.insertId);
 
 			const clientInsertRes: UpsertResult = await conn.execute(
 				"INSERT INTO client(id) VALUES (?);",
-				[userId]
+				[userId],
 			);
 
 			await conn.commit();
@@ -430,7 +445,7 @@ export class JusticeFirmRestAPIImpl
 	async sessionLogin (params: FnParams<SessionLoginInput>): Promise<EndpointResult<AuthToken | Message>> {
 		const res = await this.getLoginResponse(params.body.email, params.body.password);
 		if (res === false) {
-			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid password")
+			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid password");
 		}
 		return res;
 	}
@@ -537,15 +552,15 @@ export class JusticeFirmRestAPIImpl
 
 		const lawyerStatus = await this.getLawyerStatusInformation({
 			body: {
-				id: data.lawyerId
-			}
+				id: data.lawyerId,
+			},
 		});
 		if ("message" in lawyerStatus.body || lawyerStatus.body.status !== StatusEnum.Confirmed) {
 			return message(constants.HTTP_STATUS_FORBIDDEN,
 				"The lawyer with id " + data.lawyerId + " has not been confirmed.");
 		}
 
-		const timestamp = data.timestamp == null ? null : new Date(data.timestamp);
+		const timestamp = data.timestamp == null ? null : strToDate(data.timestamp);
 		const conn      = await this.common.getConnection();
 
 		try {
@@ -554,13 +569,14 @@ export class JusticeFirmRestAPIImpl
 			let lawyerId                             = BigInt(data.lawyerId);
 			let clientId                             = BigInt(data.authToken.id);
 			const groupInsertRes: UpsertResult       = await conn.execute(
-				`INSERT INTO "justice_firm"."group"(client_id, lawyer_id) VALUES (?, ?);`,
-				[clientId, lawyerId]
+				`INSERT INTO "justice_firm"."group"(client_id, lawyer_id)
+				 VALUES (?, ?);`,
+				[clientId, lawyerId],
 			);
 			const groupId                            = nn(groupInsertRes.insertId);
 			const appointmentInsertRes: UpsertResult = await conn.execute(
 				"INSERT INTO appointment(client_id, lawyer_id, group_id, description, timestamp) VALUES (?, ?, ?, ?, ?);",
-				[clientId, lawyerId, groupId, data.description, timestamp]
+				[clientId, lawyerId, groupId, data.description, timestamp],
 			);
 
 			await conn.commit();
@@ -642,51 +658,55 @@ export class JusticeFirmRestAPIImpl
 
 	async setLawyerStatuses (params: FnParams<SetLawyerStatusesInput>):
 		Promise<EndpointResult<Message | Nuly>> {
-		const data      = params.body;
+		const {authToken, confirmed, rejected, waiting} = params.body;
+
 		const jwtSecret = await this.common.getJwtSecret();
-		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
+		const obj       = verifyJwtToken(authToken.jwt, jwtSecret);
 		if (obj.userType !== UserAccessType.Admin) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				"To set the statuses of lawyers the user must be authenticated as an administrator.");
 		}
-		if (data.rejected.length === 0 && data.confirmed.length === 0 && data.waiting.length === 0) return noContent;
+		if (rejected.length === 0 && confirmed.length === 0 && waiting.length === 0) return noContent;
+
+		const resetIds = [...(waiting), ...(confirmed), ...rejected.map(v => v.id)];
+		pq.add(this.common.invalidateLawyerCache(resetIds));
+
 		const conn = await this.common.getConnection();
 		try {
 			await conn.beginTransaction();
 
-			if (data.confirmed.length > 0) {
-
+			if (confirmed.length > 0) {
 				const confirmRes: UpsertResult = await conn.execute(
 					`UPDATE lawyer
 					 SET status           = 'confirmed',
 					     rejection_reason = NULL
-					 WHERE id IN (${repeatedQuestionMarks(data.confirmed.length)});`,
-					data.confirmed.map(BigInt)
+					 WHERE id IN (${repeatedQuestionMarks(confirmed.length)});`,
+					confirmed.map(BigInt),
 				);
 			}
 
-			if (data.rejected.length > 0) {
+			if (rejected.length > 0) {
 				const rejectRes = await conn.batchUpdate(
 					"lawyer",
 					"id",
 					"BIGINT",
 					["status", "rejection_reason"],
 					["lawyer_status", "text"],
-					data.rejected.map(({id, reason}) => ({
+					rejected.map(({id, reason}) => ({
 						id:     BigInt(id),
-						values: ["rejected", reason]
-					}))
+						values: ["rejected", reason],
+					})),
 				);
 				console.log({rejectRes});
 			}
 
-			if (data.waiting.length > 0) {
+			if (waiting.length > 0) {
 				const waitingRes: UpsertResult = await conn.execute(
 					`UPDATE lawyer
 					 SET status           = 'waiting',
 					     rejection_reason = NULL
-					 WHERE id IN (${repeatedQuestionMarks(data.waiting.length)});`,
-					data.waiting.map(BigInt)
+					 WHERE id IN (${repeatedQuestionMarks(waiting.length)});`,
+					waiting.map(BigInt),
 				);
 			}
 
@@ -698,8 +718,8 @@ export class JusticeFirmRestAPIImpl
 			await conn.release();
 		}
 
-		const resetIds = [...data.waiting, ...data.confirmed, ...data.rejected.map(v => v.id)];
-		await this.common.invalidateLawyerCache(resetIds);
+		pq.add(ssEventsPublisher.lawyerProfileUpdate({ids: resetIds}));
+		pq.add(ssEventsPublisher.lawyersStatusesUpdate({confirmed, waiting, rejected}));
 
 		return noContent;
 	}
@@ -788,7 +808,7 @@ export class JusticeFirmRestAPIImpl
 		if (data.status === StatusEnum.Rejected) {
 			const rejectRes: UpsertResult = await pool.execute(
 				"UPDATE appointment SET status='rejected' WHERE id = ? AND lawyer_id = ?;",
-				[appointmentId, lawyerId]
+				[appointmentId, lawyerId],
 			);
 			if (rejectRes.affectedRows === 0) {
 				return message(constants.HTTP_STATUS_BAD_REQUEST,
@@ -799,12 +819,12 @@ export class JusticeFirmRestAPIImpl
 			if (data.timestamp == null) {
 				confirmRes = await pool.execute(
 					"UPDATE appointment SET status='confirmed' WHERE id = ? AND lawyer_id = ?;",
-					[appointmentId, lawyerId]
+					[appointmentId, lawyerId],
 				);
 			} else {
 				confirmRes = await pool.execute(
 					"UPDATE appointment SET status='confirmed', timestamp=? WHERE id = ? AND lawyer_id = ?;",
-					[new Date(data.timestamp), appointmentId, lawyerId]
+					[new Date(data.timestamp), appointmentId, lawyerId],
 				);
 			}
 			if (confirmRes.affectedRows === 0) {
@@ -819,24 +839,26 @@ export class JusticeFirmRestAPIImpl
 		Promise<EndpointResult<Message | Nuly>> {
 		const email                         = params.body.email;
 		const result: Record<string, any>[] = await (await this.common.getPool()).query(
-			`SELECT name FROM "justice_firm"."user" WHERE email = ? LIMIT 1;`,
-			[email]
+			`SELECT name
+			 FROM "justice_firm"."user"
+			 WHERE email = ?
+			 LIMIT 1;`,
+			[email],
 		);
 		if (result.length === 0) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "That email has not been used to sign up a user");
 		}
 		const name = result[0].name;
 
-		const now        = Date.now();
 		const otp        = await randomNumber(otpMinNum, otpMaxNum);
 		const putItemRes = await dynamoDbClient.send(new PutItemCommand({
 			TableName:              passwordResetOtpTableName,
 			Item:                   {
 				email: {S: email}, // Primary
 				otp:   {S: otp.toString(10)}, // Sort
-				ts:    {S: now.toString(10)},
+				ts:    {S: dateToDynamoDbStr(new Date())},
 			},
-			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES
+			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES,
 		}));
 		printConsumedCapacity("Put OTP", putItemRes);
 		const emailContent     = `Hello ${name},
@@ -850,24 +872,24 @@ The Justice Firm Foundation`;
 		const sendEmailRes     = await sesClient.send(new SendEmailCommand({
 			Source:      sesSourceEmailAddress,
 			Destination: {
-				ToAddresses: [email]
+				ToAddresses: [email],
 			},
 			Message:     {
 				Subject: {
 					Charset: "UTF-8",
-					Data:    "Password Reset OTP"
+					Data:    "Password Reset OTP",
 				},
 				Body:    {
 					Text: {
 						Charset: "UTF-8",
-						Data:    emailContent
+						Data:    emailContent,
 					},
 					Html: {
 						Charset: "UTF-8",
-						Data:    emailContentHtml
-					}
-				}
-			}
+						Data:    emailContentHtml,
+					},
+				},
+			},
 		}));
 		return noContent;
 	}
@@ -882,7 +904,7 @@ The Justice Firm Foundation`;
 				otp:   {S: otp}, // Sort
 			},
 			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES,
-			ReturnValues:           ReturnValue.ALL_OLD
+			ReturnValues:           ReturnValue.ALL_OLD,
 		}));
 		printConsumedCapacity("Delete & get OTP", deleteRes);
 		if (deleteRes.Attributes == null) {
@@ -901,7 +923,9 @@ The Justice Firm Foundation`;
 
 		const passwordHash            = await hash(password, saltRounds);
 		const updateRes: UpsertResult = await (await this.common.getPool()).execute(
-			`UPDATE "justice_firm"."user" u SET password_hash = ? WHERE email = ?;`, [passwordHash, email]);
+			`UPDATE "justice_firm"."user" u
+			 SET password_hash = ?
+			 WHERE email = ?;`, [passwordHash, email]);
 
 		if (updateRes.affectedRows < 1) {
 			console.error("SHOULD NEVER GET HERE: OTP was sent to an email address not used to sign up a user.");
@@ -966,25 +990,30 @@ The Justice Firm Foundation`;
 			const caseInsertRes: UpsertResult = await conn.execute(
 				`INSERT INTO "justice_firm"."case" (client_id, lawyer_id, type_id, group_id, description, status)
 				 VALUES (?, ?, ?, ?, ?, ?);`,
-				[clientId, lawyerId, data.type, groupId, caseDesc, status]
+				[clientId, lawyerId, data.type, groupId, caseDesc, status],
 			);
 			const caseId                      = nn(caseInsertRes.insertId);
 
 			if (isNullOrEmpty(data.groupName)) {
 				await conn.execute(
-					`UPDATE "justice_firm"."group" SET case_id = ? WHERE id = ?`,
-					[caseId, groupId]
+					`UPDATE "justice_firm"."group"
+					 SET case_id = ?
+					 WHERE id = ?`,
+					[caseId, groupId],
 				);
 			} else {
 				await conn.execute(
-					`UPDATE "justice_firm"."group" SET case_id = ?, NAME = ? WHERE id = ?`,
-					[caseId, data.groupName, groupId]
+					`UPDATE "justice_firm"."group"
+					 SET case_id = ?,
+					     NAME    = ?
+					 WHERE id = ?`,
+					[caseId, data.groupName, groupId],
 				);
 			}
 
 			const appointmentUpdateRes = await conn.execute(
 				"UPDATE appointment SET case_id = ? WHERE id = ?",
-				[caseId, appointmentId]
+				[caseId, appointmentId],
 			);
 
 			await conn.commit();
@@ -1053,7 +1082,7 @@ The Justice Firm Foundation`;
 				caseType:    {
 					id:   value.type_id.toString(),
 					name: value.type_name.toString(),
-				}
+				},
 			} as CaseSparseData;
 		}));
 	}
@@ -1155,7 +1184,7 @@ The Justice Firm Foundation`;
 			name: data.fileName,
 		};
 		return response(200, {
-			jwt: sign(fileUploadToken, jwtSecret)
+			jwt: sign(fileUploadToken, jwtSecret),
 		});
 	}
 
@@ -1199,7 +1228,7 @@ The Justice Firm Foundation`;
 			 FROM case_document         cd
 			 JOIN "justice_firm"."user" u ON cd.uploaded_by_id = u.id
 			 WHERE case_id = ?;`,
-			[BigInt(data.caseId)]
+			[BigInt(data.caseId)],
 		);
 		const caseDocuments                                 = res?.map((value): CaseDocumentData => {
 			return {
@@ -1233,7 +1262,9 @@ The Justice Firm Foundation`;
 		}
 
 		const res: Record<string, any>[] = await (await this.common.getPool()).query(
-			`SELECT s.lawyer_id, s.client_id FROM "justice_firm"."case" S WHERE S.id = ?;`, [BigInt(caseId)]);
+			`SELECT s.lawyer_id, s.client_id
+			 FROM "justice_firm"."case" S
+			 WHERE S.id = ?;`, [BigInt(caseId)]);
 
 		if (res.length === 0) {
 			return [400, "No such case found"];
@@ -1280,8 +1311,10 @@ The Justice Firm Foundation`;
 		const jwtSecret = await this.common.getJwtSecret();
 
 		const resSet = await (await this.common.getPool()).query(
-			`SELECT id, name, password_hash, type FROM "justice_firm"."user" WHERE email = ?;`,
-			[email]
+			`SELECT id, name, password_hash, type
+			 FROM "justice_firm"."user"
+			 WHERE email = ?;`,
+			[email],
 		);
 
 		if (resSet.length === 0) {

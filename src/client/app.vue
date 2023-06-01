@@ -128,6 +128,7 @@ function pathCompare (link: string) {
 <SnackbarListDisplayer />
 <ModalDisplayer />
 <LawyerStatusDisplayer />
+<NotificationsConnector/>
 <v-layout class="mh-100vh">
 	<v-app-bar
 		:color="userDeps.color"

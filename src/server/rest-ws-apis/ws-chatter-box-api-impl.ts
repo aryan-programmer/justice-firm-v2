@@ -9,29 +9,28 @@ import {AttributeValue} from "@aws-sdk/client-dynamodb/dist-types/models/models_
 import {GetParameterCommand} from "@aws-sdk/client-ssm";
 import {APIGatewayProxyWebsocketEventV2} from "aws-lambda/trigger/api-gateway-proxy";
 import {sign} from "jsonwebtoken";
-import {PrivateAuthToken} from "../common/api-types";
-import {UserAccessType} from "../common/db-types";
+import {PrivateAuthToken} from "../../common/api-types";
+import {UserAccessType} from "../../common/db-types";
 import {
 	ATTACHMENT_MIME,
 	ATTACHMENT_NAME,
 	ATTACHMENT_PATH,
 	CONNECTION_ID,
-	CONNECTION_KEY_ID,
-	CONNECTION_TYPE,
-	connectionsByKeyIdIndex,
+	CONNECTION_GROUP_ID,
+	GroupIdFromType,
+	connectionsByGroupIdIndex,
 	ConnectionsTable_ExpressionAttributeNames,
-	ConnectionTypeOptions,
 	MESSAGE_GROUP,
 	MESSAGE_ID,
 	MESSAGE_SENDER_ID,
 	MESSAGE_TEXT,
 	MESSAGE_TIMESTAMP
-} from "../common/infrastructure-constants";
-import {filterMap} from "../common/utils/array-methods/filterMap";
-import {nn} from "../common/utils/asserts";
-import {isNullOrEmpty} from "../common/utils/functions";
-import {Nuly} from "../common/utils/types";
-import {uniqId} from "../common/utils/uniq-id";
+} from "../../common/infrastructure-constants";
+import {filterMap} from "../../common/utils/array-methods/filterMap";
+import {nn} from "../../common/utils/asserts";
+import {isNullOrEmpty} from "../../common/utils/functions";
+import {Nuly} from "../../common/utils/types";
+import {uniqId} from "../../common/utils/uniq-id";
 import {
 	ChatAuthToken,
 	ChatGroupData,
@@ -43,22 +42,22 @@ import {
 	PostMessageInput,
 	PostMessageWithAttachmentInput,
 	PrivateChatAuthToken
-} from "../common/ws-chatter-box-api-schema";
-import {constants} from "../singularity/constants";
-import {EndpointResult} from "../singularity/endpoint";
-import {message, Message, noContent, response} from "../singularity/helpers";
-import {WSAPIImplementation, WSEndpointResult, WSFnParams} from "../singularity/websocket/ws-endpoint";
-import {eventsSender} from "../singularity/websocket/ws-model.server";
-import {CommonApiMethods} from "./common-api-methods";
+} from "../../common/ws-chatter-box-api-schema";
+import {constants} from "../../singularity/constants";
+import {EndpointResult} from "../../singularity/endpoint";
+import {message, Message, noContent, response} from "../../singularity/helpers";
+import {WSAPIImplementation, WSEndpointResult, WSFnParams} from "../../singularity/websocket/ws-endpoint";
+import {eventsSender} from "../../singularity/websocket/ws-model.server";
 import {
 	connectionsTableName,
 	dynamoDbClient,
 	messagesTableName,
 	ssmClient,
-	WS_CHATTER_BOX_API_CALLBACK_URL_PARAM_NAME
-} from "./environment-clients";
-import {printConsumedCapacity, shortenS3Url, unShortenS3Url, verifyAndDecodeJwtToken} from "./utils/functions";
-import {FileUploadData} from "./utils/types";
+} from "../common/environment-clients";
+import {dateToDynamoDbStr} from "../common/utils/date-to-str";
+import {printConsumedCapacity, shortenS3Url, unShortenS3Url, verifyAndDecodeJwtToken} from "../common/utils/functions";
+import {FileUploadData} from "../common/utils/types";
+import {PostgresDbModel} from "../db/postgres-db-model";
 
 function generateChatAuthToken (
 	user: string,
@@ -78,6 +77,8 @@ function generateChatAuthToken (
 const verifyAuthJwtToken = verifyAndDecodeJwtToken<PrivateAuthToken>;
 const verifyChatJwtToken = verifyAndDecodeJwtToken<PrivateChatAuthToken>;
 const verifyFileJwtToken = verifyAndDecodeJwtToken<FileUploadData>;
+
+const WS_CHATTER_BOX_API_CALLBACK_URL_PARAM_NAME   = nn(process.env.WS_CHATTER_BOX_API_CALLBACK_URL_PARAM_NAME);
 
 const GetMessages_ProjectionExpression     = [
 	MESSAGE_TIMESTAMP, MESSAGE_TEXT, MESSAGE_SENDER_ID, MESSAGE_ID,
@@ -100,7 +101,7 @@ export class JusticeFirmWsChatterBoxAPIImpl
 	implements WSAPIImplementation<typeof jfChatterBoxApiSchema> {
 	on: typeof fakeOn;
 
-	constructor (private common: CommonApiMethods) {
+	constructor (private common: PostgresDbModel) {
 		this.setup().catch(ex => console.trace(ex));
 	}
 
@@ -165,9 +166,9 @@ export class JusticeFirmWsChatterBoxAPIImpl
 		const putResponse = await dynamoDbClient.send(new PutItemCommand({
 			TableName:              connectionsTableName,
 			Item:                   {
-				[CONNECTION_KEY_ID]: {S: group},
-				[CONNECTION_ID]:     {S: conn},
-				[CONNECTION_TYPE]:   {S: ConnectionTypeOptions.ChatGroupConnection},
+				[CONNECTION_GROUP_ID]: {S: GroupIdFromType.Chat(group)},
+				[CONNECTION_ID]:       {S: conn},
+				// [CONNECTION_TYPE]:   {S: ConnectionIdFromType.ChatGroupConnection},
 			},
 			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES
 		}));
@@ -190,10 +191,9 @@ export class JusticeFirmWsChatterBoxAPIImpl
 		const jwtSecret                 = await this.common.getJwtSecret();
 		const jwt: PrivateChatAuthToken = await verifyChatJwtToken(chatAuthToken.jwt, jwtSecret);
 		const {group: groupId, user}    = jwt;
-		const now                       = Date.now();
 		const messageData: MessageData  = {
-			group: groupId,
-			ts:    now.toString(10),
+			group: GroupIdFromType.Chat(groupId),
+			ts:    dateToDynamoDbStr(new Date()),
 			text,
 			from:  user,
 			id:    uniqId(),
@@ -221,10 +221,9 @@ export class JusticeFirmWsChatterBoxAPIImpl
 		const jwt: PrivateChatAuthToken            = await verifyChatJwtToken(chatAuthToken.jwt, jwtSecret);
 		const file: FileUploadData                 = await verifyFileJwtToken(uploadedFile.jwt, jwtSecret);
 		const {group: groupId, user}               = jwt;
-		const now                                  = Date.now();
 		const messageData: MessageData             = {
-			group:      groupId,
-			ts:         now.toString(10),
+			group:      GroupIdFromType.Chat(groupId),
+			ts:         dateToDynamoDbStr(new Date()),
 			text,
 			from:       user,
 			id:         uniqId(),
@@ -264,7 +263,7 @@ export class JusticeFirmWsChatterBoxAPIImpl
 			KeyConditionExpression:    GetMessages_KeyConditionExpression,
 			ExpressionAttributeNames:  GetMessages_ExpressionAttributeNames,
 			ExpressionAttributeValues: {
-				[GetMessages_EAV_CNeedGroup]: {S: group}
+				[GetMessages_EAV_CNeedGroup]: {S: GroupIdFromType.Chat(group)}
 			},
 			Select:                    Select.SPECIFIC_ATTRIBUTES,
 			ReturnConsumedCapacity:    ReturnConsumedCapacity.INDEXES
@@ -301,20 +300,22 @@ export class JusticeFirmWsChatterBoxAPIImpl
 	private async sendMessageEventToGroup (group: string, messageData: MessageData) {
 		const queryResponse = await dynamoDbClient.send(new QueryCommand({
 			TableName:                 connectionsTableName,
-			IndexName:                 connectionsByKeyIdIndex,
+			IndexName:                 connectionsByGroupIdIndex,
 			ProjectionExpression:      `#${CONNECTION_ID}`,
-			KeyConditionExpression:    `#${CONNECTION_KEY_ID} = :needGroup AND #${CONNECTION_TYPE} = :needConnType`,
+			KeyConditionExpression:    `#${CONNECTION_GROUP_ID} = :needGroup`,
 			ExpressionAttributeNames:  ConnectionsTable_ExpressionAttributeNames,
 			ExpressionAttributeValues: {
-				":needGroup":    {S: group},
-				":needConnType": {S: ConnectionTypeOptions.ChatGroupConnection}
+				":needGroup": {S: GroupIdFromType.Chat(group)},
+				// ":needConnType": {S: ConnectionIdFromType.ChatGroupConnection}
 			},
 			Select:                    Select.SPECIFIC_ATTRIBUTES,
 			ReturnConsumedCapacity:    ReturnConsumedCapacity.INDEXES
 		}));
 		printConsumedCapacity("postMessage: Connections", queryResponse);
 		const conns = filterMap(queryResponse.Items, value => value?.[CONNECTION_ID]?.S?.toString());
-		await this.common.onAllConnections(conns, async conn => this.on.incomingMessage(messageData, conn));
+		await this.common.onAllConnections(conns, async conn => {
+			await this.on.incomingMessage(messageData, conn);
+		});
 		return message(200, "Message sent");
 	}
 }

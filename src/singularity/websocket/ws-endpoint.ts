@@ -56,7 +56,7 @@ export interface WSAPIModelSchema<TEndpoints extends APIEndpoints = APIEndpoints
 }
 
 export type WSEventsSender<TEvents> = {
-	[T in keyof TEvents]: TEvents[T] extends CheckerFunction<infer TEventBody> ? (v: TEventBody, connId: string) => void : never;
+	[T in keyof TEvents]: TEvents[T] extends CheckerFunction<infer TEventBody> ? (v: TEventBody, connId: string) => Promise<void> : never;
 };
 
 export function wsModelSchema<T extends APIEndpoints,
