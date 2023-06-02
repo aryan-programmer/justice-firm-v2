@@ -29,7 +29,7 @@ export type PromiseOrWSEndpointResult<TResponseBody> =
 	| Promise<WSEndpointResult<TResponseBody>>;
 
 export interface WSFnParams<TRequestBody> {
-	body: TRequestBody
+	body: TRequestBody;
 }
 
 export type WSAPIImplementation<TSchema> = TSchema extends WSAPIModelSchema<infer T> ? {
@@ -48,11 +48,11 @@ export type WSAPIAwsFunnelWrapper = Record<string,
 	(event: APIGatewayProxyWebsocketEventV2) => Promise<APIGatewayProxyStructuredResultV2>>;
 
 export interface WSEvents {
-	[v: string]: CheckerFunction<unknown>
+	[v: string]: CheckerFunction<unknown>;
 }
 
 export interface WSAPIModelSchema<TEndpoints extends APIEndpoints = APIEndpoints, TEvents extends WSEvents = WSEvents> extends APIModelSchema<TEndpoints> {
-	events: TEvents
+	events: TEvents;
 }
 
 export type WSEventsSender<TEvents> = {

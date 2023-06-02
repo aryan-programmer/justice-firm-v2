@@ -5,4 +5,4 @@ export const CssStyle = defineComponent({
 	render () {
 		return h("style", this.$slots.default?.());
 	},
-})
+});

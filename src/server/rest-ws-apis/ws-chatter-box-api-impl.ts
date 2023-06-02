@@ -15,11 +15,11 @@ import {
 	ATTACHMENT_MIME,
 	ATTACHMENT_NAME,
 	ATTACHMENT_PATH,
-	CONNECTION_ID,
 	CONNECTION_GROUP_ID,
-	GroupIdFromType,
+	CONNECTION_ID,
 	connectionsByGroupIdIndex,
 	ConnectionsTable_ExpressionAttributeNames,
+	GroupIdFromType,
 	MESSAGE_GROUP,
 	MESSAGE_ID,
 	MESSAGE_SENDER_ID,
@@ -48,12 +48,7 @@ import {EndpointResult} from "../../singularity/endpoint";
 import {message, Message, noContent, response} from "../../singularity/helpers";
 import {WSAPIImplementation, WSEndpointResult, WSFnParams} from "../../singularity/websocket/ws-endpoint";
 import {eventsSender} from "../../singularity/websocket/ws-model.server";
-import {
-	connectionsTableName,
-	dynamoDbClient,
-	messagesTableName,
-	ssmClient,
-} from "../common/environment-clients";
+import {connectionsTableName, dynamoDbClient, messagesTableName, ssmClient,} from "../common/environment-clients";
 import {dateToDynamoDbStr} from "../common/utils/date-to-str";
 import {printConsumedCapacity, shortenS3Url, unShortenS3Url, verifyAndDecodeJwtToken} from "../common/utils/functions";
 import {FileUploadData} from "../common/utils/types";
@@ -78,7 +73,7 @@ const verifyAuthJwtToken = verifyAndDecodeJwtToken<PrivateAuthToken>;
 const verifyChatJwtToken = verifyAndDecodeJwtToken<PrivateChatAuthToken>;
 const verifyFileJwtToken = verifyAndDecodeJwtToken<FileUploadData>;
 
-const WS_CHATTER_BOX_API_CALLBACK_URL_PARAM_NAME   = nn(process.env.WS_CHATTER_BOX_API_CALLBACK_URL_PARAM_NAME);
+const WS_CHATTER_BOX_API_CALLBACK_URL_PARAM_NAME = nn(process.env.WS_CHATTER_BOX_API_CALLBACK_URL_PARAM_NAME);
 
 const GetMessages_ProjectionExpression     = [
 	MESSAGE_TIMESTAMP, MESSAGE_TEXT, MESSAGE_SENDER_ID, MESSAGE_ID,
@@ -106,7 +101,7 @@ export class JusticeFirmWsChatterBoxAPIImpl
 	}
 
 	async setup () {
-		if (this.on != null) return
+		if (this.on != null) return;
 		const endpoint = nn((await ssmClient.send(new GetParameterCommand({
 			Name:           WS_CHATTER_BOX_API_CALLBACK_URL_PARAM_NAME,
 			WithDecryption: true
@@ -172,7 +167,7 @@ export class JusticeFirmWsChatterBoxAPIImpl
 			},
 			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES
 		}));
-		printConsumedCapacity("establishConnection", putResponse)
+		printConsumedCapacity("establishConnection", putResponse);
 		return response(200, {
 			...groupData,
 			chatAuthToken: generateChatAuthToken(jwt.id, group, jwtSecret)

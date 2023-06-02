@@ -178,7 +178,7 @@ async function openConnection (value: LocationQuery) {
 		}
 		const msgs: MessageData[] = messagesRes.right.body;
 		msgs.sort((a, b) => {
-			return a.ts.localeCompare(b.ts)
+			return a.ts.localeCompare(b.ts);
 		});
 		for (const msg of msgs) {
 			pastMessages.add(msg.id);

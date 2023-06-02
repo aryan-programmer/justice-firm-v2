@@ -103,7 +103,7 @@ async function certificateChange (event: Event) {
 	if (file == null) return;
 	certificateData = await readFileAsDataUrl(file);
 	if (certificateData.length > maxDataUrlLen) {
-		await error(`The file must be less than ${maxFileSize} in size.`)
+		await error(`The file must be less than ${maxFileSize} in size.`);
 	}
 }
 
@@ -143,7 +143,7 @@ const onSubmit = handleSubmit(async values => {
 	const res  = await justiceFirmApi.registerLawyer(body);
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
-		await error("Failed to sign up.")
+		await error("Failed to sign up.");
 		return;
 	}
 	lawyerStatusCheckerStore.suppressNextPopup();

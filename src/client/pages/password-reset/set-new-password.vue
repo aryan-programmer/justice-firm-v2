@@ -57,11 +57,11 @@ const onSubmit = handleSubmit(async values => {
 	});
 	if (isLeft(res) || res.right.body == null) {
 		console.log(res);
-		await error("Failed to set a new password")
+		await error("Failed to set a new password");
 		return;
 	}
 	if ("message" in res.right.body) {
-		await error("Failed to set a new password: " + res.right.body.message)
+		await error("Failed to set a new password: " + res.right.body.message);
 		return;
 	}
 	const authToken: AuthToken = res.right.body;

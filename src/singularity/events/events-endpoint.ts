@@ -13,7 +13,7 @@ export type EventsListenerAPIImplementation<TSchema, InEvent = any> = TSchema ex
 } : null;
 
 export interface EventDefinitions {
-	[v: string]: CheckerFunction<unknown>
+	[v: string]: CheckerFunction<unknown>;
 }
 
 export interface EventsModelSchema<TDefs extends EventDefinitions = EventDefinitions> {

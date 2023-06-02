@@ -9,7 +9,6 @@ import {APIGatewayProxyWebsocketEventV2} from "aws-lambda/trigger/api-gateway-pr
 import {PrivateAuthToken} from "../../../common/api-types";
 import {CONNECTION_GROUP_ID, CONNECTION_ID, GroupIdFromType} from "../../../common/infrastructure-constants";
 import {NotificationMessageData} from "../../../common/notification-types";
-import {prettyPrint} from "../../../common/utils/pretty-print";
 import {Nuly} from "../../../common/utils/types";
 import {
 	EstablishNotificationsConnectionInput,

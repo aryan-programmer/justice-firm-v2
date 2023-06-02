@@ -2,7 +2,7 @@ import {reactive, ref} from "#imports";
 import {StorageSerializers, useLocalStorage} from "@vueuse/core";
 import {EventEmitter} from "eventemitter3";
 import {sample} from "lodash";
-import {defineStore} from 'pinia'
+import {defineStore} from 'pinia';
 import {Nuly} from "../../common/utils/types";
 import {uniqId} from "../../common/utils/uniq-id";
 import {BtnVariants} from "../utils/types";

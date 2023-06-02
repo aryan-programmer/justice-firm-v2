@@ -19,7 +19,7 @@ import RectangularPlaceholder from "./RectangularPlaceholder.vue";
 
 const props = defineProps<{
 	class?: string
-}>()
+}>();
 
 const {message, error} = useModals();
 const userStore        = useUserStore();

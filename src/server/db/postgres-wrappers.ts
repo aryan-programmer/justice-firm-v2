@@ -112,7 +112,7 @@ export class PoolConnectionPatch {
 		assert(values.every(v => v.length === columnNames.length),
 			"The number of values in each row to insert must match the number of columns");
 		tableName               = wrapWithQuotesIfNot(tableName);
-		columnNames             = columnNames.map(wrapWithQuotesIfNot)
+		columnNames             = columnNames.map(wrapWithQuotesIfNot);
 		const valuesPlaceholder = repeatedNTimesWithDelimiter(
 			`(${repeatedQuestionMarks(columnNames.length)})`,
 			',',

@@ -82,7 +82,7 @@ export function verifyAndDecodeJwtToken<T> (data: string, jwtSecret: string) {
 	return obj;
 }
 
-const S3_BUCKET_DATA_URL_SHORTENED = "_jfs3://"
+const S3_BUCKET_DATA_URL_SHORTENED = "_jfs3://";
 
 export function shortenS3Url (path: string) {
 	return path.replace(S3_BUCKET_DATA_URL, S3_BUCKET_DATA_URL_SHORTENED);
@@ -100,19 +100,19 @@ export type BasicData = ReallyBasicTypes | (BasicData)[] | {
 
 export function toDynamoDBAttributeValue (v: BasicData): AttributeValue {
 	if (v == null) {
-		return {NULL: true}
+		return {NULL: true};
 	} else if (typeof v === "string") {
-		return {S: v}
+		return {S: v};
 	} else if (typeof v === "number" || typeof v === "bigint") {
 		return {N: v.toString()};
 	} else if (typeof v === "boolean") {
 		return {BOOL: v};
 	} else if (Array.isArray(v)) {
-		return {L: v.map(toDynamoDBAttributeValue)}
+		return {L: v.map(toDynamoDBAttributeValue)};
 	} else if (isIterable(v)) {
-		return {L: Array.from(v, toDynamoDBAttributeValue)}
+		return {L: Array.from(v, toDynamoDBAttributeValue)};
 	} else if (typeof v === "object") {
-		return {M: mapValues(v, toDynamoDBAttributeValue)}
+		return {M: mapValues(v, toDynamoDBAttributeValue)};
 	}
 	return {S: "__JSON__:" + JSON.stringify(v)};
 }
@@ -123,7 +123,7 @@ export function toDynamoDBItem (v: Record<string, BasicData>): Record<string, At
 
 export function fromDynamoDBAttributeValue (v: AttributeValue): BasicData {
 	if ("NULL" in v) {
-		return null
+		return null;
 	} else if ("S" in v) {
 		if (v.S?.startsWith("__JSON__:") === true) {
 			return JSON.parse(v.S.substring("__JSON__:".length));
@@ -134,9 +134,9 @@ export function fromDynamoDBAttributeValue (v: AttributeValue): BasicData {
 	} else if ("BOOL" in v) {
 		return v.BOOL;
 	} else if ("L" in v) {
-		return v.L?.map(fromDynamoDBAttributeValue) ?? []
+		return v.L?.map(fromDynamoDBAttributeValue) ?? [];
 	} else if ("M" in v) {
-		return mapValues(v.M, fromDynamoDBAttributeValue)
+		return mapValues(v.M, fromDynamoDBAttributeValue);
 	}
 	return null;
 }

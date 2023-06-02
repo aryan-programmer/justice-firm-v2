@@ -21,11 +21,11 @@ export enum UserAccessType {
 	Admin  = 'admin'
 }
 
-export const UserAccessType_T = Type.Enum(UserAccessType, {$id: "UserAccessType"})
+export const UserAccessType_T = Type.Enum(UserAccessType, {$id: "UserAccessType"});
 
 
-export const StatusSearchOptionsEnum_T = Type.Enum(StatusSearchOptionsEnum, {$id: "StatusSearchOptionsEnum"})
-export const StatusEnum_T              = Type.Enum(StatusEnum, {$id: "StatusEnum"})
+export const StatusSearchOptionsEnum_T = Type.Enum(StatusSearchOptionsEnum, {$id: "StatusSearchOptionsEnum"});
+export const StatusEnum_T              = Type.Enum(StatusEnum, {$id: "StatusEnum"});
 
 export const StatusSearchOptions = Type.Union([StatusSearchOptionsEnum_T, StatusEnum_T], {$id: "StatusSearchOptions"});
 export type StatusSearchOptions = StatusSearchOptionsEnum | StatusEnum;
@@ -36,7 +36,7 @@ export enum CaseStatusEnum {
 	Closed  = 'closed'
 }
 
-export const CaseStatusEnum_T = Type.Enum(CaseStatusEnum, {$id: "CaseStatusEnum"})
+export const CaseStatusEnum_T = Type.Enum(CaseStatusEnum, {$id: "CaseStatusEnum"});
 
 export const User = Type.Object({
 	id:           ID_T,

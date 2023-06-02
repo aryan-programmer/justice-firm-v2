@@ -50,7 +50,7 @@ const baseDataTableHeadersWithDistance: Header_T[] = [
 	...baseDataTableHeaders2
 ];
 
-const isShowingDistance = computed(() => props.lawyers.some(value => "distance" in value && typeof value.distance === "number"))
+const isShowingDistance = computed(() => props.lawyers.some(value => "distance" in value && typeof value.distance === "number"));
 const dataTableHeaders  = computed(() => isShowingDistance.value ? baseDataTableHeadersWithDistance : baseDataTableHeaders);
 
 const formFields = reactive<{

@@ -29,8 +29,8 @@ export const jfNotificationsApiSchema = wsModelSchema({
 			responseBodyChecker: lazyCheck(MessageOr(Nuly))
 		}),
 		getNotifications:    wsEndpoint({
-			path:               "getNotifications",
-			requestBodyChecker: lazyCheck(GetNotificationsInput),
+			path:                "getNotifications",
+			requestBodyChecker:  lazyCheck(GetNotificationsInput),
 			responseBodyChecker: lazyCheck(MessageOr(ArrayOf(NotificationMessageData)))
 		}),
 		$disconnect:         wsEndpoint({
@@ -41,4 +41,4 @@ export const jfNotificationsApiSchema = wsModelSchema({
 	events:    {
 		notification: lazyCheck(NotificationMessageData),
 	}
-})
+});

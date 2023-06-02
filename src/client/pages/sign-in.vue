@@ -40,11 +40,11 @@ const onSubmit = handleSubmit(async values => {
 		password: values.password,
 	});
 	if (isLeft(res) || !res.right.ok || res.right.body == null) {
-		await error("Failed to sign in")
+		await error("Failed to sign in");
 		return;
 	}
 	if ("message" in res.right.body) {
-		await error("Failed to sign in: " + res.right.body.message)
+		await error("Failed to sign in: " + res.right.body.message);
 		return;
 	}
 	const authToken: AuthToken = res.right.body;

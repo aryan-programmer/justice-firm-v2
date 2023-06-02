@@ -17,7 +17,9 @@ import {
 	statusSearchOptionHuman_Any,
 	statusSearchOptionsDbToHuman,
 	StatusSearchOptionsEnum,
-	statusSearchOptionsHumanValsToDb, textMaxLength, textMaxWords
+	statusSearchOptionsHumanValsToDb,
+	textMaxLength,
+	textMaxWords
 } from "./constants";
 import {GeolocationNotAvailableError} from "./errors";
 import {memoizeWeak} from "./memoizeWeak";
@@ -33,7 +35,7 @@ export function nullOrEmptyCoalesce<T> (s: string | Nuly, s2: T) {
 
 export function trimStr (s: string, wordCount: number = textMaxWords, maxTextLength: number = textMaxLength): string {
 	const words = s.split(/([^A-Za-z0-9]+)/g);
-	let res = s;
+	let res     = s;
 	// Consecutive non-alphanumeric character are part of the array as separate elements i.e. as a separate "word"
 	wordCount *= 2;
 	if (words.length > wordCount) {
@@ -41,7 +43,7 @@ export function trimStr (s: string, wordCount: number = textMaxWords, maxTextLen
 	}
 	if (res.length > maxTextLength) {
 		const actualMaxLength = maxTextLength - 3;
-		res               = "";
+		res                   = "";
 		for (const word of words) {
 			if ((res.length + word.length) > actualMaxLength) break;
 			res += word;

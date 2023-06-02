@@ -26,7 +26,7 @@ const dataTableHeaders = computed((args) => {
 		{title: 'Timestamp', align: 'start', key: 'timestamp', sortable: true, sort: compareDates},
 		{title: 'Opened on', align: 'start', key: 'openedOn', sortable: true, sort: compareDates},
 		{title: 'View more', align: 'start', key: 'id', sortable: true},
-	]
+	];
 	return res as unknown as DataTableHeader[];
 });
 

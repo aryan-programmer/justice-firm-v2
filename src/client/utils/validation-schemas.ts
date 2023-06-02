@@ -6,7 +6,7 @@ function emptyOrMin (s: yup.StringSchema, min: number) {
 		"Must be have length of 0 or greater than or equal to " + min,
 		value => {
 			return value == null || value.length === 0 || value.length >= min;
-		})
+		});
 }
 
 function optionalNumberTransform (value: any) {

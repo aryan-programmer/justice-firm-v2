@@ -18,7 +18,7 @@ const sizeClass = computed(() =>
 );
 
 function onLoad () {
-	emit('imageLoad')
+	emit('imageLoad');
 }
 </script>
 

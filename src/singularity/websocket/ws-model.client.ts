@@ -103,7 +103,7 @@ function sendImplementationMapper<TEndpoints extends APIEndpoints = APIEndpoints
 			};
 			return right(res);
 		}
-	}
+	};
 }
 
 type ResponseEventName<TResponseName extends string> = `response:${TResponseName}`;
@@ -157,7 +157,7 @@ export function websocketClient<TEndpoints extends APIEndpoints = APIEndpoints,
 						// console.log(data);
 						return isNullOrEmpty(data) ? null : JSON.parse(data);
 					} else if (isBlob(data)) {
-						return data.text().then(v => isNullOrEmpty(v) ? null : JSON.parse(v))
+						return data.text().then(v => isNullOrEmpty(v) ? null : JSON.parse(v));
 					}
 					return Buffer.from(data).toJSON();
 				}

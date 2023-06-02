@@ -1,29 +1,11 @@
 <script setup lang="ts">
-import {
-	ChatWSAPIClient,
-	computed,
-	definePageMeta,
-	justiceFirmApi,
-	navigateTo,
-	onBeforeUnmount,
-	reactive,
-	ref,
-	useRoute,
-	useRouter,
-	watch
-} from "#imports";
+import {onBeforeUnmount, reactive, ref, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
-import {_ExtractStateFromSetupStore} from "pinia";
-import {UnwrapRef} from "vue";
-import {LocationQuery} from "vue-router";
 import {AuthToken} from "../../common/api-types";
 import {ID_T} from "../../common/db-types";
 import {NotificationMessageData} from "../../common/notification-types";
-import {nn} from "../../common/utils/asserts";
-import {firstIfArray} from "../../common/utils/functions";
-import {prettyPrint, removeProxies} from "../../common/utils/pretty-print";
+import {removeProxies} from "../../common/utils/pretty-print";
 import {Nuly} from "../../common/utils/types";
-import {EstablishChatConnectionOutput, MessageData} from "../../common/ws-chatter-box-api-schema";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 import {NotificationsWSAPIClient} from "../utils/api-fetcher-impl";
@@ -76,8 +58,8 @@ async function openConnection (value: AuthToken | Nuly) {
 			await error(`Failed to open a connection for notifications with the ID`);
 			return;
 		}
-		chatClient.value        = cl;
-		const messagesRes       = await cl.getNotifications({authToken: value});
+		chatClient.value  = cl;
+		const messagesRes = await cl.getNotifications({authToken: value});
 		if (isLeft(messagesRes) || !messagesRes.right.ok || messagesRes.right.body == null || "message" in messagesRes.right.body) {
 			console.log(messagesRes);
 			await error(`Failed to get messages`);

@@ -35,8 +35,8 @@ const userInfo    = computed(() => {
 		userType = "Administrator";
 		break;
 	}
-	return userType + " " + userStore.authToken.name
-})
+	return userType + " " + userStore.authToken.name;
+});
 const commonLinks = [
 	{icon: "fa-search", title: "Find Lawyer", link: "/search-lawyers"},
 ];
@@ -128,7 +128,7 @@ function pathCompare (link: string) {
 <SnackbarListDisplayer />
 <ModalDisplayer />
 <LawyerStatusDisplayer />
-<NotificationsConnector/>
+<NotificationsConnector />
 <v-layout class="mh-100vh">
 	<v-app-bar
 		:color="userDeps.color"

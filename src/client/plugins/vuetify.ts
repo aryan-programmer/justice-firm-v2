@@ -1,5 +1,5 @@
 import {defineNuxtPlugin} from "#app";
-import {library} from '@fortawesome/fontawesome-svg-core'
+import {library} from '@fortawesome/fontawesome-svg-core';
 import {faSquare as farSquare} from "@fortawesome/free-regular-svg-icons";
 import {
 	faArrowRotateLeft,
@@ -56,11 +56,11 @@ import {
 	faUserTie,
 	faXmark
 } from "@fortawesome/free-solid-svg-icons";
-import {FontAwesomeIcon} from '@fortawesome/vue-fontawesome'
+import {FontAwesomeIcon} from '@fortawesome/vue-fontawesome';
 //@ts-ignore
 import {VueMasonryPlugin} from 'vue-masonry';
-import {createVuetify} from 'vuetify'
-import {aliases, fa} from 'vuetify/iconsets/fa-svg'
+import {createVuetify} from 'vuetify';
+import {aliases, fa} from 'vuetify/iconsets/fa-svg';
 import {
 	VDataTable,
 	VDataTableFooter,
@@ -68,7 +68,7 @@ import {
 	VDataTableRows,
 	VDataTableServer,
 	VDataTableVirtual
-} from 'vuetify/labs/VDataTable'
+} from 'vuetify/labs/VDataTable';
 
 library.add(
 	faGavel,
@@ -150,8 +150,8 @@ export default defineNuxtPlugin(nuxtApp => {
 				fa,
 			},
 		}
-	})
+	});
 
-	nuxtApp.vueApp.use(vuetify)
+	nuxtApp.vueApp.use(vuetify);
 	nuxtApp.vueApp.use(VueMasonryPlugin);
-})
+});

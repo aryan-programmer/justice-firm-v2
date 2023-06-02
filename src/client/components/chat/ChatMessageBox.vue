@@ -10,7 +10,7 @@ const props = defineProps<{
 }>();
 const emit  = defineEmits<{
 	(on: 'imageLoad'): void
-}>()
+}>();
 
 const isMeDeps  = computed(() => props.message.isMe ? {
 	bgColor: meChatBgColor,
@@ -19,10 +19,10 @@ const isMeDeps  = computed(() => props.message.isMe ? {
 	bgColor: otherChatMessageBgColor,
 	class:   "is-other",
 });
-const lrClasses = computed(() => `${props.message.first ? "first" : ""} ${props.message.last ? "last" : ""}`)
+const lrClasses = computed(() => `${props.message.first ? "first" : ""} ${props.message.last ? "last" : ""}`);
 
 function onLoad () {
-	emit('imageLoad')
+	emit('imageLoad');
 }
 </script>
 

@@ -1,5 +1,5 @@
 export function dateToDynamoDbStr (d: Date) {
-	return d.getTime().toString(10)
+	return d.getTime().toString(10);
 }
 
 export function strToDate (d: string) {

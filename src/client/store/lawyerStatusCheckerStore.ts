@@ -1,7 +1,7 @@
 import {navigateTo} from "#imports";
 import {StorageSerializers, useLocalStorage} from "@vueuse/core";
 import {isLeft} from "fp-ts/Either";
-import {defineStore} from 'pinia'
+import {defineStore} from 'pinia';
 import {UserAccessType} from "../../common/db-types";
 import {GetLawyerStatusOutput} from "../../common/rest-api-schema";
 import {StatusEnum} from "../../common/utils/constants";

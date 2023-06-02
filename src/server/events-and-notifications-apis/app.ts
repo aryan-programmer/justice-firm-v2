@@ -19,7 +19,7 @@ import {WsNotificationsHelper} from "./notifications/ws-notifications-helper";
 
 const common                     = new RedisCacheModel();
 const notifs                     = new WsNotificationsHelper(common);
-const listenerImpl                   = new SSEventsListener(common, notifs);
+const listenerImpl               = new SSEventsListener(common, notifs);
 const wsNotificationsApiBaseImpl = new JusticeFirmWsNotificationsAPIImpl(common);
 const wsNotificationsApiImpl     = awsWSLambdaFunnelWrapper(jfNotificationsApiSchema, wsNotificationsApiBaseImpl, {
 	validateOutputs: false,

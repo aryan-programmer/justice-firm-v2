@@ -1,5 +1,5 @@
 import {StorageSerializers, useLocalStorage} from "@vueuse/core";
-import {defineStore} from 'pinia'
+import {defineStore} from 'pinia';
 import {AuthToken} from "../../common/api-types";
 import {Nuly} from "../../common/utils/types";
 

@@ -110,7 +110,7 @@ async function certificateChange (event: Event) {
 	certificateData = await readFileAsDataUrl(file);
 	if (certificateData.length > maxDataUrlLen) {
 		certificateClear(null);
-		await error(`The file must be less than ${maxFileSize} in size.`)
+		await error(`The file must be less than ${maxFileSize} in size.`);
 	}
 }
 
@@ -160,12 +160,12 @@ const onSubmit = handleSubmit(async values => {
 		latitude:            +(values.latitude ?? profile?.latitude ?? 0),
 		longitude:           +(values.longitude ?? profile?.longitude ?? 0),
 		specializationTypes: specializationTypes,
-	}
+	};
 	console.log(body, values);
 	const res = await justiceFirmApi.updateLawyerProfile(body);
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
-		await error("Failed to set your profile.")
+		await error("Failed to set your profile.");
 		return;
 	}
 	await navigateTo("/");

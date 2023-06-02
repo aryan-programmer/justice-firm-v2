@@ -15,9 +15,9 @@ const fakeChecker: CheckerFunction<unknown> = {
 		return null;
 	},
 	get typeName (): string {
-		return "ANY"
+		return "ANY";
 	}
-}
+};
 
 export function fakeCheck<T> (): CheckerFunction<T> {
 	return fakeChecker;
@@ -103,4 +103,4 @@ export function message (
 export const noContent: EndpointResult<null> = {
 	statusCode: constants.HTTP_STATUS_NO_CONTENT,
 	body:       null
-}
+};

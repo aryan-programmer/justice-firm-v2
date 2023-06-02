@@ -19,7 +19,7 @@ const props = defineProps<{
 }>();
 const emit  = defineEmits<{
 	(on: 'uploadFile', data: UploadFileWithDescriptionDialogEventData): void
-}>()
+}>();
 
 let validationSchema         = yup.object({
 	attachment:  yup.string().min(1).required().label("Attachment"),
@@ -48,7 +48,7 @@ async function attachmentChange (event: Event) {
 	attachmentData = await readFileAsDataUrl(file);
 	if (attachmentData.length > maxDataUrlLen) {
 		attachmentClear();
-		await error(`The file must be less than ${maxFileSize} in size.`)
+		await error(`The file must be less than ${maxFileSize} in size.`);
 	}
 	attachmentName = file.name;
 	if (isNullOrEmpty((description.value.value as any)?.toString()))

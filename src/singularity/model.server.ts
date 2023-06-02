@@ -9,7 +9,7 @@ export function errorsToResponse (errors: TypeCheckError[]) {
 	return {
 		statusCode: constants.HTTP_STATUS_BAD_REQUEST,
 		body:       {errors}
-	}
+	};
 }
 
 export class EarlyExitResponseError extends Error {
@@ -94,9 +94,9 @@ function awsWrapGetter<TEndpoints extends APIEndpoints = APIEndpoints> (
 					...res.headers
 				},
 				body:    JSON.stringify(res.body, null, 0)
-			}
-		}
-	}
+			};
+		};
+	};
 }
 
 export function awsLambdaFunnelWrapper<TEndpoints extends APIEndpoints = APIEndpoints> (

@@ -15,7 +15,7 @@ export const CONNECTION_GROUP_ID = "gid"; // Value depends on value of CONNECTIO
 
 export class GroupIdFromType {
 	static Chat (s: string) {
-		return s
+		return s;
 	}
 
 	static UserNotifications (s: string) {

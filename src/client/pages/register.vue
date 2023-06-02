@@ -92,7 +92,7 @@ const onSubmit = handleSubmit(async values => {
 	});
 	if (isLeft(res) || !res.right.ok || res.right.body == null || "message" in res.right.body) {
 		console.log(res);
-		await error("Failed to sign up.")
+		await error("Failed to sign up.");
 		return;
 	}
 	userStore.signIn(res.right.body);

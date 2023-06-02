@@ -28,7 +28,7 @@ const isMeDeps  = computed(() => isMe.value ? {
 const userStore = useUserStore();
 
 function onLoad () {
-	emit('imageLoad')
+	emit('imageLoad');
 }
 </script>
 

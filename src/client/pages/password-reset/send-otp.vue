@@ -32,7 +32,7 @@ const onSubmit = handleSubmit(async values => {
 		email: values.email,
 	});
 	if (isLeft(res) || !res.right.ok) {
-		await error("Failed to send password reset OTP")
+		await error("Failed to send password reset OTP");
 		return;
 	}
 	message /*not-awaiting*/(`Sent password reset OTP successfully`);

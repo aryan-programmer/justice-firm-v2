@@ -48,7 +48,7 @@ const shouldShowCardActions                  = computed(() =>
 );
 
 
-const showSetAppointmentTimestamp = computed(() => appointment.value?.timestamp == null || appointment.value.timestamp === "")
+const showSetAppointmentTimestamp = computed(() => appointment.value?.timestamp == null || appointment.value.timestamp === "");
 const appointmentDateTimeValid    = computed(() => {
 	// if showSetAppointmentTimestamp then appointmentDateTime.value !== ""
 	return !showSetAppointmentTimestamp.value || (appointmentDateTime.value !== "" && new Date(appointmentDateTime.value).getTime() >= todayUnixTs);

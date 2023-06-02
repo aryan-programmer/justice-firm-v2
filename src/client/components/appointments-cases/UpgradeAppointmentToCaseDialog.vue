@@ -47,7 +47,7 @@ async function upgradeAppointmentToCase () {
 		await error(`Failed to upgrade appointment to a case`);
 		return;
 	}
-	await navigateTo("/case-details?id=" + res.right.body)
+	await navigateTo("/case-details?id=" + res.right.body);
 	await message(`Successfully upgraded appointment to a case`);
 }
 

@@ -12,7 +12,7 @@ const emit  = defineEmits<{
 }>();
 
 function onLoad () {
-	emit('imageLoad')
+	emit('imageLoad');
 }
 </script>
 

@@ -14,7 +14,7 @@ type FilterNullish<T extends unknown[]> = T extends [] ? [] :
                                           H extends undefined | null | never | void ? FilterNullish<R> : [H, ...FilterNullish<R>] : T
 
 export interface FnParams<TRequestBody> {
-	body: TRequestBody
+	body: TRequestBody;
 }
 
 export type TBody<T> = T;
@@ -82,7 +82,7 @@ export class Endpoint<TReqBody, TResBody>
 }
 
 export interface APIEndpoints {
-	[v: string]: Endpoint<unknown, unknown>
+	[v: string]: Endpoint<unknown, unknown>;
 }
 
 export function endpoint<TReqBody, TResBody> (end: EndpointSchema<TReqBody, TResBody>): Endpoint<TReqBody, TResBody> {

@@ -47,7 +47,7 @@ export function readFileAsDataUrl (file: File): Promise<string> {
 		fileReader.addEventListener("error", listener);
 		fileReader.addEventListener("abort", listener);
 		fileReader.readAsDataURL(file);
-	})
+	});
 }
 
 export async function fetchAppointmentsIntoRefByUserType (
@@ -176,19 +176,19 @@ export function forceRipple ($el: HTMLElement) {
 			$el.dispatchEvent(new Event("mouseup"));
 			resolve();
 		}, 300);
-	})
+	});
 }
 
 export async function validateDataUrlAsPhotoBrowserSide (dataUrl: string, modals: ModalStoreWrapper) {
 	if (dataUrl.length > maxDataUrlLen) {
-		await modals.error(`The file must be less than ${maxFileSize} in size.`)
+		await modals.error(`The file must be less than ${maxFileSize} in size.`);
 	}
 	const response = await fetch(dataUrl);
 	const fileType = response.headers.get("Content-Type") ?? "text/plain";
 	if (fileType != null && validImageMimeTypes.includes(fileType)) {
 		return true;
 	} else {
-		await modals.error(invalidImageMimeTypeMessage)
+		await modals.error(invalidImageMimeTypeMessage);
 	}
 	return false;
 }
@@ -208,7 +208,7 @@ export function messageDataToDisplayable (
 			last:       next == null || next.from !== msg.from,
 			isMe:       msg.from === myId,
 			timeString: timeFormat(strToDate(msg.ts))!
-		}
+		};
 	});
 	res.sort((a, b) => a.tsInt - b.tsInt);
 	return res;

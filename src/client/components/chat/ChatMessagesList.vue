@@ -13,7 +13,7 @@ const props         = defineProps<{
 }>();
 const emit          = defineEmits<{
 	(on: 'anyImageLoaded'): void
-}>()
+}>();
 const messageGroups = computed(() => {
 	return _
 		.chain(props.messages)
@@ -32,7 +32,7 @@ const messageGroups = computed(() => {
 const userStore = useUserStore();
 
 function onLoad () {
-	emit('anyImageLoaded')
+	emit('anyImageLoaded');
 }
 </script>
 

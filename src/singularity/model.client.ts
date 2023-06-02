@@ -111,7 +111,7 @@ function fetchImplementationMapper<TEndpoints extends APIEndpoints = APIEndpoint
 			};
 			return right(res);
 		}
-	}
+	};
 }
 
 export function fetchImplementation<TEndpoints extends APIEndpoints = APIEndpoints> (

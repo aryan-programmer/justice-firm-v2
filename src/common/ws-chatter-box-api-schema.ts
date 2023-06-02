@@ -98,4 +98,4 @@ export const jfChatterBoxApiSchema = wsModelSchema({
 	events:    {
 		incomingMessage: lazyCheck(MessageData),
 	}
-})
+});

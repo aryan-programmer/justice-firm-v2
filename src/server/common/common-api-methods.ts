@@ -75,7 +75,7 @@ export class CommonApiMethods {
 
 	async onAllConnections (conns: string[], predicate: (conn: string) => Promise<void>) {
 		if (conns.length === 0) return;
-		await pMap(conns,async conn => {
+		await pMap(conns, async conn => {
 			try {
 				await predicate(conn);
 			} catch (ex) {
