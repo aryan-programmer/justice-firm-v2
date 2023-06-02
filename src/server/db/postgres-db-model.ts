@@ -11,6 +11,7 @@ import {
 	StatusSearchOptions,
 	StatusSearchOptionsEnum
 } from "../../common/db-types";
+import {AppointmentFullData} from "../../common/rest-api-schema";
 import {filterMap} from "../../common/utils/array-methods/filterMap";
 import {nn} from "../../common/utils/asserts";
 import {radiusOfEarthInKm} from "../../common/utils/constants";
@@ -37,7 +38,7 @@ export const DB_USERNAME                = nn(process.env.DB_USERNAME);
 const baseLawyerColumns = "u.id, u.name, u.email, u.phone, u.address, u.photo_path, u.gender, l.latitude, l.longitude, l.certification_link, l.status, l.rejection_reason";
 
 function retTrue () {
-	return true
+	return true;
 }
 
 function retTrueOnNotConfirmed (v: { status: StatusEnum }) {
@@ -118,6 +119,8 @@ function getSqlWhereAndClauseFromStatus (status: StatusSearchOptions): {
 	}
 }
 
+export const usePool = null;
+
 export class PostgresDbModel extends RedisCacheModel {
 	private pool: Pool | Nuly           = null;
 	private poolPatch: PoolPatch | Nuly = null;
@@ -168,12 +171,13 @@ export class PostgresDbModel extends RedisCacheModel {
 	public async getLawyerData (
 		id: string,
 		options?: {
-			getStatistics?: boolean | Nuly,
-			getCaseSpecializations?: boolean | Nuly,
-			getBareAppointments?: boolean | Nuly,
-			getBareCases?: boolean | Nuly,
+			getStatistics?: boolean | Nuly;
+			getCaseSpecializations?: boolean | Nuly;
+			getBareAppointments?: boolean | Nuly;
+			getBareCases?: boolean | Nuly;
 			forceRefetch?: boolean | Nuly
-		}
+		},
+		runner: PoolPatch | PoolConnectionPatch | null = usePool,
 	) {
 		let {
 			    getStatistics,
@@ -181,17 +185,20 @@ export class PostgresDbModel extends RedisCacheModel {
 			    getBareAppointments,
 			    getBareCases,
 			    forceRefetch
-		    }      = options ?? {};
+		    } = options ?? {};
 		getStatistics ??= false;
 		getCaseSpecializations ??= false;
 		getBareAppointments ??= false;
 		getBareCases ??= false;
 		forceRefetch ??= false;
-		const pool = await this.getPool();
+		if (runner === usePool) {
+			runner = await this.getPool();
+		}
 
-		const bid                               = BigInt(id);
+		const bid = BigInt(id);
+
 		const lawyer: LawyerSearchResult | Nuly = await this.cacheResult(LAWYER_DATA(id), async () => {
-			const res: Record<string, any>[] = await pool.query(
+			const res: Record<string, any>[] = await runner!.query(
 				`SELECT ${baseLawyerColumns}
 				 FROM lawyer                l
 				 JOIN "justice_firm"."user" u ON u.id = l.id
@@ -208,7 +215,7 @@ export class PostgresDbModel extends RedisCacheModel {
 
 		if (getCaseSpecializations) {
 			lawyer.caseSpecializations = await this.cacheResult(LAWYER_CASE_SPECIALIZATIONS(id), async () => {
-				const res: Record<string, any>[] = await pool.query(
+				const res: Record<string, any>[] = await runner!.query(
 					`SELECT ct.id,
 					        ct.name
 					 FROM lawyer_specialization ls
@@ -224,7 +231,7 @@ export class PostgresDbModel extends RedisCacheModel {
 
 		if (getStatistics) {
 			lawyer.statistics = await this.NOT_CACHE_RESULT(`lawyer:${id}:statistics`, async () => {
-				const res: Record<string, any>[] = await pool.query(
+				const res: Record<string, any>[] = await runner!.query(
 					`SELECT las.rejected_appointments,
 					        las.waiting_appointments,
 					        las.confirmed_appointments,
@@ -243,7 +250,7 @@ export class PostgresDbModel extends RedisCacheModel {
 
 		if (getBareAppointments) {
 			lawyer.appointments = await this.NOT_CACHE_RESULT(LAWYER_BARE_APPOINTMENTS(id), async () => {
-				const res: Record<string, any>[] = await pool.query(
+				const res: Record<string, any>[] = await runner!.query(
 					`SELECT a.id,
 					        a.client_id AS oth_id,
 					        cu.name     AS oth_name,
@@ -268,7 +275,7 @@ export class PostgresDbModel extends RedisCacheModel {
 
 		if (getBareCases) {
 			lawyer.cases = await this.NOT_CACHE_RESULT(LAWYER_BARE_CASES(id), async () => {
-				const res: Record<string, any>[] = await pool.query(
+				const res: Record<string, any>[] = await runner!.query(
 					`SELECT c.id,
 					        c.client_id AS oth_id,
 					        cu.name     AS oth_name,
@@ -299,19 +306,16 @@ export class PostgresDbModel extends RedisCacheModel {
 
 	public async searchAllLawyers (
 		options: {
-			name: string,
-			email: string,
-			address: string,
-			status: StatusSearchOptions,
-			getStatistics?: boolean | Nuly,
-			forceRefetch?: boolean | Nuly,
-			coords?: {
-				         latitude: number,
-				         longitude: number,
-			         } | Nuly
-		}
+			name: string;
+			email: string;
+			address: string;
+			status: StatusSearchOptions;
+			getStatistics?: boolean | Nuly;
+			forceRefetch?: boolean | Nuly;
+			coords?: { latitude: number; longitude: number } | Nuly
+		},
+		runner: PoolPatch | PoolConnectionPatch | null = usePool
 	) {
-		const pool  = await this.getPool();
 		const cache = await this.getRedisClient();
 
 		let {
@@ -328,6 +332,9 @@ export class PostgresDbModel extends RedisCacheModel {
 		name         = `%${name}%`;
 		address      = `%${address}%`;
 		email        = `%${email}%`;
+		if (runner === usePool) {
+			runner = await this.getPool();
+		}
 
 		/*`SELECT id
 	 FROM user
@@ -335,7 +342,7 @@ export class PostgresDbModel extends RedisCacheModel {
 	   AND MATCH (name) AGAINST ( ? IN BOOLEAN MODE )
 	   AND MATCH (email) AGAINST ( ? IN BOOLEAN MODE )
 	   AND MATCH (address) AGAINST ( ? IN BOOLEAN MODE );`*/
-		const queryResults: Record<string, any>[] = await pool.query(
+		const queryResults: Record<string, any>[] = await runner.query(
 			`SELECT id
 			 FROM "justice_firm"."user"
 			 WHERE name LIKE ?
@@ -373,7 +380,7 @@ export class PostgresDbModel extends RedisCacheModel {
 		console.log(needToFetchIds.length, needToFetchIds);
 		if (needToFetchIds.length > 0) {
 			const {statusWherePart, statusQueryArray}  = getSqlWhereAndClauseFromStatus(status);
-			const sqlRes: Record<string, any>[]        = await pool.query(
+			const sqlRes: Record<string, any>[]        = await runner.query(
 				`SELECT ${baseLawyerColumns}
 				 FROM lawyer                l
 				 JOIN "justice_firm"."user" u ON u.id = l.id
@@ -417,7 +424,7 @@ export class PostgresDbModel extends RedisCacheModel {
 		}
 
 		if (getStatistics) {
-			const statsRes: Record<string, any>[] = await pool.query(
+			const statsRes: Record<string, any>[] = await runner.query(
 				`SELECT las.rejected_appointments,
 				        las.waiting_appointments,
 				        las.confirmed_appointments,
@@ -437,6 +444,67 @@ export class PostgresDbModel extends RedisCacheModel {
 		return lawyersByStatus;
 	}
 
+	public async getName (id: string | bigint, runner: PoolPatch | PoolConnectionPatch | null = usePool) {
+		if (runner === usePool) {
+			runner = await this.getPool();
+		}
+		const nameRes = await runner.query(`SELECT name FROM "justice_firm"."user" WHERE id = ?`, [BigInt(id)]);
+		if (nameRes.length === 0) {
+			return null;
+		}
+		return nameRes[0]?.name?.toString() as string | Nuly;
+	}
+
+	public async getAppointmentData (id: string | bigint, runner: PoolPatch | PoolConnectionPatch | null = usePool) {
+		if (runner === usePool) {
+			runner = await this.getPool();
+		}
+		const res: Record<string, any>[] = await runner.query(
+			`SELECT a.id          AS a_id,
+			        a.group_id    AS a_group_id,
+			        a.case_id     AS a_case_id,
+			        a.description AS a_description,
+			        a.timestamp   AS a_timestamp,
+			        a.opened_on   AS a_opened_on,
+			        a.status      AS a_status,
+			        c.id          AS c_id,
+			        c.name        AS c_name,
+			        c.email       AS c_email,
+			        c.phone       AS c_phone,
+			        c.address     AS c_address,
+			        c.photo_path  AS c_photo_path,
+			        c.gender      AS c_gender,
+			        a.lawyer_id   AS l_id
+			 FROM appointment           a
+			 JOIN "justice_firm"."user" c
+			      ON c.id = a.client_id
+			 WHERE a.id = ?;`, [BigInt(id)]);
+
+		if (res.length === 0) {
+			return null;
+		}
+
+		const value                    = res[0];
+		const client: ClientDataResult = PostgresDbModel.recordWithPrefixToClientData(value);
+		const lawyer                   = await this.getLawyerData(String(value.l_id), {}, runner);
+		if (lawyer == null) {
+			return null;
+		}
+
+		const appointment: AppointmentFullData = {
+			id:          value.a_id.toString(),
+			description: value.a_description.toString(),
+			caseId:      value.a_case_id?.toString(),
+			groupId:     value.a_group_id.toString(),
+			timestamp:   value.a_timestamp?.toString(),
+			openedOn:    value.a_opened_on.toString(),
+			status:      value.a_status.toString(),
+			client,
+			lawyer,
+		};
+		return appointment;
+	}
+
 	public static recordToClientData (value: Record<string, any>): ClientDataResult {
 		return {
 			id:        value.id.toString(),
@@ -446,7 +514,19 @@ export class PostgresDbModel extends RedisCacheModel {
 			address:   value.address.toString(),
 			photoPath: value.photo_path.toString(),
 			gender:    value.gender?.toString(),
-		}
+		};
+	}
+
+	public static recordWithPrefixToClientData (value: Record<string, any>): ClientDataResult {
+		return {
+			id:        value.c_id.toString(),
+			name:      value.c_name.toString(),
+			email:     value.c_email.toString(),
+			phone:     value.c_phone.toString(),
+			address:   value.c_address.toString(),
+			photoPath: value.c_photo_path.toString(),
+			gender:    value.c_gender?.toString(),
+		};
 	}
 
 	public static recordToLawyerSearchResult (value: Record<string, any>, extractStatistics: boolean = false) {
@@ -472,5 +552,25 @@ export class PostgresDbModel extends RedisCacheModel {
 			totalCases:            toNumIfNotNull(value.total_cases) ?? 0,
 			totalClients:          toNumIfNotNull(value.total_clients) ?? 0,
 		};
+	}
+
+	public static extractAndParseLawyerAndClientData (value: Record<string, any>) {
+		const lawyer: LawyerSearchResult = {
+			id:                value.l_id.toString(),
+			name:              value.l_name.toString(),
+			email:             value.l_email.toString(),
+			phone:             value.l_phone.toString(),
+			address:           value.l_address.toString(),
+			photoPath:         value.l_photo_path.toString(),
+			gender:            value.l_gender?.toString(),
+			latitude:          Number(value.l_latitude),
+			longitude:         Number(value.l_longitude),
+			certificationLink: value.l_certification_link.toString(),
+			status:            nullOrEmptyCoalesce(value.l_status.toString(), StatusEnum.Waiting),
+			rejectionReason:   value.l_rejection_reason?.toString(),
+			distance:          undefined,
+		} as LawyerSearchResult;
+		const client: ClientDataResult   = PostgresDbModel.recordWithPrefixToClientData(value);
+		return {lawyer, client};
 	}
 }

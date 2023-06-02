@@ -129,7 +129,7 @@ export const OpenAppointmentRequestInput = Type.Object({
 	lawyerId:    ID_T,
 	authToken:   ClientAuthToken,
 	description: String_T,
-	timestamp:   OptionalString_T
+	timestamp:   OptionalString_T,
 }, {$id: "OpenAppointmentRequestInput"});
 export type OpenAppointmentRequestInput = Static<typeof OpenAppointmentRequestInput>;
 

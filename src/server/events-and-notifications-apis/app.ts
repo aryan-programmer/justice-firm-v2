@@ -36,7 +36,7 @@ const listenerFn                 = eventsListenerLambdaFunnelWrapper(ssEventsSch
 });
 
 export async function handlerBase (event: APIGatewayProxyWebsocketEventV2 | SNSEvent): Promise<APIGatewayProxyStructuredResultV2 | void> {
-	console.log(event);
+	// console.log(event);
 	if ("Records" in event) {
 		await pMap(event.Records, listenerFn);
 		return;
@@ -55,7 +55,7 @@ export async function handlerBase (event: APIGatewayProxyWebsocketEventV2 | SNSE
 
 export async function handler (event: APIGatewayProxyWebsocketEventV2 | SNSEvent): Promise<APIGatewayProxyStructuredResultV2 | void> {
 	const res = await handlerBase(event);
-	console.log(res);
+	// console.log(res);
 	await pq.waitForAll();
 	return res;
 }

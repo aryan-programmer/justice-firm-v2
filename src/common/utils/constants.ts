@@ -9,6 +9,11 @@ export const otpLength        = 6;
 export const maxFileSize      = "2 MB";
 export const maxDataUrlLen    = 3100000; // A bit more than 2048 kb
 
+export const textMaxWords = 17;
+
+export const textMaxLength               = 100;
+export const trimmedDescriptionMaxLength = textMaxLength;
+
 export const radiusOfEarthInKm = 6371;
 
 export const otpMinNum = +("1" + "0".repeat(otpLength - 1));
@@ -98,7 +103,7 @@ export function getCaseTypes (): CaseType[] {
 		{id: "10", name: "Intellectual Property"},
 		{id: "11", name: "Personal Injury"},
 		{id: "12", name: "Tax"}
-	]
+	];
 }
 
 export function isIterable (input: any): input is Iterable<any> {

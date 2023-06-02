@@ -20,13 +20,20 @@ const router           = useRouter();
 const route            = useRoute();
 const lawyer           = ref<LawyerSearchResult | Nuly>();
 
+const today       = new Date();
+const todayUnixTs = Date.now();
+const minDateTime = today.toISOString().substring(0, "YYYY-MM-DDThh:mm".length);
+
 const description            = ref("");
 const appointmentDateTime    = ref("");
 const fixAppointmentDateTime = ref(false);
-const dataValid              = computed(() =>
-	(fixAppointmentDateTime.value !== true || appointmentDateTime.value.length !== 0) &&
-	!isNullOrEmpty(description.value)
-);
+const dataValid              = computed(() => {
+	return (fixAppointmentDateTime.value !== true || (
+		       appointmentDateTime.value.length !== 0 &&
+		       new Date(appointmentDateTime.value).getTime() >= todayUnixTs
+	       )) &&
+	       !isNullOrEmpty(description.value);
+});
 
 watch(() => route.query.id, async value => {
 	const id = value?.toString();
@@ -68,7 +75,7 @@ async function handleSubmit () {
 	assert(lawyerVal != null);
 
 	const timestamp = fixAppointmentDateTime.value === true && appointmentDateTime.value.length !== 0 ?
-	                  appointmentDateTime.value :
+	                  new Date(appointmentDateTime.value).toISOString() :
 	                  undefined;
 
 	const res = await justiceFirmApi.openAppointmentRequest({
@@ -132,6 +139,7 @@ async function handleSubmit () {
 						label="Fix appointment timestamp"
 						density="comfortable"
 						type="datetime-local"
+						:min="minDateTime"
 					/>
 				</v-col>
 			</v-row>

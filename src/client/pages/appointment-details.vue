@@ -29,6 +29,10 @@ const rejectDialogOpen    = ref<boolean>(false);
 const confirmDialogOpen   = ref<boolean>(false);
 const appointmentDateTime = ref("");
 
+const today       = new Date();
+const todayUnixTs = Date.now();
+const minDateTime = today.toISOString().substring(0, "YYYY-MM-DDThh:mm".length);
+
 const showingAppointmentConfirmRejectButtons = computed(() =>
 	userStore.authToken?.userType === UserAccessType.Lawyer &&
 	appointment.value?.status === StatusEnum.Waiting
@@ -47,7 +51,7 @@ const shouldShowCardActions                  = computed(() =>
 const showSetAppointmentTimestamp = computed(() => appointment.value?.timestamp == null || appointment.value.timestamp === "")
 const appointmentDateTimeValid    = computed(() => {
 	// if showSetAppointmentTimestamp then appointmentDateTime.value !== ""
-	return !showSetAppointmentTimestamp.value || appointmentDateTime.value !== "";
+	return !showSetAppointmentTimestamp.value || (appointmentDateTime.value !== "" && new Date(appointmentDateTime.value).getTime() >= todayUnixTs);
 });
 
 watch(() => route.query, value => {
@@ -83,7 +87,7 @@ async function confirmAppointment () {
 		authToken:     nn(userStore.authToken) as LawyerAuthToken,
 		appointmentId: nn(appointment.value).id,
 		status:        StatusEnum.Confirmed,
-		timestamp:     showSetAppointmentTimestamp.value ? appointmentDateTime.value : null
+		timestamp:     showSetAppointmentTimestamp.value ? new Date(appointmentDateTime.value).toISOString() : null
 	};
 	await commonSendRes(params, "confirm");
 }
@@ -191,6 +195,7 @@ async function commonSendRes (params: SetAppointmentStatusInput, mode: string) {
 								label="Appointment timestamp"
 								density="comfortable"
 								type="datetime-local"
+								:min="minDateTime"
 								required
 							/>
 						</div>

@@ -17,7 +17,6 @@ import {
 import {
 	CaseDocumentData,
 	CaseStatusEnum,
-	ClientDataResult,
 	ID_T,
 	LawyerSearchResult,
 	StatusEnum,
@@ -54,9 +53,9 @@ import {
 	UpgradeAppointmentToCaseInput,
 	UploadFileInput,
 } from "../../common/rest-api-schema";
-import {nn} from "../../common/utils/asserts";
+import {assert, nn} from "../../common/utils/asserts";
 import {invalidImageMimeTypeMessage, otpMaxNum, otpMinNum, validImageMimeTypes} from "../../common/utils/constants";
-import {isNullOrEmpty, nullOrEmptyCoalesce} from "../../common/utils/functions";
+import {isNullOrEmpty, nullOrEmptyCoalesce, trimStr} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import {constants} from "../../singularity/constants";
 import {EndpointResult, FnParams} from "../../singularity/endpoint";
@@ -191,18 +190,18 @@ export class JusticeFirmRestAPIImpl
 		const data      = params.body;
 		const jwtSecret = await this.common.getJwtSecret();
 		const obj       = verifyJwtToken(data.authToken.jwt, jwtSecret);
+		const pool      = await this.common.getPool();
 		if (obj.userType === UserAccessType.Lawyer) {
 			const res = await this.common.getLawyerData(obj.id, {
 				getStatistics:          true,
 				getCaseSpecializations: true,
-			});
+			}, pool);
 			if (res == null) {
 				return message(404, "Not found");
 			}
 			return response(200, res);
 		}
 
-		const pool                       = await this.common.getPool();
 		const res: Record<string, any>[] = await pool.query(
 			`SELECT u.id,
 			        u.name,
@@ -465,7 +464,7 @@ export class JusticeFirmRestAPIImpl
 			name:    data.name ?? "",
 			coords:  coords,
 			status:  StatusEnum.Confirmed,
-		});
+		}, await this.common.getPool());
 
 		return response(200, res);
 	}
@@ -492,7 +491,7 @@ export class JusticeFirmRestAPIImpl
 			status:        data.status,
 			getStatistics: true,
 			forceRefetch:  true,
-		});
+		}, await this.common.getPool());
 		return response(200, res);
 	}
 
@@ -518,7 +517,7 @@ export class JusticeFirmRestAPIImpl
 		const lawyer = await this.common.getLawyerData(data.id, {
 			...data,
 			forceRefetch,
-		});
+		}, await this.common.getPool());
 		if (lawyer == null) {
 			return message(404, "No such lawyer found");
 		}
@@ -560,14 +559,24 @@ export class JusticeFirmRestAPIImpl
 				"The lawyer with id " + data.lawyerId + " has not been confirmed.");
 		}
 
+		let lawyerId    = BigInt(data.lawyerId);
+		let clientId    = BigInt(data.authToken.id);
+		const openedOn  = new Date();
 		const timestamp = data.timestamp == null ? null : strToDate(data.timestamp);
-		const conn      = await this.common.getConnection();
+
+		const conn = await this.common.getConnection();
+
+		const clientName = await this.common.getName(clientId, conn);
+		if (clientName == null) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED,
+				"A user with id " + clientId + " does not exist.");
+		}
+
+		let appointmentId: string;
 
 		try {
 			await conn.beginTransaction();
 
-			let lawyerId                             = BigInt(data.lawyerId);
-			let clientId                             = BigInt(data.authToken.id);
 			const groupInsertRes: UpsertResult       = await conn.execute(
 				`INSERT INTO "justice_firm"."group"(client_id, lawyer_id)
 				 VALUES (?, ?);`,
@@ -575,18 +584,32 @@ export class JusticeFirmRestAPIImpl
 			);
 			const groupId                            = nn(groupInsertRes.insertId);
 			const appointmentInsertRes: UpsertResult = await conn.execute(
-				"INSERT INTO appointment(client_id, lawyer_id, group_id, description, timestamp) VALUES (?, ?, ?, ?, ?);",
-				[clientId, lawyerId, groupId, data.description, timestamp],
+				"INSERT INTO appointment(client_id, lawyer_id, group_id, description, opened_on, timestamp) VALUES (?, ?, ?, ?, ?, ?);",
+				[clientId, lawyerId, groupId, data.description, openedOn, timestamp],
 			);
 
 			await conn.commit();
-			return response(200, nn(appointmentInsertRes.insertId).toString());
+
+			appointmentId = nn(appointmentInsertRes.insertId).toString();
 		} catch (e) {
 			await conn.rollback();
 			throw e;
 		} finally {
 			await conn.release();
 		}
+
+		pq.add(ssEventsPublisher.newAppointmentRequest({
+			openedOn:           openedOn.toISOString(),
+			appointmentId,
+			lawyerId:           data.lawyerId,
+			trimmedDescription: trimStr(data.description),
+			client:             {
+				id:   obj.id,
+				name: clientName,
+			}
+		}));
+
+		return response(200, appointmentId);
 	}
 
 	async getAppointments (params: FnParams<GetAppointmentsInput>):
@@ -636,9 +659,9 @@ export class JusticeFirmRestAPIImpl
 				   AND a.status = ?`;
 		}
 		if (data.orderByOpenedOn === true) {
-			sql += " ORDER BY a.opened_on;";
+			sql += " ORDER BY a.opened_on DESC;";
 		} else {
-			sql += " ORDER BY a.timestamp;";
+			sql += " ORDER BY a.timestamp DESC;";
 		}
 		const res: Record<string, any>[] = await (await this.common.getPool())
 			.query(sql, [BigInt(jwt.id), data.withStatus]);
@@ -732,64 +755,14 @@ export class JusticeFirmRestAPIImpl
 		if (jwt == null) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid auth token");
 		}
-
-		const res: Record<string, any>[] = await (await this.common.getPool()).query(
-			`SELECT a.id                  AS a_id,
-			        a.group_id            AS a_group_id,
-			        a.case_id             AS a_case_id,
-			        a.description         AS a_description,
-			        a.timestamp           AS a_timestamp,
-			        a.opened_on           AS a_opened_on,
-			        a.status              AS a_status,
-			        c.id                  AS c_id,
-			        c.name                AS c_name,
-			        c.email               AS c_email,
-			        c.phone               AS c_phone,
-			        c.address             AS c_address,
-			        c.photo_path          AS c_photo_path,
-			        c.gender              AS c_gender,
-			        lu.id                 AS l_id,
-			        lu.name               AS l_name,
-			        lu.email              AS l_email,
-			        lu.phone              AS l_phone,
-			        lu.address            AS l_address,
-			        lu.photo_path         AS l_photo_path,
-			        lu.gender             AS l_gender,
-			        ll.latitude           AS l_latitude,
-			        ll.longitude          AS l_longitude,
-			        ll.certification_link AS l_certification_link,
-			        ll.status             AS l_status,
-			        ll.rejection_reason   AS l_rejection_reason
-			 FROM appointment           a
-			 JOIN "justice_firm"."user" c
-			      ON c.id = a.client_id
-			 JOIN "justice_firm"."user" lu
-			      ON lu.id = a.lawyer_id
-			 JOIN lawyer                ll
-			      ON lu.id = ll.id
-			 WHERE a.id = ?;`, [BigInt(data.id)]);
-
-		if (res.length === 0) {
+		const appointment = await this.common.getAppointmentData(data.id);
+		if (appointment == null) {
 			return message(404, "No such appointment found");
 		}
-
-		const value            = res[0];
-		const {lawyer, client} = this.extractAndParseLawyerAndClientData(value);
-		if (lawyer.id !== jwt.id && client.id !== jwt.id) {
+		if (appointment.lawyer.id !== jwt.id && appointment.client.id !== jwt.id) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				`User id ${jwt.id} is not allowed access the details of appointment ${data.id}`);
 		}
-		const appointment: AppointmentFullData = {
-			id:          value.a_id.toString(),
-			description: value.a_description.toString(),
-			caseId:      value.a_case_id?.toString(),
-			groupId:     value.a_group_id.toString(),
-			timestamp:   value.a_timestamp?.toString(),
-			openedOn:    value.a_opened_on.toString(),
-			status:      value.a_status.toString(),
-			client,
-			lawyer,
-		};
 		return response(200, appointment);
 	}
 
@@ -802,37 +775,67 @@ export class JusticeFirmRestAPIImpl
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				"To set an appointment's status the user must be authenticated as a lawyer");
 		}
-		const pool          = await this.common.getPool();
+		const conn          = await this.common.getConnection();
 		const lawyerId      = BigInt(jwt.id);
 		const appointmentId = BigInt(data.appointmentId);
-		if (data.status === StatusEnum.Rejected) {
-			const rejectRes: UpsertResult = await pool.execute(
-				"UPDATE appointment SET status='rejected' WHERE id = ? AND lawyer_id = ?;",
-				[appointmentId, lawyerId],
-			);
-			if (rejectRes.affectedRows === 0) {
-				return message(constants.HTTP_STATUS_BAD_REQUEST,
-					`Either the appointment with the id ${appointmentId} doesn't exist or you do not have access to edit it.`);
-			}
-		} else {
-			let confirmRes: UpsertResult;
-			if (data.timestamp == null) {
-				confirmRes = await pool.execute(
-					"UPDATE appointment SET status='confirmed' WHERE id = ? AND lawyer_id = ?;",
+		const appointment   = await this.common.getAppointmentData(appointmentId, conn);
+		if (appointment === null) {
+			return message(404, "No such appointment found");
+		}
+		if (appointment.lawyer.id !== jwt.id) {
+			return message(constants.HTTP_STATUS_UNAUTHORIZED,
+				`Lawyer id ${jwt.id} is not allowed change the details of appointment ${data.appointmentId}`);
+		}
+
+		try {
+			if (data.status === StatusEnum.Rejected) {
+				const rejectRes: UpsertResult = await conn.execute(
+					"UPDATE appointment SET status='rejected' WHERE id = ? AND lawyer_id = ?;",
 					[appointmentId, lawyerId],
 				);
+				assert(rejectRes.affectedRows === 1);
+				pq.add(ssEventsPublisher.appointmentStatusUpdate({
+					clientId:      appointment.client.id,
+					appointmentId: data.appointmentId,
+					lawyer:        {
+						id:   appointment.lawyer.id,
+						name: appointment.lawyer.name,
+					},
+					status:        StatusEnum.Rejected,
+				}));
 			} else {
-				confirmRes = await pool.execute(
-					"UPDATE appointment SET status='confirmed', timestamp=? WHERE id = ? AND lawyer_id = ?;",
-					[new Date(data.timestamp), appointmentId, lawyerId],
-				);
+				let confirmRes: UpsertResult;
+				if (data.timestamp == null) {
+					if (appointment.timestamp == null) {
+						return message(constants.HTTP_STATUS_BAD_REQUEST,
+							`If the appointment timestamp was not set by the client, the lawyer must set it.`);
+					}
+					confirmRes = await conn.execute(
+						"UPDATE appointment SET status='confirmed' WHERE id = ? AND lawyer_id = ?;",
+						[appointmentId, lawyerId],
+					);
+				} else {
+					confirmRes = await conn.execute(
+						"UPDATE appointment SET status='confirmed', timestamp=? WHERE id = ? AND lawyer_id = ?;",
+						[new Date(data.timestamp), appointmentId, lawyerId],
+					);
+				}
+				assert(confirmRes.affectedRows === 1);
+				pq.add(ssEventsPublisher.appointmentStatusUpdate({
+					clientId:      appointment.client.id,
+					appointmentId: data.appointmentId,
+					lawyer:        {
+						id:   appointment.lawyer.id,
+						name: appointment.lawyer.name,
+					},
+					status:        StatusEnum.Confirmed,
+					timestamp:     strToDate(nn(data.timestamp ?? appointment.timestamp)).toISOString(),
+				}));
 			}
-			if (confirmRes.affectedRows === 0) {
-				return message(constants.HTTP_STATUS_BAD_REQUEST,
-					`Either the appointment with the id ${appointmentId} doesn't exist or you do not have access to edit it.`);
-			}
+			return noContent;
+		} finally {
+			await conn.release();
 		}
-		return noContent;
 	}
 
 	async sendPasswordResetOTP (params: FnParams<SendPasswordResetOTPInput>):
@@ -1051,7 +1054,7 @@ The Justice Firm Foundation`;
 			       JOIN "justice_firm"."user" l ON l.id = s.lawyer_id
 			       JOIN case_type             ct ON ct.id = s.type_id
 			       WHERE s.client_id = ?
-			       ORDER BY S.opened_on;`;
+			       ORDER BY S.opened_on DESC;`;
 		} else {
 			sql = `SELECT s.id,
 			              c.id    AS oth_id,
@@ -1066,7 +1069,7 @@ The Justice Firm Foundation`;
 			       JOIN "justice_firm"."user" c ON c.id = s.client_id
 			       JOIN case_type             ct ON ct.id = s.type_id
 			       WHERE s.lawyer_id = ?
-			       ORDER BY S.opened_on;`;
+			       ORDER BY S.opened_on DESC;`;
 		}
 		const res: Record<string, any>[] = await (await this.common.getPool())
 			.query(sql, [BigInt(jwt.id)]);
@@ -1135,7 +1138,7 @@ The Justice Firm Foundation`;
 		}
 
 		const value            = res[0];
-		const {lawyer, client} = this.extractAndParseLawyerAndClientData(value);
+		const {lawyer, client} = PostgresDbModel.extractAndParseLawyerAndClientData(value);
 		if (lawyer.id !== jwt.id && client.id !== jwt.id) {
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				`User id ${jwt.id} is not allowed access the details of case ${data.id}`);
@@ -1277,34 +1280,6 @@ The Justice Firm Foundation`;
 			return [constants.HTTP_STATUS_UNAUTHORIZED, `User id ${jwt.id} is not allowed access the details of case ${caseId}`];
 		}
 		return jwt;
-	}
-
-	private extractAndParseLawyerAndClientData (value: Record<string, any>) {
-		const lawyer: LawyerSearchResult = {
-			id:                value.l_id.toString(),
-			name:              value.l_name.toString(),
-			email:             value.l_email.toString(),
-			phone:             value.l_phone.toString(),
-			address:           value.l_address.toString(),
-			photoPath:         value.l_photo_path.toString(),
-			gender:            value.l_gender?.toString(),
-			latitude:          Number(value.l_latitude),
-			longitude:         Number(value.l_longitude),
-			certificationLink: value.l_certification_link.toString(),
-			status:            nullOrEmptyCoalesce(value.l_status.toString(), StatusEnum.Waiting),
-			rejectionReason:   value.l_rejection_reason?.toString(),
-			distance:          undefined,
-		} as LawyerSearchResult;
-		const client: ClientDataResult   = {
-			id:        value.c_id.toString(),
-			name:      value.c_name.toString(),
-			email:     value.c_email.toString(),
-			phone:     value.c_phone.toString(),
-			address:   value.c_address.toString(),
-			photoPath: value.c_photo_path.toString(),
-			gender:    value.c_gender?.toString(),
-		} as ClientDataResult;
-		return {lawyer, client};
 	}
 
 	private async getLoginResponse (email: string, password: string) {

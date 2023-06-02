@@ -1,6 +1,7 @@
 import {GoneException} from "@aws-sdk/client-apigatewaymanagementapi";
 import {DeleteItemCommand, ReturnConsumedCapacity} from "@aws-sdk/client-dynamodb";
 import {GetParameterCommand} from "@aws-sdk/client-ssm";
+import pMap from "p-map";
 import {createClient} from "redis";
 import {CONNECTION_ID} from "../../common/infrastructure-constants";
 import {nn} from "../../common/utils/asserts";
@@ -74,7 +75,7 @@ export class CommonApiMethods {
 
 	async onAllConnections (conns: string[], predicate: (conn: string) => Promise<void>) {
 		if (conns.length === 0) return;
-		await Promise.all(conns.map(async conn => {
+		await pMap(conns,async conn => {
 			try {
 				await predicate(conn);
 			} catch (ex) {
@@ -85,7 +86,7 @@ export class CommonApiMethods {
 					console.log({ex});
 				}
 			}
-		}));
+		});
 	}
 
 	async cacheResult<T> (

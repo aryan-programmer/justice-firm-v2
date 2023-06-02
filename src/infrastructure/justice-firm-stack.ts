@@ -133,8 +133,8 @@ export class JusticeFirmStack extends Stack {
 			},
 			removalPolicy: RemovalPolicy.DESTROY,
 			billingMode:   BillingMode.PROVISIONED,
-			readCapacity:  3,
-			writeCapacity: 3,
+			readCapacity:  5,
+			writeCapacity: 5,
 		});
 		this.connectionsTable.addGlobalSecondaryIndex({
 			indexName:    connectionsByGroupIdIndex,
@@ -146,8 +146,8 @@ export class JusticeFirmStack extends Stack {
 			// 	name: CONNECTION_TYPE,
 			// 	type: AttributeType.STRING
 			// },
-			readCapacity:  3,
-			writeCapacity: 3,
+			readCapacity:  5,
+			writeCapacity: 5,
 		});
 
 		new CfnOutput(this, "ConnectionsTableArn", {
@@ -385,21 +385,47 @@ export class JusticeFirmStack extends Stack {
 		this.messagesTable.grantReadWriteData(this.eventAndNotifsLambda);
 		this.connectionsTable.grantReadWriteData(this.eventAndNotifsLambda);
 		this.jfNotificationsWsApi.grantManageConnections(this.eventAndNotifsLambda);
+
+		this.eventAndNotifsLambda.addToRolePolicy(new PolicyStatement({
+			effect:    Effect.ALLOW,
+			actions:   [
+				"dynamodb:PartiQLSelect"
+			],
+			resources: [
+				this.connectionsTable.tableArn,
+				this.connectionsTable.tableArn + "/index/*"
+			]
+		}));
+		this.eventAndNotifsLambda.addToRolePolicy(new PolicyStatement({
+			effect:     Effect.DENY,
+			actions:    [
+				"dynamodb:PartiQLSelect"
+			],
+			resources:  [
+				this.connectionsTable.tableArn,
+				this.connectionsTable.tableArn + "/index/*"
+			],
+			conditions: {
+				Bool: {
+					"dynamodb:FullTableScan": [
+						true
+					]
+				}
+			}
+		}));
 	}
 
 	private addSesPolicy () {
-		this.apiFunnelLambda.addToRolePolicy(
-			new PolicyStatement({
-				effect:    Effect.ALLOW,
-				actions:   [
-					'ses:SendEmail',
-					'ses:SendRawEmail',
-					'ses:SendTemplatedEmail',
-				],
-				resources: [
-					"*"
-				],
-			}),
-		);
+		this.apiFunnelLambda.addToRolePolicy(new PolicyStatement({
+			effect:    Effect.ALLOW,
+			actions:   [
+				'ses:SendEmail',
+				'ses:SendRawEmail',
+				'ses:SendTemplatedEmail',
+			],
+			resources: [
+				"*"
+			],
+		}));
 	}
 }

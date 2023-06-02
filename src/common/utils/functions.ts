@@ -17,7 +17,7 @@ import {
 	statusSearchOptionHuman_Any,
 	statusSearchOptionsDbToHuman,
 	StatusSearchOptionsEnum,
-	statusSearchOptionsHumanValsToDb
+	statusSearchOptionsHumanValsToDb, textMaxLength, textMaxWords
 } from "./constants";
 import {GeolocationNotAvailableError} from "./errors";
 import {memoizeWeak} from "./memoizeWeak";
@@ -31,11 +31,24 @@ export function nullOrEmptyCoalesce<T> (s: string | Nuly, s2: T) {
 	return isNullOrEmpty(s) ? s2 : s;
 }
 
-export function trimStr (s: string, wordCount: number = 13): string {
+export function trimStr (s: string, wordCount: number = textMaxWords, maxTextLength: number = textMaxLength): string {
 	const words = s.split(/([^A-Za-z0-9]+)/g);
-	if (words.length > wordCount)
-		return words.slice(0, wordCount).join("") + "...";
-	else return s;
+	let res = s;
+	// Consecutive non-alphanumeric character are part of the array as separate elements i.e. as a separate "word"
+	wordCount *= 2;
+	if (words.length > wordCount) {
+		res = words.slice(0, wordCount).join("") + "...";
+	}
+	if (res.length > maxTextLength) {
+		const actualMaxLength = maxTextLength - 3;
+		res               = "";
+		for (const word of words) {
+			if ((res.length + word.length) > actualMaxLength) break;
+			res += word;
+		}
+		res += "...";
+	}
+	return res;
 }
 
 export function dateStringFormat (s: string | Nuly): string | Nuly {
@@ -144,7 +157,7 @@ export async function getCurrentPosition (options?: PositionOptions) {
 		} else {
 			reject(new GeolocationNotAvailableError());
 		}
-	})
+	});
 }
 
 export function getDayFromMs (ms: number) {
@@ -155,27 +168,27 @@ export function getDayFromMs (ms: number) {
 }
 
 export function genderHumanToDB (h: string | Nuly) {
-	return genderHumanValsToDb[h as keyof typeof genderHumanValsToDb] ?? genderHumanValsToDb.Unknown
+	return genderHumanValsToDb[h as keyof typeof genderHumanValsToDb] ?? genderHumanValsToDb.Unknown;
 }
 
 export function genderDBToHuman (h: string | Nuly) {
-	return genderDbValsToHuman[h as keyof typeof genderDbValsToHuman] ?? genderDbValsToHuman.unknown
+	return genderDbValsToHuman[h as keyof typeof genderDbValsToHuman] ?? genderDbValsToHuman.unknown;
 }
 
 export function statusSearchHumanToDB (h: string | Nuly): StatusSearchOptionsEnum | StatusEnum {
-	return statusSearchOptionsHumanValsToDb[h as keyof typeof statusSearchOptionsHumanValsToDb] ?? StatusSearchOptionsEnum.Any
+	return statusSearchOptionsHumanValsToDb[h as keyof typeof statusSearchOptionsHumanValsToDb] ?? StatusSearchOptionsEnum.Any;
 }
 
 export function statusSearchDBToHuman (h: StatusSearchOptionsEnum | StatusEnum | Nuly) {
-	return statusSearchOptionsDbToHuman[h as keyof typeof statusSearchOptionsDbToHuman] ?? statusSearchOptionHuman_Any
+	return statusSearchOptionsDbToHuman[h as keyof typeof statusSearchOptionsDbToHuman] ?? statusSearchOptionHuman_Any;
 }
 
 export function chatGroupAttachmentPathPrefix (groupId: string, userId: string) {
-	return `chat/${groupId}/files/from/${userId}/`
+	return `chat/${groupId}/files/from/${userId}/`;
 }
 
 export function caseDocumentPathPrefix (caseId: string, authToken: AuthToken) {
-	return `case/${caseId}/docs/by-${authToken.userType.substring(0, 3)}-${authToken.id}/`
+	return `case/${caseId}/docs/by-${authToken.userType.substring(0, 3)}-${authToken.id}/`;
 }
 
 export function getDistanceFromLatLonInKm (
@@ -196,5 +209,5 @@ export function getDistanceFromLatLonInKm (
 }
 
 export function deg2rad (deg: number) {
-	return deg * (Math.PI / 180)
+	return deg * (Math.PI / 180);
 }

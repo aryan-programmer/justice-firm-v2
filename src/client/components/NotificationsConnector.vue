@@ -21,6 +21,7 @@ import {ID_T} from "../../common/db-types";
 import {NotificationMessageData} from "../../common/notification-types";
 import {nn} from "../../common/utils/asserts";
 import {firstIfArray} from "../../common/utils/functions";
+import {prettyPrint, removeProxies} from "../../common/utils/pretty-print";
 import {Nuly} from "../../common/utils/types";
 import {EstablishChatConnectionOutput, MessageData} from "../../common/ws-chatter-box-api-schema";
 import {useModals} from "../store/modalsStore";
@@ -93,7 +94,7 @@ async function openConnection (value: AuthToken | Nuly) {
 	} finally {
 		isLoading.value = false;
 	}
-	console.log(notifications.notifications);
+	console.log(removeProxies(notifications));
 }
 </script>
 

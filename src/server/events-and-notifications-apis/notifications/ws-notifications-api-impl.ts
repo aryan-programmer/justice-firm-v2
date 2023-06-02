@@ -9,6 +9,7 @@ import {APIGatewayProxyWebsocketEventV2} from "aws-lambda/trigger/api-gateway-pr
 import {PrivateAuthToken} from "../../../common/api-types";
 import {CONNECTION_GROUP_ID, CONNECTION_ID, GroupIdFromType} from "../../../common/infrastructure-constants";
 import {NotificationMessageData} from "../../../common/notification-types";
+import {prettyPrint} from "../../../common/utils/pretty-print";
 import {Nuly} from "../../../common/utils/types";
 import {
 	EstablishNotificationsConnectionInput,
@@ -85,10 +86,10 @@ export class JusticeFirmWsNotificationsAPIImpl
 		}));
 
 		printConsumedCapacity("getNotifications", queryResponse);
+		// prettyPrint("getNotifications: ", jwt, queryResponse);
 
 		if (queryResponse.Items == null || queryResponse.Items.length === 0)
 			return response(200, []);
-		console.log(JSON.stringify(queryResponse.Items, null, 4));
 		return response(200, queryResponse.Items.map(value => dynamoDbRecordToNotification(groupId, value)));
 	}
 }
