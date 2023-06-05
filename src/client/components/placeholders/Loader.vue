@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {computed} from "#imports";
 import {hexToRgb} from "../../../common/utils/colors";
 
 const props               = defineProps<{

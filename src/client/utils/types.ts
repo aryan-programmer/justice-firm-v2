@@ -1,5 +1,6 @@
 import {FieldContext} from "vee-validate";
 import {StatusEnum} from "../../common/db-types";
+import {NotificationMessageData} from "../../common/notification-types";
 import {Nuly, Paths} from "../../common/utils/types";
 import {MessageData} from "../../common/ws-chatter-box-api-schema";
 
@@ -86,3 +87,24 @@ export enum BtnVariants {
 }
 
 export type Density = 'default' | 'comfortable' | 'compact';
+
+export enum SemanticColorLevel {
+	Error   = 'error',
+	Warning = 'warning',
+	Info    = 'info',
+	Success = 'success',
+}
+
+export type NotificationDataDisplayable = Omit<NotificationMessageData, "timestamp"> & {
+	timestamp: Date,
+	text: string,
+	link?: string,
+	level: SemanticColorLevel,
+	dateStrings: {
+		date: string,
+		time: string,
+		dateTime: string,
+	},
+	levelColor: string,
+	icon?: string,
+};

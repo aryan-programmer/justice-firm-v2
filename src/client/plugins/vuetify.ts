@@ -4,6 +4,7 @@ import {faSquare as farSquare} from "@fortawesome/free-regular-svg-icons";
 import {
 	faArrowRotateLeft,
 	faBars,
+	faBell,
 	faBriefcase,
 	faBugSlash,
 	faCalendarDays,
@@ -124,7 +125,8 @@ library.add(
 	faArrowRotateLeft,
 	faIdBadge,
 	faInfo,
-	faInfoCircle
+	faInfoCircle,
+	faBell
 );
 // import * as components from 'vuetify/components'
 // import * as directives from 'vuetify/directives'

@@ -1,9 +1,27 @@
+import {SemanticColorLevel} from "./types";
+
 export const contentLoaderSpeed                 = 2;
 export const contentLoaderPrimaryColor          = "#f3f3f3";
 export const contentLoaderSecondaryColor        = "#ecebeb";
 export const contentLoaderTextHeight            = 16;
 export const contentLoaderTextHeightWithPadding = 20;
 export const contentLoaderTextRounding          = 5;
+
+export const appointmentsIcon = "fa-calendar-days";
+export const casesIcon        = "fa-briefcase";
+export const gavelIcon        = "fa-gavel";
+
+export const successColor = "green-accent-4";
+export const infoColor    = "blue-accent-4";
+export const warningColor = "warning";
+export const errorColor   = "red-accent-3";
+
+export const levelToColorMap = {
+	[SemanticColorLevel.Error]:   errorColor,
+	[SemanticColorLevel.Warning]: warningColor,
+	[SemanticColorLevel.Info]:    infoColor,
+	[SemanticColorLevel.Success]: successColor,
+};
 
 export const confirmedColor          = "green-accent-4";
 export const waitingColor            = "warning";

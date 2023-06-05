@@ -8,14 +8,20 @@ import LawyerStatusDisplayer from "./components/general/LawyerStatusDisplayer.vu
 import ModalDisplayer from "./components/general/ModalDisplayer.vue";
 import NavItem from "./components/general/NavItem.vue";
 import SnackbarListDisplayer from "./components/general/SnackbarListDisplayer.vue";
+import {useNotificationsStore} from "./store/notificationsStore";
 import {useUserStore} from "./store/userStore";
+import {appointmentsIcon, casesIcon, gavelIcon} from "./utils/constants";
 
-const userStore = useUserStore();
+const userStore     = useUserStore();
+const notifications = useNotificationsStore();
 
-const isSideNavVisible            = ref(false);
-const display                     = useDisplay();
-const {xs: hideSideNavBreakpoint} = display;
-const rail                        = computed(() => !hideSideNavBreakpoint.value);
+const isSideNavVisible      = ref(false);
+const showingNotifications  = ref<boolean>(false);
+const display               = useDisplay();
+const {xs, width}           = display;
+const hideSideNavBreakpoint = xs;
+const notificationsMaxWidth = computed(() => xs.value ? width.value : width.value / 2);
+const rail                  = computed(() => !hideSideNavBreakpoint.value);
 
 const router = useRouter();
 
@@ -58,9 +64,9 @@ const userDeps    = computed(() => {
 	case UserAccessType.Lawyer:
 		return {
 			links: [
-				{icon: "fa-gavel", title: "Home", link: "/"},
-				{icon: "fa-calendar-days", title: "Appointments", link: "/lawyer-appointments"},
-				{icon: "fa-briefcase", title: "Cases", link: "/lawyer-cases"},
+				{icon: gavelIcon, title: "Home", link: "/"},
+				{icon: appointmentsIcon, title: "Appointments", link: "/lawyer-appointments"},
+				{icon: casesIcon, title: "Cases", link: "/lawyer-cases"},
 				{icon: "fa-id-badge", title: "Profile", link: "/user-profile"},
 			],
 			color: "gradient--flying-lemon",
@@ -72,8 +78,8 @@ const userDeps    = computed(() => {
 			links: [
 				{icon: "fa-user", title: "Home", link: "/"},
 				...commonLinks,
-				{icon: "fa-calendar-days", title: "Appointments", link: "/client-appointments"},
-				{icon: "fa-briefcase", title: "Cases", link: "/client-cases"},
+				{icon: appointmentsIcon, title: "Appointments", link: "/client-appointments"},
+				{icon: casesIcon, title: "Cases", link: "/client-cases"},
 				{icon: "fa-id-badge", title: "Profile", link: "/user-profile"},
 			],
 			color: "gradient--perfect-white",
@@ -105,9 +111,14 @@ function pathCompare (link: string) {
 	if (link === "/") return currPath === "/";
 	return currPath.startsWith(link);
 }
+
+async function notificationsViewMore () {
+	showingNotifications.value = false;
+	await navigateTo("/notifications");
+}
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .app-bar-title-text {
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -122,13 +133,27 @@ function pathCompare (link: string) {
 	flex-direction: column;
 	padding: 6px !important;
 }
+
+.notifications-actions-card {
+	z-index: 10000;
+	position: -webkit-sticky;
+	position: sticky;
+	top: 0px;
+
+	& > .notifications-actions {
+		display: flex;
+		flex-direction: row;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		padding: 4px;
+	}
+}
 </style>
 
 <template>
 <SnackbarListDisplayer />
 <ModalDisplayer />
 <LawyerStatusDisplayer />
-<NotificationsConnector />
 <v-layout class="mh-100vh">
 	<v-app-bar
 		:color="userDeps.color"
@@ -148,6 +173,60 @@ function pathCompare (link: string) {
 		</v-app-bar-title>
 
 		<template v-slot:append>
+		<v-menu
+			v-model="showingNotifications"
+			:close-on-content-click="false"
+			location="end"
+		>
+			<template v-slot:activator="{ props }">
+			<v-btn class="me-3" icon v-bind="props">
+				<v-badge :content="notifications.notifications.length" color="blue">
+					<v-icon>fa-bell</v-icon>
+				</v-badge>
+			</v-btn>
+			</template>
+			<v-card min-width="300" :max-width="notificationsMaxWidth" density="compact">
+				<v-card-text class="mt-0 pt-0">
+					<v-card
+						elevation="1"
+						color="blue-lighten-4"
+						variant="flat"
+						density="compact"
+						class="notifications-actions-card rounded-b-lg rounded-t-0">
+						<v-card-text class="notifications-actions">
+							<v-btn
+								class="px-2"
+								rounded
+								density="compact"
+								variant="tonal"
+								style="min-width: 0px; visibility: hidden;">
+								<v-icon>fa-close</v-icon>
+							</v-btn>
+							<v-btn
+								to="/notifications"
+								density="compact"
+								rounded
+								color=""
+								variant="tonal"
+								@click="notificationsViewMore"
+							>
+								View More
+							</v-btn>
+							<v-btn
+								class="px-2"
+								rounded
+								density="compact"
+								variant="tonal"
+								style="min-width: 0px"
+								@click="showingNotifications=false">
+								<v-icon>fa-close</v-icon>
+							</v-btn>
+						</v-card-text>
+					</v-card>
+					<NotificationsList :notifications="notifications.notifications" />
+				</v-card-text>
+			</v-card>
+		</v-menu>
 		Welcome, {{ userInfo }}
 		</template>
 	</v-app-bar>

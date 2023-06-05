@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import {justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch, withMessageBodyIfApplicable} from "#imports";
+import {
+	computed,
+	justiceFirmApi,
+	navigateTo,
+	ref,
+	useRoute,
+	useRouter,
+	watch,
+	withMessageBodyIfApplicable
+} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {StatusEnum, UserAccessType} from "../../common/db-types";
 import {GetLawyerInput, LawyerSearchResult} from "../../common/rest-api-schema";

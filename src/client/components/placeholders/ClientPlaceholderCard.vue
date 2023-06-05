@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, contentLoaderPrimaryColor, contentLoaderSecondaryColor, useSlots} from "#imports";
+import {computed, contentLoaderPrimaryColor, contentLoaderSecondaryColor, contentLoaderSpeed, useSlots} from "#imports";
 import {ContentLoader} from "vue-content-loader";
 import {useDisplay} from "vuetify";
 import {

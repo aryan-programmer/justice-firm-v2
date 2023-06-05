@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {watch} from "#imports";
 import {StatusEnum} from "../../../common/db-types";
 import {nullOrEmptyCoalesce} from "../../../common/utils/functions";
 import {useLawyerStatusCheckerStore} from "../../store/lawyerStatusCheckerStore";

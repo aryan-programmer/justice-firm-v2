@@ -2,6 +2,7 @@
 import {
 	contentLoaderPrimaryColor,
 	contentLoaderSecondaryColor,
+	contentLoaderSpeed,
 	contentLoaderTextHeight,
 	contentLoaderTextHeightWithPadding,
 	contentLoaderTextRounding,

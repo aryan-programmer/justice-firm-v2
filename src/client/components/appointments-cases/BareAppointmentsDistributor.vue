@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {computed} from "#imports";
 import {AppointmentBareData, StatusEnum} from "../../../common/db-types";
 import BareAppointmentsTable from "./BareAppointmentsTable.vue";
 

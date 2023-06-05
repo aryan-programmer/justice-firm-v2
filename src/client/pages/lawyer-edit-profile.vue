@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {definePageMeta, justiceFirmApi, navigateTo, readFileAsDataUrl, watch} from "#imports";
+import {definePageMeta, justiceFirmApi, navigateTo, readFileAsDataUrl, ref, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import isEmpty from "lodash/isEmpty";
 import {FieldContext, useField, useForm} from 'vee-validate';

@@ -65,7 +65,10 @@ export function dateStringFormat (s: string | Nuly): string | Nuly {
 	});
 }
 
-export function dateFormat (d: Date | Nuly): string | Nuly {
+export function dateFormat (d: Date | Nuly): string | undefined;
+export function dateFormat (d: Date): string;
+
+export function dateFormat (d: Date | Nuly): string | undefined {
 	return d?.toLocaleDateString(undefined, {
 		day:     "numeric",
 		weekday: "short",
@@ -97,6 +100,10 @@ export function getDateTimeHeader (d: Date) {
 	} else {
 		return res;
 	}
+}
+
+export function reverseComparator<T> (comp: (a: T, b: T) => number): (a: T, b: T) => number {
+	return (a: T, b: T) => -comp(a, b);
 }
 
 export function compareDates (a: Date | Nuly, b: Date | Nuly) {

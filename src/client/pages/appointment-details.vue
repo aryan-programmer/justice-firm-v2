@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import {computed, definePageMeta, justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
+import {
+	computed,
+	definePageMeta,
+	getColorFromStatus,
+	justiceFirmApi,
+	navigateTo,
+	ref,
+	useRoute,
+	useRouter,
+	watch
+} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {LocationQuery} from "vue-router";
 import {LawyerAuthToken} from "../../common/api-types";

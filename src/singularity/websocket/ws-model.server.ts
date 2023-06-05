@@ -82,6 +82,7 @@ export function eventsSender<TEndpoints extends APIEndpoints = APIEndpoints,
 				}
 			}
 
+			// TODO: No spread body
 			let eventBody  = {
 				event: eventName,
 				...body

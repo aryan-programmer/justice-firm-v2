@@ -1,6 +1,12 @@
 import {Ref} from "@vue/reactivity";
 import {isLeft, isRight} from "fp-ts/Either";
 import {StatusEnum} from "../../common/db-types";
+import {
+	LawyerStatusUpdateNotification,
+	NotificationMessageData,
+	NotificationType,
+	UserNotification
+} from "../../common/notification-types";
 import {AppointmentSparseData} from "../../common/rest-api-schema";
 import {assert, nn} from "../../common/utils/asserts";
 import {
@@ -9,7 +15,13 @@ import {
 	maxFileSize,
 	validImageMimeTypes
 } from "../../common/utils/constants";
-import {timeFormat} from "../../common/utils/functions";
+import {
+	dateFormat,
+	dateStringFormat,
+	getDateTimeHeader,
+	nullOrEmptyCoalesce,
+	timeFormat
+} from "../../common/utils/functions";
 import {Nuly, Writeable} from "../../common/utils/types";
 import {MessageData} from "../../common/ws-chatter-box-api-schema";
 import {strToDate} from "../../server/common/utils/date-to-str";
@@ -19,8 +31,23 @@ import {ModelResponseOrErr} from "../../singularity/model.client";
 import {ModalStoreWrapper} from "../store/modalsStore";
 import {UserStore_T} from "../store/userStore";
 import {justiceFirmApi} from "./api-fetcher-impl";
-import {confirmedColor, iconClassesArray, rejectedColor, waitingColor} from "./constants";
-import {KeepAsIsEnum, MessageDataDisplayable, StatusSelectionOptions} from "./types";
+import {
+	appointmentsIcon,
+	confirmedColor,
+	gavelIcon,
+	iconClassesArray,
+	infoColor,
+	levelToColorMap,
+	rejectedColor,
+	waitingColor
+} from "./constants";
+import {
+	KeepAsIsEnum,
+	MessageDataDisplayable,
+	NotificationDataDisplayable,
+	SemanticColorLevel,
+	StatusSelectionOptions
+} from "./types";
 
 export class FileReaderEventError extends Error {
 	public readonly event: ProgressEvent<FileReader>;
@@ -214,6 +241,10 @@ export function messageDataToDisplayable (
 	return res;
 }
 
+export function getColorFromLevel (status: SemanticColorLevel | Nuly) {
+	return levelToColorMap[status ?? SemanticColorLevel.Info] ?? infoColor;
+}
+
 export function getColorFromStatus (status: StatusEnum | Nuly) {
 	switch (status) {
 	case StatusEnum.Rejected:
@@ -251,4 +282,72 @@ export function withMessageBodyIfApplicable<T> (msg: string, res: ModelResponseO
 		}
 	}
 	return msg;
+}
+
+function notificationExtraDataForLawyerStatusUpdate (v: LawyerStatusUpdateNotification) {
+	switch (v.status) {
+	case StatusEnum.Rejected:
+		return {
+			text:  "Your application has been rejected for the following reason(s): " + nullOrEmptyCoalesce(v.rejectionReason,
+				"Unknown reason"),
+			level: SemanticColorLevel.Error
+		};
+	case StatusEnum.Confirmed:
+		return {
+			text:  "Your application has been confirmed",
+			level: SemanticColorLevel.Success,
+		};
+	case StatusEnum.Waiting:
+	default:
+		return {
+			text:  "Your application is in the waiting state",
+			level: SemanticColorLevel.Warning
+		};
+	}
+}
+
+export function notificationExtraData (v: UserNotification): Pick<NotificationDataDisplayable, "text" | "link" | "icon"> & {
+	level?: NotificationDataDisplayable["level"]
+} {
+	switch (v.type) {
+	case NotificationType.NewAppointmentRequest:
+		return {
+			text: `${v.client.name} opened a new appointment request: ${v.trimmedDescription}`,
+			link: `/appointment-details?id=${v.appointmentId}`,
+			icon: appointmentsIcon,
+		};
+	case NotificationType.LawyerStatusUpdate:
+		return {
+			...notificationExtraDataForLawyerStatusUpdate(v),
+			icon: gavelIcon,
+		};
+	case NotificationType.AppointmentStatusUpdate:
+		return {
+			text: `${v.lawyer.name} ${v.status} your appointment request. ${
+				v.status === StatusEnum.Confirmed ?
+				`It is scheduled on ${dateStringFormat(v.timestamp)}.` :
+				""
+			}`,
+			link: `/appointment-details?id=${v.appointmentId}`,
+			icon: appointmentsIcon,
+		};
+	}
+}
+
+export function notificationDataToDisplayable (v: NotificationMessageData): NotificationDataDisplayable {
+	const res = {
+		...v,
+		timestamp: strToDate(v.timestamp),
+		level:     SemanticColorLevel.Info,
+		...notificationExtraData(v.notification),
+	};
+	return {
+		...res,
+		dateStrings: {
+			date:     getDateTimeHeader(res.timestamp),
+			time:     timeFormat(res.timestamp)!,
+			dateTime: dateFormat(res.timestamp)!
+		},
+		levelColor:  getColorFromLevel(res.level),
+	};
 }

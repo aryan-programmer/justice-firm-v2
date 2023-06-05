@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {onMounted, ref} from "#imports";
 import {AppointmentSparseData} from "../../../common/rest-api-schema";
-import {printRemoveProxies} from "../../../common/utils/pretty-print";
 import {Nuly} from "../../../common/utils/types";
 import {useModals} from "../../store/modalsStore";
 import {useUserStore} from "../../store/userStore";
@@ -20,18 +19,6 @@ const rejectedAppointments            = ref<AppointmentSparseData[] | Nuly>(null
 const areWaitingAppointmentsLoading   = ref<boolean>(false);
 const areConfirmedAppointmentsLoading = ref<boolean>(false);
 const areRejectedAppointmentsLoading  = ref<boolean>(false);
-
-watch(() => [
-	waitingAppointments.value,
-	confirmedAppointments.value,
-	rejectedAppointments.value,
-], value => {
-	printRemoveProxies({
-		waitingAppointments:   waitingAppointments.value,
-		confirmedAppointments: confirmedAppointments.value,
-		rejectedAppointments:  rejectedAppointments.value,
-	});
-});
 
 onMounted(async () => {
 	await fetchAppointmentsByCategory({

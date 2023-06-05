@@ -102,6 +102,7 @@
 		"vue-content-loader": "^2.0.1",
 		"vue-masonry": "^0.16.0",
 		"vue-tsc": "^1.6.5",
+		"vue-virtual-scroller": "^1.1.2",
 		"vuetify": "^3.3.0",
 		"webpack": "^5.83.1",
 		"websocket-as-promised": "^2.0.1",

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, useSlots} from "#imports";
+import {computed, getColorFromStatus, rejectedColor, useSlots} from "#imports";
 import {useDisplay} from "vuetify";
 import {StatusEnum} from "../../../common/db-types";
 import {LawyerSearchResult} from "../../../common/rest-api-schema";

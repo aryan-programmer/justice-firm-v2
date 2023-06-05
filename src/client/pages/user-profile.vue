@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import {definePageMeta, navigateTo, ref, useRoute, useRouter, watch, withMessageBodyIfApplicable} from "#imports";
+import {
+	computed,
+	definePageMeta,
+	justiceFirmApi,
+	navigateTo,
+	ref,
+	useRoute,
+	useRouter,
+	watch,
+	withMessageBodyIfApplicable
+} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {ClientDataResult, UserAccessType} from "../../common/db-types";
 import {LawyerSearchResult} from "../../common/rest-api-schema";

@@ -192,8 +192,10 @@ export function websocketClient<TEndpoints extends APIEndpoints = APIEndpoints,
 					}
 				}
 
+				const {event, ...dataWithoutEvent} = data;
+
 				// @ts-ignore
-				this.emit(data.event, data);
+				this.emit(data.event, dataWithoutEvent);
 			});
 			return value;
 		}

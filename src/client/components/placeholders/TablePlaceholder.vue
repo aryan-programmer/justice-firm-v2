@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {computed, contentLoaderSpeed} from "#imports";
 import {ContentLoader} from "vue-content-loader";
 import {useDisplay} from "vuetify";
 

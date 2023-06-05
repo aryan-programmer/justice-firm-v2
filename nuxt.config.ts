@@ -52,4 +52,7 @@ export default defineNuxtConfig({
 		transpile: ['vuetify'],
 	},
 	ssr:     false,
+	imports: {
+		autoImport: false
+	}
 })
