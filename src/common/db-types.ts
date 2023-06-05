@@ -80,6 +80,13 @@ export const IDWithName = Type.Object({
 }, {$id: "IDWithName"});
 export type IDWithName = Static<typeof IDWithName>;
 
+export const UserNameWithType = Type.Object({
+	id:   ID_T,
+	name: String_T,
+	type: UserAccessType_T
+}, {$id: "UserNameWithType"});
+export type UserNameWithType = Static<typeof UserNameWithType>;
+
 export const CaseDocumentData = Type.Object({
 	id:          ID_T,
 	file:        FileUploadData,

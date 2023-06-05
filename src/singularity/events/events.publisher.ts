@@ -4,6 +4,7 @@ import {
 	EventsPublisher,
 	ListenerEvent
 } from "~~/src/singularity/events/events-endpoint";
+import {prettyPrint} from "../../common/utils/pretty-print";
 import {getErrorPathPrepender} from "../endpoint";
 import {EarlyExitResponseError, errorsToResponse} from "../model.server";
 
@@ -32,10 +33,11 @@ export function eventsPublisher<TDefs extends EventDefinitions = EventDefinition
 				}
 			}
 
-			let eventBody  = {
+			let eventBody = {
 				event: eventName,
 				...body
 			};
+			prettyPrint(eventBody);
 			const postData = JSON.stringify(eventBody, null, 0);
 			await publish({
 				event:     eventName,

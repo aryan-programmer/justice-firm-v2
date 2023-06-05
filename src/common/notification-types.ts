@@ -2,15 +2,19 @@ import {Static, TEnum, TLiteral, TObject, Type} from "@sinclair/typebox";
 import {
 	AppointmentConfirmedData,
 	AppointmentRejectedData,
+	CaseDocumentUploadedData,
+	CaseUpgradeFromAppointmentData,
 	NewAppointmentRequestData
 } from "../server/common/ss-events-schema";
 import {ID_T, StatusEnum_T} from "./db-types";
 import {OptionalString_T, String_T} from "./utils/types";
 
 export enum NotificationType {
-	LawyerStatusUpdate      = "0",
-	NewAppointmentRequest   = "1",
-	AppointmentStatusUpdate = "2",
+	LawyerStatusUpdate         = "0",
+	NewAppointmentRequest      = "1",
+	AppointmentStatusUpdate    = "2",
+	CaseUpgradeFromAppointment = "3",
+	CaseDocumentUploaded       = "4",
 }
 
 export const NotificationType_T = (function () {
@@ -57,21 +61,32 @@ export const AppointmentStatusUpdateNotification = Type.Union([
 ], {$id: "AppointmentStatusUpdateNotification"});
 export type AppointmentStatusUpdateNotification = Static<typeof AppointmentStatusUpdateNotification>;
 
-export const NotificationToLawyer = Type.Union([
-	LawyerStatusUpdateNotification,
-	NewAppointmentRequestNotification
-], {$id: "NotificationToLawyer"});
-export type NotificationToLawyer = Static<typeof NotificationToLawyer>;
+export const CaseUpgradeFromAppointmentNotification = WithTypeField(
+	Type.Omit(
+		CaseUpgradeFromAppointmentData,
+		["clientId"]
+	),
+	NotificationType_T.CaseUpgradeFromAppointment,
+	"CaseUpgradeFromAppointmentNotification"
+);
+export type CaseUpgradeFromAppointmentNotification = Static<typeof CaseUpgradeFromAppointmentNotification>;
 
-export const NotificationToClient = Type.Union([
-	AppointmentStatusUpdateNotification,
-], {$id: "NotificationToClient"});
-export type NotificationToClient = Static<typeof NotificationToClient>;
+export const CaseDocumentUploadedNotification = WithTypeField(
+	Type.Omit(
+		CaseDocumentUploadedData,
+		["recipient"]
+	),
+	NotificationType_T.CaseDocumentUploaded,
+	"CaseDocumentUploadedNotification"
+);
+export type CaseDocumentUploadedNotification = Static<typeof CaseDocumentUploadedNotification>;
 
 export const UserNotification = Type.Union([
 	LawyerStatusUpdateNotification,
 	NewAppointmentRequestNotification,
 	AppointmentStatusUpdateNotification,
+	CaseUpgradeFromAppointmentNotification,
+	CaseDocumentUploadedNotification,
 ], {$id: "UserNotification"});
 export type UserNotification = Static<typeof UserNotification>;
 

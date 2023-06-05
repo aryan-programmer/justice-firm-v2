@@ -3,6 +3,7 @@ import {StatusEnum} from "../../common/db-types";
 import {NotificationMessageData} from "../../common/notification-types";
 import {Nuly, Paths} from "../../common/utils/types";
 import {MessageData} from "../../common/ws-chatter-box-api-schema";
+import {FileUploadData} from "../../server/common/utils/types";
 
 export type SelectItemKey =
 	| boolean
@@ -95,10 +96,18 @@ export enum SemanticColorLevel {
 	Success = 'success',
 }
 
+export type LinkData = {
+	                       text: string,
+	                       link: string,
+                       } | {
+	                       text?: string | Nuly,
+	                       file: FileUploadData,
+                       }
+
 export type NotificationDataDisplayable = Omit<NotificationMessageData, "timestamp"> & {
 	timestamp: Date,
 	text: string,
-	link?: string,
+	links: LinkData[],
 	level: SemanticColorLevel,
 	dateStrings: {
 		date: string,

@@ -8,6 +8,7 @@ import {
 	TSchema,
 	Type
 } from "@sinclair/typebox";
+import {strToDate} from "../../server/common/utils/date-to-str";
 import {AuthToken} from "../api-types";
 import {
 	genderDbValsToHuman,
@@ -54,9 +55,9 @@ export function trimStr (s: string, wordCount: number = textMaxWords, maxTextLen
 }
 
 export function dateStringFormat (s: string | Nuly): string | Nuly {
-	return s == null ? null : new Date(s).toLocaleDateString(undefined, {
+	return s == null ? null : strToDate(s).toLocaleDateString(undefined, {
 		day:     "numeric",
-		weekday: "short",
+		weekday: "long",
 		month:   "short",
 		year:    "numeric",
 		hour:    "2-digit",

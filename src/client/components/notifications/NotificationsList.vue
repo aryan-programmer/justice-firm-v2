@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import {computed} from "#imports";
-import {dateFormat, getDateTimeHeader, timeFormat} from "../../../common/utils/functions";
 import {getColorFromLevel} from "../../utils/functions";
 import {NotificationDataDisplayable} from "../../utils/types";
+import FileDownloadButton from "../uploaded-files/FileDownloadButton.vue";
 
 const props                   = defineProps<{
 	notifications: NotificationDataDisplayable[],
@@ -32,30 +32,34 @@ const showTimeStampOnOpposite = computed(() => props.showTimeStampOnOpposite ===
 	>
 		<template v-slot:opposite v-if="showTimeStampOnOpposite">
 		<p class="text-right">
-			<span class="text-no-wrap">{{ getDateTimeHeader(notif.timestamp)! }}</span><br />
-			<span class="text-no-wrap">{{ timeFormat(notif.timestamp)! }}</span>
+			<span class="text-no-wrap">{{ notif.dateStrings.date }}</span><br />
+			<span class="text-no-wrap">{{ notif.dateStrings.time }}</span>
 		</p>
 		</template>
 		<v-card
-			:subtitle="(showTimeStampOnOpposite?undefined:dateFormat(notif.timestamp))!"
+			:subtitle="(showTimeStampOnOpposite?undefined:notif.dateStrings.dateTime)!"
 			:color="getColorFromLevel(notif.level)"
 			density="compact"
 			variant="tonal"
 			rounded="lg">
-			<v-card-text class="pb-3">
-				{{ notif.text }}<br />
-				<v-card-actions class="mr-0 mb-0 mt-1 pa-0" style="min-height: 0px; margin-left: -8px">
-					<v-btn
-						v-if="notif.link!=null"
-						:to="notif.link"
-						class="ma-0"
-						color="cyan-lighten-4"
-						density="compact"
-						rounded
-						variant="elevated">View more
-					</v-btn>
-				</v-card-actions>
+			<v-card-text class="" v-bind:class="{'pb-0': notif.links.length>0}">
+				<p class="pre-wrap">{{ notif.text }}</p>
 			</v-card-text>
+			<v-card-actions class="pt-1" style="min-height: 0px;" v-if="notif.links.length>0">
+				<template v-for="link in notif.links">
+				<v-btn
+					v-if="'link' in link"
+					:to="link.link"
+					class=""
+					color="cyan-lighten-4"
+					density="compact"
+					rounded
+					variant="elevated">
+					{{ link.text }}
+				</v-btn>
+				<FileDownloadButton v-else-if="'file' in link" :file="link.file" :button-text="link.text" />
+				</template>
+			</v-card-actions><!--mr-0 mb-0 mt-2 pa-0-->
 		</v-card>
 	</v-timeline-item>
 </v-timeline>

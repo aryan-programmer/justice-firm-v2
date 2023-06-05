@@ -1,10 +1,11 @@
 import {Static, Type} from "@sinclair/typebox";
-import {ID_T, IDWithName, StatusEnum} from "../../common/db-types";
+import {ID_T, IDWithName, StatusEnum, UserNameWithType} from "../../common/db-types";
 import {trimmedDescriptionMaxLength} from "../../common/utils/constants";
 import {ArrayOf} from "../../common/utils/functions";
 import {OptionalBoolean_T, String_T} from "../../common/utils/types";
 import {eventsModelSchema} from "../../singularity/events/events-endpoint";
 import {lazyCheck} from "../../singularity/helpers";
+import {FileUploadData} from "./utils/types";
 
 export const LawyerProfileUpdateData = Type.Object({
 	ids:                           ArrayOf(ID_T),
@@ -50,12 +51,33 @@ export const AppointmentStatusUpdateData = Type.Union([
 ], {$id: "AppointmentStatusUpdateData"});
 export type AppointmentStatusUpdateData = Static<typeof AppointmentStatusUpdateData>;
 
+export const CaseUpgradeFromAppointmentData = Type.Object({
+	appointmentId:          ID_T,
+	caseId:                 ID_T,
+	clientId:               ID_T,
+	lawyer:                 IDWithName,
+	trimmedCaseDescription: Type.String({maxLength: trimmedDescriptionMaxLength}),
+}, {$id: "CaseUpgradeFromAppointmentData"});
+export type CaseUpgradeFromAppointmentData = Static<typeof CaseUpgradeFromAppointmentData>;
+
+export const CaseDocumentUploadedData = Type.Object({
+	caseDocumentId:             ID_T,
+	caseId:                     ID_T,
+	sender:                     UserNameWithType,
+	recipient:                  UserNameWithType,
+	documentUploadData:         FileUploadData,
+	trimmedDocumentDescription: Type.String({maxLength: trimmedDescriptionMaxLength}),
+}, {$id: "CaseDocumentUploadedData"});
+export type CaseDocumentUploadedData = Static<typeof CaseDocumentUploadedData>;
+
 export const ssEventsSchema = eventsModelSchema({
 	name:   "JusticeFirm-ServerSide-EventsSchema",
 	events: {
-		lawyerProfileUpdate:     lazyCheck(LawyerProfileUpdateData),
-		lawyersStatusesUpdate:   lazyCheck(LawyersStatusesUpdateData),
-		newAppointmentRequest:   lazyCheck(NewAppointmentRequestData),
-		appointmentStatusUpdate: lazyCheck(AppointmentStatusUpdateData),
+		lawyerProfileUpdate:        lazyCheck(LawyerProfileUpdateData),
+		lawyersStatusesUpdate:      lazyCheck(LawyersStatusesUpdateData),
+		newAppointmentRequest:      lazyCheck(NewAppointmentRequestData),
+		appointmentStatusUpdate:    lazyCheck(AppointmentStatusUpdateData),
+		caseUpgradeFromAppointment: lazyCheck(CaseUpgradeFromAppointmentData),
+		caseDocumentUploaded:       lazyCheck(CaseDocumentUploadedData),
 	},
 });

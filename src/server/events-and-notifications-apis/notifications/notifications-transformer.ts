@@ -1,25 +1,46 @@
 import {AttributeValue} from "@aws-sdk/client-dynamodb/dist-types/models/models_0";
-import {MESSAGE_GROUP, MESSAGE_ID, MESSAGE_TIMESTAMP,} from "../../../common/infrastructure-constants";
+import {UserAccessType} from "../../../common/db-types";
+import {
+	ATTACHMENT_MIME,
+	ATTACHMENT_NAME,
+	ATTACHMENT_PATH,
+	MESSAGE_GROUP,
+	MESSAGE_ID,
+	MESSAGE_TIMESTAMP,
+} from "../../../common/infrastructure-constants";
 import {NotificationMessageData, NotificationType, UserNotification} from "../../../common/notification-types";
 import {nn} from "../../../common/utils/asserts";
 import {StatusEnum} from "../../../common/utils/constants";
 import {isNullOrEmpty} from "../../../common/utils/functions";
+import {Nuly} from "../../../common/utils/types";
 
 const NOTIFICATION_TYPE = "ntyp";
 const NOTIFICATION_DATA = "ndat";
 
+const AppointmentId      = "aid";
+const TrimmedDescription = "desc";
+const ClientId           = "cid";
+const ClientName         = "cname";
+const LawyerId           = "lid";
+const LawyerName         = "lname";
+
 const LawyerStatusUpdate_Status          = "lsu:st";
 const LawyerStatusUpdate_RejectionReason = "lsu:rej";
 
-const AppointmentId                            = "aid";
-const NewAppointmentRequest_TrimmedDescription = "desc";
-const NewAppointmentRequest_ClientId           = "cid";
-const NewAppointmentRequest_ClientName         = "cname";
+const AppointmentStatusUpdate_Status    = "sts";
+const AppointmentStatusUpdate_Timestamp = "ts";
 
-const AppointmentStatusUpdate_Status     = "sts";
-const AppointmentStatusUpdate_Timestamp  = "ts";
-const AppointmentStatusUpdate_LawyerId   = "lid";
-const AppointmentStatusUpdate_LawyerName = "lname";
+const CaseUpgradeFromAppointment_TrimmedCaseDescription = TrimmedDescription;
+const CaseId                                            = "csid";
+
+const CaseDocumentUploaded_CaseDocumentId             = "csdid";
+const CaseDocumentUploaded_TrimmedDocumentDescription = TrimmedDescription;
+const CaseDocumentUploaded_SenderId                   = "sid";
+const CaseDocumentUploaded_SenderName                 = "sname";
+const CaseDocumentUploaded_SenderType                 = "styp";
+const CaseDocumentUploaded_DocumentPath               = ATTACHMENT_PATH;
+const CaseDocumentUploaded_DocumentMime               = ATTACHMENT_MIME;
+const CaseDocumentUploaded_DocumentName               = ATTACHMENT_NAME;
 
 export const GetNotifications_ProjectionExpression     = [
 	MESSAGE_TIMESTAMP, MESSAGE_ID, NOTIFICATION_TYPE, NOTIFICATION_DATA
@@ -34,48 +55,74 @@ export const GetNotifications_ExpressionAttributeNames = [
 	return prev;
 }, {} as Record<string, string>);
 
+function getStringFieldIf (name: string, value: string | Nuly, condition: boolean = true): Record<string, AttributeValue> {
+	return !isNullOrEmpty(value) && condition ? {
+		[name]: {S: value},
+	} : {};
+}
+
 function notificationDataToDynamodbMap (
 	data: NotificationMessageData,
 ): Record<string, AttributeValue> {
 	const notification = data.notification;
 	switch (notification.type) {
 	case NotificationType.LawyerStatusUpdate:
-		if (isNullOrEmpty(notification.rejectionReason)) {
-			return {
-				[LawyerStatusUpdate_Status]: {S: notification.status}
-			};
-		} else {
-			return {
-				[LawyerStatusUpdate_Status]:          {S: notification.status},
-				[LawyerStatusUpdate_RejectionReason]: {S: notification.rejectionReason}
-			};
-		}
-		break;
+		return {
+			[LawyerStatusUpdate_Status]: {S: notification.status},
+			...getStringFieldIf(
+				LawyerStatusUpdate_RejectionReason,
+				notification.rejectionReason
+			),
+		};
 	case NotificationType.NewAppointmentRequest:
 		return {
-			[AppointmentId]:                            {S: notification.appointmentId},
-			[NewAppointmentRequest_TrimmedDescription]: {S: notification.trimmedDescription},
-			[NewAppointmentRequest_ClientId]:           {S: notification.client.id},
-			[NewAppointmentRequest_ClientName]:         {S: notification.client.name},
+			[AppointmentId]:      {S: notification.appointmentId},
+			[TrimmedDescription]: {S: notification.trimmedDescription},
+			[ClientId]:           {S: notification.client.id},
+			[ClientName]:         {S: notification.client.name},
 		};
 	case NotificationType.AppointmentStatusUpdate:
 		if (notification.status === StatusEnum.Rejected) {
 			return {
-				[AppointmentId]:                      {S: notification.appointmentId},
-				[AppointmentStatusUpdate_Status]:     {S: notification.status},
-				[AppointmentStatusUpdate_LawyerId]:   {S: notification.lawyer.id},
-				[AppointmentStatusUpdate_LawyerName]: {S: notification.lawyer.name},
+				[AppointmentId]:                  {S: notification.appointmentId},
+				[AppointmentStatusUpdate_Status]: {S: notification.status},
+				[LawyerId]:                       {S: notification.lawyer.id},
+				[LawyerName]:                     {S: notification.lawyer.name},
 			};
 		} else {
 			return {
-				[AppointmentId]:                      {S: notification.appointmentId},
-				[AppointmentStatusUpdate_Status]:     {S: notification.status},
-				[AppointmentStatusUpdate_Timestamp]:  {S: notification.timestamp},
-				[AppointmentStatusUpdate_LawyerId]:   {S: notification.lawyer.id},
-				[AppointmentStatusUpdate_LawyerName]: {S: notification.lawyer.name},
+				[AppointmentId]:                     {S: notification.appointmentId},
+				[AppointmentStatusUpdate_Status]:    {S: notification.status},
+				[AppointmentStatusUpdate_Timestamp]: {S: notification.timestamp},
+				[LawyerId]:                          {S: notification.lawyer.id},
+				[LawyerName]:                        {S: notification.lawyer.name},
 			};
 		}
 		break;
+	case NotificationType.CaseUpgradeFromAppointment:
+		return {
+			[AppointmentId]: {S: notification.appointmentId},
+			[LawyerId]:      {S: notification.lawyer.id},
+			[LawyerName]:    {S: notification.lawyer.name},
+
+			[CaseUpgradeFromAppointment_TrimmedCaseDescription]: {S: notification.trimmedCaseDescription},
+			[CaseId]:                                            {S: notification.caseId},
+		};
+	case NotificationType.CaseDocumentUploaded:
+		return {
+			[CaseDocumentUploaded_CaseDocumentId]:             {S: notification.caseDocumentId},
+			[CaseDocumentUploaded_TrimmedDocumentDescription]: {S: notification.trimmedDocumentDescription},
+			[CaseDocumentUploaded_SenderId]:                   {S: notification.sender.id},
+			[CaseDocumentUploaded_SenderName]:                 {S: notification.sender.name},
+			[CaseDocumentUploaded_SenderType]:                 {S: notification.sender.type},
+			[CaseDocumentUploaded_DocumentPath]:               {S: notification.documentUploadData.path},
+			[CaseDocumentUploaded_DocumentMime]:               {S: notification.documentUploadData.mime},
+			[CaseId]:                                          {S: notification.caseId},
+			...getStringFieldIf(
+				CaseDocumentUploaded_DocumentName,
+				notification.documentUploadData.name
+			),
+		};
 	}
 }
 
@@ -116,10 +163,10 @@ function dynamodbMapToNotificationData (
 		return {
 			type,
 			appointmentId:      nn(data[AppointmentId].S),
-			trimmedDescription: nn(data[NewAppointmentRequest_TrimmedDescription].S),
+			trimmedDescription: nn(data[TrimmedDescription].S),
 			client:             {
-				id:   nn(data[NewAppointmentRequest_ClientId].S),
-				name: nn(data[NewAppointmentRequest_ClientName].S),
+				id:   nn(data[ClientId].S),
+				name: nn(data[ClientName].S),
 			},
 		};
 	case NotificationType.AppointmentStatusUpdate:
@@ -131,8 +178,8 @@ function dynamodbMapToNotificationData (
 				status,
 				timestamp:     nn(data[AppointmentStatusUpdate_Timestamp].S),
 				lawyer:        {
-					id:   nn(data[AppointmentStatusUpdate_LawyerId].S),
-					name: nn(data[AppointmentStatusUpdate_LawyerName].S),
+					id:   nn(data[LawyerId].S),
+					name: nn(data[LawyerName].S),
 				},
 			};
 		} else {
@@ -141,11 +188,39 @@ function dynamodbMapToNotificationData (
 				appointmentId: nn(data[AppointmentId].S),
 				status:        StatusEnum.Rejected,
 				lawyer:        {
-					id:   nn(data[AppointmentStatusUpdate_LawyerId].S),
-					name: nn(data[AppointmentStatusUpdate_LawyerName].S),
+					id:   nn(data[LawyerId].S),
+					name: nn(data[LawyerName].S),
 				},
 			};
 		}
+	case NotificationType.CaseUpgradeFromAppointment:
+		return {
+			type,
+			appointmentId:          nn(data[AppointmentId].S),
+			caseId:                 nn(data[CaseId].S),
+			lawyer:                 {
+				id:   nn(data[LawyerId].S),
+				name: nn(data[LawyerName].S),
+			},
+			trimmedCaseDescription: nn(data[CaseUpgradeFromAppointment_TrimmedCaseDescription].S),
+		};
+	case NotificationType.CaseDocumentUploaded:
+		return {
+			type,
+			caseDocumentId:             nn(data[CaseDocumentUploaded_CaseDocumentId].S),
+			trimmedDocumentDescription: nn(data[CaseDocumentUploaded_TrimmedDocumentDescription].S),
+			sender:                     {
+				id:   nn(data[CaseDocumentUploaded_SenderId].S),
+				name: nn(data[CaseDocumentUploaded_SenderName].S),
+				type: nn(data[CaseDocumentUploaded_SenderType].S) as UserAccessType,
+			},
+			documentUploadData:         {
+				path: nn(data[CaseDocumentUploaded_DocumentPath].S),
+				mime: nn(data[CaseDocumentUploaded_DocumentMime].S),
+				name: data[CaseDocumentUploaded_DocumentName].S ?? undefined,
+			},
+			caseId:                     nn(data[CaseId].S),
+		};
 	}
 }
 

@@ -4,6 +4,8 @@ import {EventsListenerAPIImplementation, ListenerEvent} from "../../../singulari
 import {RedisCacheModel} from "../../common/redis-cache-model";
 import {
 	AppointmentStatusUpdateData,
+	CaseDocumentUploadedData,
+	CaseUpgradeFromAppointmentData,
 	LawyerProfileUpdateData,
 	LawyersStatusesUpdateData,
 	NewAppointmentRequestData,
@@ -66,11 +68,27 @@ export class SSEventsListener implements EventsListenerAPIImplementation<typeof 
 	async appointmentStatusUpdate (ev: ListenerEvent<AppointmentStatusUpdateData>) {
 		const {clientId, ...data} = ev.params;
 		await this.notifs.sendNotification(ev.params.clientId, ev.timestamp, data.status === StatusEnum.Confirmed ? {
-			type: NotificationType.AppointmentStatusUpdate,
 			...data,
+			type:      NotificationType.AppointmentStatusUpdate,
 			timestamp: dateToDynamoDbStr(strToDate(data.timestamp)),
 		} : {
+			...data,
 			type: NotificationType.AppointmentStatusUpdate,
+		});
+	}
+
+	async caseUpgradeFromAppointment (ev: ListenerEvent<CaseUpgradeFromAppointmentData>) {
+		const {clientId, ...notif} = ev.params;
+		await this.notifs.sendNotification(clientId, ev.timestamp, {
+			...notif,
+			type: NotificationType.CaseUpgradeFromAppointment
+		});
+	}
+
+	async caseDocumentUploaded (ev: ListenerEvent<CaseDocumentUploadedData>) {
+		const {recipient, ...data} = ev.params;
+		await this.notifs.sendNotification(ev.params.recipient.id, ev.timestamp, {
+			type: NotificationType.CaseDocumentUploaded,
 			...data
 		});
 	}

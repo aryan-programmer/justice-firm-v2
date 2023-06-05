@@ -5,7 +5,8 @@ import {FileUploadData} from "../../../server/common/utils/types";
 
 const props = defineProps<{
 	file: FileUploadData,
-	buttonText?: string | Nuly
+	buttonText?: string | Nuly,
+	class?: string | Nuly
 }>();
 
 const fileName = computed(() => props.buttonText ?? props.file.name ?? "Unnamed");
@@ -13,7 +14,7 @@ const fileName = computed(() => props.buttonText ?? props.file.name ?? "Unnamed"
 
 <template>
 <v-btn
-	class="mx-auto text-none"
+	:class="props.class??''"
 	color="gradient--shy-rainbow"
 	variant="elevated"
 	density="compact"

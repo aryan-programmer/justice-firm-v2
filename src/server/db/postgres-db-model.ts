@@ -11,7 +11,7 @@ import {
 	StatusSearchOptions,
 	StatusSearchOptionsEnum
 } from "../../common/db-types";
-import {AppointmentFullData} from "../../common/rest-api-schema";
+import {AppointmentFullData, CaseFullData} from "../../common/rest-api-schema";
 import {filterMap} from "../../common/utils/array-methods/filterMap";
 import {nn} from "../../common/utils/asserts";
 import {radiusOfEarthInKm} from "../../common/utils/constants";
@@ -503,6 +503,71 @@ export class PostgresDbModel extends RedisCacheModel {
 			lawyer,
 		};
 		return appointment;
+	}
+
+	public async getCaseData (id: string | bigint, runner: PoolPatch | PoolConnectionPatch | null = usePool) {
+		if (runner === usePool) {
+			runner = await this.getPool();
+		}
+		const res: Record<string, any>[] = await runner.query(
+			`SELECT s.id                  AS s_id,
+			        s.group_id            AS s_group_id,
+			        s.type_id             AS s_type_id,
+			        ct.name               AS s_type_name,
+			        s.description         AS s_description,
+			        s.opened_on           AS s_opened_on,
+			        s.status              AS s_status,
+			        c.id                  AS c_id,
+			        c.name                AS c_name,
+			        c.email               AS c_email,
+			        c.phone               AS c_phone,
+			        c.address             AS c_address,
+			        c.photo_path          AS c_photo_path,
+			        c.gender              AS c_gender,
+			        lu.id                 AS l_id,
+			        lu.name               AS l_name,
+			        lu.email              AS l_email,
+			        lu.phone              AS l_phone,
+			        lu.address            AS l_address,
+			        lu.photo_path         AS l_photo_path,
+			        lu.gender             AS l_gender,
+			        ll.latitude           AS l_latitude,
+			        ll.longitude          AS l_longitude,
+			        ll.certification_link AS l_certification_link,
+			        ll.status             AS l_status,
+			        ll.rejection_reason   AS l_rejection_reason
+			 FROM "justice_firm"."case" s
+			 JOIN "justice_firm"."user" c ON c.id = s.client_id
+			 JOIN "justice_firm"."user" lu ON lu.id = s.lawyer_id
+			 JOIN lawyer                ll ON lu.id = ll.id
+			 JOIN case_type             ct ON s.type_id = ct.id
+			 WHERE s.id = ?;`, [BigInt(id)]);
+
+		if (res.length === 0) {
+			return null;
+		}
+
+		const value                    = res[0];
+		const client: ClientDataResult = PostgresDbModel.recordWithPrefixToClientData(value);
+		const lawyer                   = await this.getLawyerData(String(value.l_id), {}, runner);
+		if (lawyer == null) {
+			return null;
+		}
+
+		const caseFullData: CaseFullData = {
+			id:          value.s_id.toString(),
+			description: value.s_description.toString(),
+			caseType:    {
+				id:   value.s_type_id.toString(),
+				name: value.s_type_name.toString(),
+			},
+			groupId:     value.s_group_id.toString(),
+			openedOn:    value.s_opened_on.toString(),
+			status:      value.s_status.toString(),
+			client,
+			lawyer,
+		};
+		return caseFullData;
 	}
 
 	public static recordToClientData (value: Record<string, any>): ClientDataResult {

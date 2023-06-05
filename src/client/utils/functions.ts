@@ -16,6 +16,7 @@ import {
 	validImageMimeTypes
 } from "../../common/utils/constants";
 import {
+	capitalizeFirstLetter,
 	dateFormat,
 	dateStringFormat,
 	getDateTimeHeader,
@@ -33,6 +34,7 @@ import {UserStore_T} from "../store/userStore";
 import {justiceFirmApi} from "./api-fetcher-impl";
 import {
 	appointmentsIcon,
+	casesIcon,
 	confirmedColor,
 	gavelIcon,
 	iconClassesArray,
@@ -306,15 +308,19 @@ function notificationExtraDataForLawyerStatusUpdate (v: LawyerStatusUpdateNotifi
 	}
 }
 
-export function notificationExtraData (v: UserNotification): Pick<NotificationDataDisplayable, "text" | "link" | "icon"> & {
-	level?: NotificationDataDisplayable["level"]
+export function notificationExtraData (v: UserNotification): Pick<NotificationDataDisplayable, "text" | "icon"> & {
+	level?: NotificationDataDisplayable["level"],
+	links?: NotificationDataDisplayable["links"]
 } {
 	switch (v.type) {
 	case NotificationType.NewAppointmentRequest:
 		return {
-			text: `${v.client.name} opened a new appointment request: ${v.trimmedDescription}`,
-			link: `/appointment-details?id=${v.appointmentId}`,
-			icon: appointmentsIcon,
+			text:  `${v.client.name} opened a new appointment request: ${v.trimmedDescription}`,
+			links: [{
+				link: `/appointment-details?id=${v.appointmentId}`,
+				text: "View appointment request"
+			}],
+			icon:  appointmentsIcon,
 		};
 	case NotificationType.LawyerStatusUpdate:
 		return {
@@ -323,19 +329,44 @@ export function notificationExtraData (v: UserNotification): Pick<NotificationDa
 		};
 	case NotificationType.AppointmentStatusUpdate:
 		return {
-			text: `${v.lawyer.name} ${v.status} your appointment request. ${
+			text:  `${v.lawyer.name} ${v.status} your appointment request. ${
 				v.status === StatusEnum.Confirmed ?
 				`It is scheduled on ${dateStringFormat(v.timestamp)}.` :
 				""
 			}`,
-			link: `/appointment-details?id=${v.appointmentId}`,
-			icon: appointmentsIcon,
+			links: [{
+				link: `/appointment-details?id=${v.appointmentId}`,
+				text: "View appointment"
+			}],
+			icon:  appointmentsIcon,
+		};
+	case NotificationType.CaseUpgradeFromAppointment:
+		return {
+			text:  `${v.lawyer.name} opened a case for you: ${v.trimmedCaseDescription}`,
+			links: [{
+				link: `/case-details?id=${v.appointmentId}`,
+				text: "View case"
+			}],
+			icon:  casesIcon,
+		};
+	case NotificationType.CaseDocumentUploaded:
+		return {
+			text:  `${capitalizeFirstLetter(v.sender.type)} ${v.sender.name} uploaded a case document: ${v.documentUploadData.name ?? ""}\nDescription: ${v.trimmedDocumentDescription}`,
+			icon:  casesIcon,
+			links: [{
+				file: v.documentUploadData,
+				text: "Download file"
+			}, {
+				link: `/case-details?id=${v.caseId}`,
+				text: "View parent case"
+			}],
 		};
 	}
 }
 
 export function notificationDataToDisplayable (v: NotificationMessageData): NotificationDataDisplayable {
 	const res = {
+		links: [],
 		...v,
 		timestamp: strToDate(v.timestamp),
 		level:     SemanticColorLevel.Info,

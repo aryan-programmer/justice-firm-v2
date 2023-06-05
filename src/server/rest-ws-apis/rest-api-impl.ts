@@ -4,6 +4,8 @@ import {DeleteItemCommand, PutItemCommand, ReturnConsumedCapacity, ReturnValue} 
 import {S3Client} from "@aws-sdk/client-s3";
 import {SendEmailCommand, SESClient} from "@aws-sdk/client-ses";
 import {compareSync, hash} from "bcryptjs";
+import {isLeft} from "fp-ts/Either";
+import {Either, left, right} from "fp-ts/lib/Either";
 import {sign} from "jsonwebtoken";
 import {pq} from "~~/src/server/common/background-promise-queue";
 import {ssEventsPublisher} from "~~/src/server/rest-ws-apis/ss-events-publisher";
@@ -21,6 +23,7 @@ import {
 	LawyerSearchResult,
 	StatusEnum,
 	UserAccessType,
+	UserNameWithType,
 } from "../../common/db-types";
 import {
 	AddCaseDocumentInput,
@@ -110,11 +113,6 @@ const verifyFileJwtToken = verifyAndDecodeJwtToken<FileUploadData>;
 export class JusticeFirmRestAPIImpl
 	implements APIImplementation<typeof justiceFirmApiSchema> {
 	constructor (private common: PostgresDbModel) {
-		// this.getLawyerData = function (this: JusticeFirmRestAPIImpl, ...args) {
-		// 	return this.common.cacheResult("getLawyerData-" + JSON.stringify(args),
-		// 		() => this.getLawyerData(...args)
-		// 	);
-		// };
 	}
 
 	async registerLawyer (params: FnParams<RegisterLawyerInput>):
@@ -564,17 +562,17 @@ export class JusticeFirmRestAPIImpl
 		const openedOn  = new Date();
 		const timestamp = data.timestamp == null ? null : strToDate(data.timestamp);
 
-		const conn = await this.common.getConnection();
-
-		const clientName = await this.common.getName(clientId, conn);
-		if (clientName == null) {
-			return message(constants.HTTP_STATUS_UNAUTHORIZED,
-				"A user with id " + clientId + " does not exist.");
-		}
-
 		let appointmentId: string;
+		const conn = await this.common.getConnection();
+		let clientName: null | string | undefined;
 
 		try {
+			clientName = await this.common.getName(clientId, conn);
+			if (clientName == null) {
+				return message(constants.HTTP_STATUS_UNAUTHORIZED,
+					"A user with id " + clientId + " does not exist.");
+			}
+
 			await conn.beginTransaction();
 
 			const groupInsertRes: UpsertResult       = await conn.execute(
@@ -605,7 +603,7 @@ export class JusticeFirmRestAPIImpl
 			trimmedDescription: trimStr(data.description),
 			client:             {
 				id:   obj.id,
-				name: clientName,
+				name: clientName ?? "",
 			}
 		}));
 
@@ -775,19 +773,21 @@ export class JusticeFirmRestAPIImpl
 			return message(constants.HTTP_STATUS_UNAUTHORIZED,
 				"To set an appointment's status the user must be authenticated as a lawyer");
 		}
-		const conn          = await this.common.getConnection();
-		const lawyerId      = BigInt(jwt.id);
-		const appointmentId = BigInt(data.appointmentId);
-		const appointment   = await this.common.getAppointmentData(appointmentId, conn);
-		if (appointment === null) {
-			return message(404, "No such appointment found");
-		}
-		if (appointment.lawyer.id !== jwt.id) {
-			return message(constants.HTTP_STATUS_UNAUTHORIZED,
-				`Lawyer id ${jwt.id} is not allowed change the details of appointment ${data.appointmentId}`);
-		}
+
+		const conn = await this.common.getConnection();
 
 		try {
+			const lawyerId      = BigInt(jwt.id);
+			const appointmentId = BigInt(data.appointmentId);
+			const appointment   = await this.common.getAppointmentData(appointmentId, conn);
+			if (appointment === null) {
+				return message(404, "No such appointment found");
+			}
+			if (appointment.lawyer.id !== jwt.id) {
+				return message(constants.HTTP_STATUS_UNAUTHORIZED,
+					`Lawyer id ${jwt.id} is not allowed change the details of appointment ${data.appointmentId}`);
+			}
+
 			if (data.status === StatusEnum.Rejected) {
 				const rejectRes: UpsertResult = await conn.execute(
 					"UPDATE appointment SET status='rejected' WHERE id = ? AND lawyer_id = ?;",
@@ -832,10 +832,11 @@ export class JusticeFirmRestAPIImpl
 					timestamp:     strToDate(nn(data.timestamp ?? appointment.timestamp)).toISOString(),
 				}));
 			}
-			return noContent;
 		} finally {
 			await conn.release();
 		}
+
+		return noContent;
 	}
 
 	async sendPasswordResetOTP (params: FnParams<SendPasswordResetOTPInput>):
@@ -951,43 +952,40 @@ The Justice Firm Foundation`;
 			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Auth token must be that of a lawyer");
 		}
 
-		const res: Record<string, any>[] = await (await this.common.getPool()).query(
-			`SELECT a.id          AS a_id,
-			        a.lawyer_id   AS l_id,
-			        a.client_id   AS c_id,
-			        a.group_id    AS a_group_id,
-			        a.case_id     AS a_case_id,
-			        a.description AS a_description
-			 FROM appointment a
-			 WHERE a.id = ?;`, [BigInt(data.appointmentId)]);
-
-		if (res.length === 0) {
-			return message(404, "No such appointment found");
-		}
-
-		const value    = res[0];
-		const lawyerId = BigInt(value.l_id.toString());
-		const clientId = BigInt(value.c_id.toString());
-
-		const groupId       = BigInt(value.a_group_id.toString());
-		const appointmentId = BigInt(value.a_id.toString());
-
-		if (BigInt(jwt.id) !== lawyerId) {
-			return message(constants.HTTP_STATUS_UNAUTHORIZED,
-				"You are not authorized to promote this appointment to a case.");
-		}
-
-		if (!isNullOrEmpty(value.a_case_id?.toString())) {
-			return message(constants.HTTP_STATUS_BAD_REQUEST,
-				"This appointment has already been promoted to a case.");
-		}
-
-		const caseDesc = nullOrEmptyCoalesce(data.description, value.a_description.toString());
-		const status   = data.status ?? CaseStatusEnum.Open;
-
 		const conn = await this.common.getConnection();
+		let caseId: number | bigint;
+		let appointment: null | AppointmentFullData;
+		let caseDesc: string;
 
 		try {
+			appointment = await this.common.getAppointmentData(data.appointmentId, conn);
+			if (appointment == null) {
+				return message(404, "No such appointment found");
+			}
+			if (appointment.lawyer.id !== jwt.id) {
+				return message(constants.HTTP_STATUS_UNAUTHORIZED,
+					`Lawyer id ${jwt.id} is not allowed change the details of appointment ${data.appointmentId}`);
+			}
+
+			const lawyerId = BigInt(appointment.lawyer.id);
+			const clientId = BigInt(appointment.client.id);
+
+			const groupId       = BigInt(appointment.groupId);
+			const appointmentId = BigInt(appointment.id);
+
+			if (BigInt(jwt.id) !== lawyerId) {
+				return message(constants.HTTP_STATUS_UNAUTHORIZED,
+					"You are not authorized to promote this appointment to a case.");
+			}
+
+			if (!isNullOrEmpty(appointment.caseId)) {
+				return message(constants.HTTP_STATUS_BAD_REQUEST,
+					"This appointment has already been promoted to a case.");
+			}
+
+			caseDesc     = nullOrEmptyCoalesce(data.description, appointment.description);
+			const status = data.status ?? CaseStatusEnum.Open;
+
 			await conn.beginTransaction();
 
 			const caseInsertRes: UpsertResult = await conn.execute(
@@ -995,7 +993,7 @@ The Justice Firm Foundation`;
 				 VALUES (?, ?, ?, ?, ?, ?);`,
 				[clientId, lawyerId, data.type, groupId, caseDesc, status],
 			);
-			const caseId                      = nn(caseInsertRes.insertId);
+			caseId                            = nn(caseInsertRes.insertId);
 
 			if (isNullOrEmpty(data.groupName)) {
 				await conn.execute(
@@ -1020,13 +1018,23 @@ The Justice Firm Foundation`;
 			);
 
 			await conn.commit();
-			return response(200, caseId.toString());
 		} catch (e) {
 			await conn.rollback();
 			throw e;
 		} finally {
 			await conn.release();
 		}
+		assert(appointment != null);
+
+		pq.add(ssEventsPublisher.caseUpgradeFromAppointment({
+			appointmentId:          appointment.id,
+			caseId:                 caseId.toString(),
+			clientId:               appointment.client.id,
+			lawyer:                 appointment.lawyer,
+			trimmedCaseDescription: trimStr(caseDesc),
+		}));
+
+		return response(200, caseId.toString());
 	}
 
 	async getCasesData (params: FnParams<GetCasesDataInput>):
@@ -1092,71 +1100,12 @@ The Justice Firm Foundation`;
 
 	async getCase (params: FnParams<GetByIdInput>):
 		Promise<EndpointResult<Message | CaseFullData>> {
-		const data      = params.body;
-		const jwtSecret = await this.common.getJwtSecret();
-		const jwt       = verifyJwtToken(data.authToken.jwt, jwtSecret);
-		if (jwt == null) {
-			return message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid auth token");
+		const data       = params.body;
+		const caseAccess = await this.verifyCaseAccess(data.authToken, data.id);
+		if (isLeft(caseAccess)) {
+			return caseAccess.left;
 		}
-
-		const res: Record<string, any>[] = await (await this.common.getPool()).query(
-			`SELECT s.id                  AS s_id,
-			        s.group_id            AS s_group_id,
-			        s.type_id             AS s_type_id,
-			        ct.name               AS s_type_name,
-			        s.description         AS s_description,
-			        s.opened_on           AS s_opened_on,
-			        s.status              AS s_status,
-			        c.id                  AS c_id,
-			        c.name                AS c_name,
-			        c.email               AS c_email,
-			        c.phone               AS c_phone,
-			        c.address             AS c_address,
-			        c.photo_path          AS c_photo_path,
-			        c.gender              AS c_gender,
-			        lu.id                 AS l_id,
-			        lu.name               AS l_name,
-			        lu.email              AS l_email,
-			        lu.phone              AS l_phone,
-			        lu.address            AS l_address,
-			        lu.photo_path         AS l_photo_path,
-			        lu.gender             AS l_gender,
-			        ll.latitude           AS l_latitude,
-			        ll.longitude          AS l_longitude,
-			        ll.certification_link AS l_certification_link,
-			        ll.status             AS l_status,
-			        ll.rejection_reason   AS l_rejection_reason
-			 FROM "justice_firm"."case" s
-			 JOIN "justice_firm"."user" c ON c.id = s.client_id
-			 JOIN "justice_firm"."user" lu ON lu.id = s.lawyer_id
-			 JOIN lawyer                ll ON lu.id = ll.id
-			 JOIN case_type             ct ON s.type_id = ct.id
-			 WHERE s.id = ?;`, [BigInt(data.id)]);
-
-		if (res.length === 0) {
-			return message(404, "No such case found");
-		}
-
-		const value            = res[0];
-		const {lawyer, client} = PostgresDbModel.extractAndParseLawyerAndClientData(value);
-		if (lawyer.id !== jwt.id && client.id !== jwt.id) {
-			return message(constants.HTTP_STATUS_UNAUTHORIZED,
-				`User id ${jwt.id} is not allowed access the details of case ${data.id}`);
-		}
-		const caseFullData: CaseFullData = {
-			id:          value.s_id.toString(),
-			description: value.s_description.toString(),
-			caseType:    {
-				id:   value.s_type_id.toString(),
-				name: value.s_type_name.toString(),
-			},
-			groupId:     value.s_group_id.toString(),
-			openedOn:    value.s_opened_on.toString(),
-			status:      value.s_status.toString(),
-			client,
-			lawyer,
-		};
-		return response(200, caseFullData);
+		return response(200, caseAccess.right.caseData);
 	}
 
 	async uploadFile (params: FnParams<UploadFileInput>):
@@ -1195,9 +1144,12 @@ The Justice Firm Foundation`;
 		Promise<EndpointResult<Message | ID_T>> {
 		const data       = params.body;
 		const caseAccess = await this.verifyCaseAccess(data.authToken, data.caseId);
-		if (Array.isArray(caseAccess)) {
-			return message(caseAccess[0], caseAccess[1]);
+		if (isLeft(caseAccess)) {
+			return caseAccess.left;
 		}
+
+		const caseRes  = caseAccess.right.caseData;
+		const senderId = caseAccess.right.jwt.id;
 
 		const jwtSecret = await this.common.getJwtSecret();
 		const fileData  = verifyFileJwtToken(data.file.jwt, jwtSecret);
@@ -1205,9 +1157,38 @@ The Justice Firm Foundation`;
 		const filePath          = shortenS3Url(fileData.path);
 		const res: UpsertResult = await (await this.common.getPool()).execute(
 			"INSERT INTO case_document (case_id, file_link, file_mime, file_name, description, uploaded_by_id) VALUES (?, ?, ?, ?, ?, ?)",
-			[BigInt(data.caseId), filePath, fileData.mime, fileData.name, data.description, caseAccess.id]);
+			[BigInt(data.caseId), filePath, fileData.mime, fileData.name, data.description, senderId]);
 
 		const caseDocumentId = nn(res.insertId).toString();
+
+		const isSenderClient               = caseRes.client.id === senderId;
+		const clientData: UserNameWithType = {
+			id:   caseRes.client.id,
+			name: caseRes.client.name,
+			type: UserAccessType.Client
+		};
+		const lawyerData: UserNameWithType = {
+			id:   caseRes.lawyer.id,
+			name: caseRes.lawyer.name,
+			type: UserAccessType.Lawyer
+		};
+		let recipient: UserNameWithType;
+		let sender: UserNameWithType;
+		if (isSenderClient) {
+			sender    = clientData;
+			recipient = lawyerData;
+		} else {
+			sender    = lawyerData;
+			recipient = clientData;
+		}
+		pq.add(ssEventsPublisher.caseDocumentUploaded({
+			caseDocumentId,
+			caseId:                     data.caseId,
+			documentUploadData:         fileData,
+			recipient,
+			sender,
+			trimmedDocumentDescription: trimStr(data.description),
+		}));
 
 		return response(constants.HTTP_STATUS_OK, caseDocumentId);
 	}
@@ -1216,8 +1197,8 @@ The Justice Firm Foundation`;
 		Promise<EndpointResult<Message | CaseDocumentData[]>> {
 		const data       = params.body;
 		const caseAccess = await this.verifyCaseAccess(data.authToken, data.caseId);
-		if (Array.isArray(caseAccess)) {
-			return message(caseAccess[0], caseAccess[1]);
+		if (isLeft(caseAccess)) {
+			return caseAccess.left;
 		}
 		const res: Record<string, string | number | Date>[] = await (await this.common.getPool()).query(
 			`SELECT cd.id  AS case_doc_id,
@@ -1257,29 +1238,32 @@ The Justice Firm Foundation`;
 		return await conn.batchInsert("lawyer_specialization", ["lawyer_id", "case_type_id"], params);
 	}
 
-	private async verifyCaseAccess (authToken: AuthToken, caseId: ID_T): Promise<PrivateAuthToken | [number, string]> {
+	private async verifyCaseAccess (authToken: AuthToken, caseId: ID_T): Promise<
+		Either<EndpointResult<Message>, {
+			caseData: CaseFullData,
+			jwt: PrivateAuthToken,
+		}>
+	> {
 		const jwtSecret = await this.common.getJwtSecret();
 		const jwt       = verifyJwtToken(authToken.jwt, jwtSecret);
 		if (jwt == null) {
-			return [constants.HTTP_STATUS_UNAUTHORIZED, "Invalid auth token"];
+			return left(message(constants.HTTP_STATUS_UNAUTHORIZED, "Invalid auth token"));
 		}
 
-		const res: Record<string, any>[] = await (await this.common.getPool()).query(
-			`SELECT s.lawyer_id, s.client_id
-			 FROM "justice_firm"."case" S
-			 WHERE S.id = ?;`, [BigInt(caseId)]);
+		const res = await this.common.getCaseData(caseId);
 
-		if (res.length === 0) {
-			return [400, "No such case found"];
+		if (res == null) {
+			return left(message(400, "No such case found"));
 		}
 
-		const value    = res[0];
-		const lawyerId = value.lawyer_id?.toString();
-		const clientId = value.client_id?.toString();
-		if (lawyerId !== jwt.id && clientId !== jwt.id) {
-			return [constants.HTTP_STATUS_UNAUTHORIZED, `User id ${jwt.id} is not allowed access the details of case ${caseId}`];
+		if (res.lawyer.id !== jwt.id && res.client.id !== jwt.id) {
+			return left(message(constants.HTTP_STATUS_UNAUTHORIZED,
+				`User id ${jwt.id} is not allowed access the details of case ${caseId}`));
 		}
-		return jwt;
+		return right({
+			caseData: res,
+			jwt,
+		});
 	}
 
 	private async getLoginResponse (email: string, password: string) {
