@@ -50,16 +50,19 @@ const showTimeStampOnOpposite = computed(() => props.showTimeStampOnOpposite ===
 				<v-btn
 					v-if="'link' in link"
 					:to="link.link"
-					class=""
 					color="cyan-lighten-4"
 					density="compact"
 					rounded
 					variant="elevated">
 					{{ link.text }}
 				</v-btn>
-				<FileDownloadButton v-else-if="'file' in link" :file="link.file" :button-text="link.text" />
+				<FileDownloadButton
+					v-else-if="'file' in link"
+					:file="link.file"
+					:button-text="link.text"
+					color="cyan-lighten-4" />
 				</template>
-			</v-card-actions><!--mr-0 mb-0 mt-2 pa-0-->
+			</v-card-actions>
 		</v-card>
 	</v-timeline-item>
 </v-timeline>

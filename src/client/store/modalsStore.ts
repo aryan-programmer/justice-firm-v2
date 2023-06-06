@@ -1,11 +1,11 @@
-import {reactive, ref} from "#imports";
+import {reactive, ref, SemanticColorLevel, warningColor} from "#imports";
 import {StorageSerializers, useLocalStorage} from "@vueuse/core";
 import {EventEmitter} from "eventemitter3";
 import {sample} from "lodash";
 import {defineStore} from 'pinia';
 import {Nuly} from "../../common/utils/types";
 import {uniqId} from "../../common/utils/uniq-id";
-import {BtnVariants} from "../utils/types";
+import {BtnVariants, NotificationDataDisplayable} from "../utils/types";
 
 export enum CloseType {
 	Ok          = "Ok",
@@ -24,8 +24,7 @@ export type ModalData = {
 	okBtnVariant: BtnVariants;
 };
 
-export type SnackbarData = {
-	message: string;
+export type SnackbarBaseData = {
 	textColor: string;
 	backgroundColor: string;
 	okBtnText: string;
@@ -34,11 +33,21 @@ export type SnackbarData = {
 	timeoutMs: number;
 	id: string;
 };
+export type SnackbarDataWithMessage = SnackbarBaseData & {
+	message: string;
+};
+export type SnackbarDataWithNotification = SnackbarBaseData & {
+	notification: NotificationDataDisplayable
+};
+export type SnackbarData = SnackbarDataWithMessage | SnackbarDataWithNotification;
 
 export type ModalOptions = Partial<ModalData & {
 	type: 'modal' | Nuly
 }>;
-export type SnackbarOptions = Partial<Omit<SnackbarData, 'id' | 'showing'> & {
+export type SnackbarOptionsWithMessage = Partial<Omit<SnackbarDataWithMessage, 'id' | 'showing'> & {
+	type: 'snackbar' | Nuly,
+}>;
+export type SnackbarOptionsWithNotification = Partial<Omit<SnackbarDataWithNotification, 'id' | 'showing' | 'notification'> & {
 	type: 'snackbar' | Nuly,
 }>;
 
@@ -124,53 +133,92 @@ export const useModalStore = defineStore('ModalStore', () => {
 
 export type ModalStore_T = ReturnType<typeof useModalStore>;
 
+export const defaultWarningBgColor       = warningColor;
+export const defaultErrorBgColor         = "red-lighten-3";
+export const defaultSuccessBgColors      = [
+	"gradient--lemon-gate",
+	"gradient--dusty-grass",
+	"gradient--new-life",
+	"gradient--morning-salad",
+	"gradient--grass-shampoo",
+];
 export const defaultAlertBgColors        = [
 	"gradient--landing-aircraft",
 	"gradient--perfect-white",
-	"gradient--gagarin-view",
+	// "gradient--gagarin-view",
 	"gradient--deep-light-blue",
-	"gradient--sharpeye-eagle",
-	"gradient--lemon-gate",
+	// "gradient--sharpeye-eagle",
 	"gradient--kind-steel",
 	"gradient--cochiti-lake",
 	"gradient--confident-cloud",
-	"gradient--flying-lemon",
-	"gradient--morning-salad"
+	// "gradient--flying-lemon",
+	"gradient--malibu-beach",
+	"gradient--salt-mountain",
+	"gradient--high-flight"
 ];
 export const defaultAlertOptions         = {
 	title:        "Justice Firm",
 	okBtnVariant: BtnVariants.Tonal,
 	okBtnText:    "OK",
-	okBtnColor:   "green-darken-4",
+	okBtnColor:   "teal-darken-4",
 };
 export const defaultErrorOptions         = {
 	...defaultAlertOptions,
 	title:        "Error",
 	okBtnVariant: BtnVariants.Elevated,
-	okBtnColor:   "red-lighten-1",
+	okBtnColor:   "purple-lighten-1",
 };
+export const defaultSnackbarTimeout      = 4000;
 export const defaultSnackbarAlertOptions = {
 	okBtnVariant: BtnVariants.Tonal,
 	okBtnText:    "OK",
-	okBtnColor:   "green-darken-4",
-	timeoutMs:    4000,
+	okBtnColor:   "teal-darken-4",
+	timeoutMs:    defaultSnackbarTimeout,
 	textColor:    "black",
 };
 export const defaultSnackbarErrorOptions = {
 	...defaultSnackbarAlertOptions,
 	title:        "Error",
 	okBtnVariant: BtnVariants.Elevated,
-	okBtnColor:   "red-lighten-1",
+	okBtnColor:   "purple-lighten-1",
 };
+
+export function getBgColorFromSemanticLevel (level: SemanticColorLevel) {
+	switch (level) {
+	case SemanticColorLevel.Error:
+		return defaultErrorBgColor;
+	case SemanticColorLevel.Warning:
+		return defaultWarningBgColor;
+	case SemanticColorLevel.Info:
+		return sample(defaultAlertBgColors)!;
+	case SemanticColorLevel.Success:
+		return sample(defaultSuccessBgColors)!;
+	}
+}
 
 export class ModalStoreWrapper {
 	constructor (private modalsStore: ModalStore_T) {
-		this.message      = this.message.bind(this);
-		this.error        = this.error.bind(this);
-		this.errorMessage = this.errorMessage.bind(this);
+		this.message          = this.message.bind(this);
+		this.error            = this.error.bind(this);
+		this.errorMessage     = this.errorMessage.bind(this);
+		this.showNotification = this.showNotification.bind(this);
 	}
 
-	message (message: string, opts?: ModalOptions | SnackbarOptions) {
+	showNotification (notification: NotificationDataDisplayable, opts?: SnackbarOptionsWithNotification) {
+		const thisId          = "snackbar-notification-" + uniqId();
+		const isErrOrWarning  = notification.level === SemanticColorLevel.Warning || notification.level === SemanticColorLevel.Error;
+		const defaultOpts     = isErrOrWarning ? defaultSnackbarErrorOptions : defaultSnackbarAlertOptions;
+		const backgroundColor = getBgColorFromSemanticLevel(notification.level);
+		return this.modalsStore.showSnackbar({
+			...defaultOpts,
+			backgroundColor,
+			notification,
+			...opts,
+			id: thisId,
+		});
+	}
+
+	message (message: string, opts?: ModalOptions | SnackbarOptionsWithMessage) {
 		if (opts?.message === 'snackbar' || this.modalsStore.messagesAsSnackbars) {
 			const thisId = "snackbar-" + uniqId();
 
@@ -191,13 +239,13 @@ export class ModalStoreWrapper {
 		}
 	}
 
-	errorMessage (message: string, opts?: ModalOptions | SnackbarOptions) {
+	errorMessage (message: string, opts?: ModalOptions | SnackbarOptionsWithMessage) {
 		if (opts?.message === 'snackbar' || this.modalsStore.messagesAsSnackbars) {
 			const thisId = "snackbar-" + uniqId();
 
 			return this.modalsStore.showSnackbar({
 				...defaultSnackbarErrorOptions,
-				backgroundColor: "red-lighten-4",
+				backgroundColor: defaultErrorBgColor,
 				message,
 				...opts,
 				id: thisId,
@@ -205,7 +253,7 @@ export class ModalStoreWrapper {
 		} else {
 			return this.modalsStore.showModal({
 				...defaultErrorOptions,
-				backgroundColor: sample(defaultAlertBgColors)!,
+				backgroundColor: defaultErrorBgColor,
 				message,
 				...opts,
 			});

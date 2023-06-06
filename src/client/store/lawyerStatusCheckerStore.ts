@@ -20,6 +20,10 @@ export const useLawyerStatusCheckerStore = defineStore('LawyerStatusCheckerStore
 	const userStore               = useUserStore();
 	const {message, error}        = useModals();
 	userStore.$subscribe(async mutation => {
+		// TODO: Replaced with notifications
+		if (true as boolean) {
+			return;
+		}
 		const authToken = userStore.authToken;
 		if (authToken == null || authToken.userType !== UserAccessType.Lawyer) {
 			pastStatus.value = null;

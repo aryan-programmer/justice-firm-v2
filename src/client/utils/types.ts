@@ -96,16 +96,20 @@ export enum SemanticColorLevel {
 	Success = 'success',
 }
 
-export type LinkData = {
-	                       text: string,
-	                       link: string,
-                       } | {
-	                       text?: string | Nuly,
-	                       file: FileUploadData,
-                       }
+export type LinkData =
+	{
+		shortText?: string,
+		text: string,
+		link: string,
+	} | {
+		shortText?: string | Nuly,
+		text?: string | Nuly,
+		file: FileUploadData,
+	};
 
 export type NotificationDataDisplayable = Omit<NotificationMessageData, "timestamp"> & {
 	timestamp: Date,
+	shortText?: string | Nuly,
 	text: string,
 	links: LinkData[],
 	level: SemanticColorLevel,

@@ -7,21 +7,23 @@ import {compareDates, reverseComparator} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import {notificationDataToDisplayable} from "../utils/functions";
 import {NotificationDataDisplayable} from "../utils/types";
-import {useModals} from "./modalsStore";
+import {defaultSnackbarTimeout, useModals} from "./modalsStore";
 import {useUserStore} from "./userStore";
 
+export const defaultNotificationTimeout = defaultSnackbarTimeout * 1.75;
+
 export const useNotificationsStore = defineStore('NotificationsStore', () => {
-	const {message, error}    = useModals();
-	const userStore           = useUserStore();
-	const notificationsClient = ref<NotificationsWSAPIClient | Nuly>();
-	const isLoading           = ref<boolean>(true);
-	const notificationsArray  = ref<NotificationDataDisplayable[]>([]);
-	const notifications       = new ReactiveSplayTree<Date, NotificationDataDisplayable>(() => {
+	const {message, error, showNotification} = useModals();
+	const userStore                          = useUserStore();
+	const notificationsClient                = ref<NotificationsWSAPIClient | Nuly>();
+	const isLoading                          = ref<boolean>(true);
+	const notificationsArray                 = ref<NotificationDataDisplayable[]>([]);
+	const notifications                      = new ReactiveSplayTree<Date, NotificationDataDisplayable>(() => {
 		const v                  = notifications.values();
 		notificationsArray.value = v;
 		console.log(v);
 	}, reverseComparator(compareDates));
-	const pastNotifications   = new Set<ID_T>();
+	const pastNotifications                  = new Set<ID_T>();
 
 	watch(() => userStore.authToken, value => {
 		openConnection(userStore.authToken);
@@ -40,6 +42,9 @@ export const useNotificationsStore = defineStore('NotificationsStore', () => {
 			const notif = notificationDataToDisplayable(message);
 			pastNotifications.add(notif.id);
 			notifications.add(notif.timestamp, notif);
+			await showNotification(notif, {
+				timeoutMs: defaultNotificationTimeout,
+			});
 		});
 	});
 

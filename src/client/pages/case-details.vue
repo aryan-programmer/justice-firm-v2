@@ -12,6 +12,7 @@ import {
 	firstIfArray,
 	nullOrEmptyCoalesce
 } from "../../common/utils/functions";
+import {printRemoveProxies} from "../../common/utils/pretty-print";
 import {sleep} from "../../common/utils/sleep";
 import {Nuly} from "../../common/utils/types";
 import CaseDocumentsGrid from "../components/appointments-cases/CaseDocumentsGrid.vue";
@@ -116,7 +117,7 @@ async function fetchCase (value: LocationQuery) {
 	caseData.value = res.right.body;
 	await Promise.race([fetchCaseDocuments(), sleep(1000)]);
 	isLoading.value = false;
-	console.log(caseDocuments.value);
+	printRemoveProxies({caseDocuments: caseDocuments.value});
 }
 </script>
 

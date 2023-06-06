@@ -21,7 +21,8 @@ import {
 	dateStringFormat,
 	getDateTimeHeader,
 	nullOrEmptyCoalesce,
-	timeFormat
+	timeFormat,
+	trimFileName
 } from "../../common/utils/functions";
 import {Nuly, Writeable} from "../../common/utils/types";
 import {MessageData} from "../../common/ws-chatter-box-api-schema";
@@ -308,7 +309,7 @@ function notificationExtraDataForLawyerStatusUpdate (v: LawyerStatusUpdateNotifi
 	}
 }
 
-export function notificationExtraData (v: UserNotification): Pick<NotificationDataDisplayable, "text" | "icon"> & {
+export function notificationExtraData (v: UserNotification): Pick<NotificationDataDisplayable, "text" | "shortText" | "icon"> & {
 	level?: NotificationDataDisplayable["level"],
 	links?: NotificationDataDisplayable["links"]
 } {
@@ -317,8 +318,9 @@ export function notificationExtraData (v: UserNotification): Pick<NotificationDa
 		return {
 			text:  `${v.client.name} opened a new appointment request: ${v.trimmedDescription}`,
 			links: [{
-				link: `/appointment-details?id=${v.appointmentId}`,
-				text: "View appointment request"
+				link:      `/appointment-details?id=${v.appointmentId}`,
+				shortText: "View",
+				text:      "View appointment request",
 			}],
 			icon:  appointmentsIcon,
 		};
@@ -335,8 +337,9 @@ export function notificationExtraData (v: UserNotification): Pick<NotificationDa
 				""
 			}`,
 			links: [{
-				link: `/appointment-details?id=${v.appointmentId}`,
-				text: "View appointment"
+				link:      `/appointment-details?id=${v.appointmentId}`,
+				shortText: "View",
+				text:      "View appointment"
 			}],
 			icon:  appointmentsIcon,
 		};
@@ -345,20 +348,24 @@ export function notificationExtraData (v: UserNotification): Pick<NotificationDa
 			text:  `${v.lawyer.name} opened a case for you: ${v.trimmedCaseDescription}`,
 			links: [{
 				link: `/case-details?id=${v.appointmentId}`,
-				text: "View case"
+				text: "View case",
 			}],
 			icon:  casesIcon,
 		};
 	case NotificationType.CaseDocumentUploaded:
 		return {
-			text:  `${capitalizeFirstLetter(v.sender.type)} ${v.sender.name} uploaded a case document: ${v.documentUploadData.name ?? ""}\nDescription: ${v.trimmedDocumentDescription}`,
-			icon:  casesIcon,
-			links: [{
-				file: v.documentUploadData,
-				text: "Download file"
+			text:      `${capitalizeFirstLetter(v.sender.type)} ${v.sender.name} uploaded a case document: ${v.documentUploadData.name ?? ""}\nDescription: ${v.trimmedDocumentDescription}`,
+			shortText: `${v.sender.name} uploaded a case document: ${v.documentUploadData.name == null ? "" : trimFileName(
+				v.documentUploadData.name)}: ${v.trimmedDocumentDescription}`,
+			icon:      casesIcon,
+			links:     [{
+				file:      v.documentUploadData,
+				shortText: "Open file",
+				text:      "Download file",
 			}, {
-				link: `/case-details?id=${v.caseId}`,
-				text: "View parent case"
+				link:      `/case-details?id=${v.caseId}`,
+				shortText: "View case",
+				text:      "View parent case",
 			}],
 		};
 	}

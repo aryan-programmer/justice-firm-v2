@@ -1,11 +1,26 @@
-<!--<script setup lang="ts">-->
-<!--import {useModals} from "../store/modalsStore";-->
+<!--
+<script setup lang="ts">
+import {useModals} from "../store/modalsStore";
+import {useNotificationsStore} from "../store/notificationsStore";
 
-<!--const modals = useModals();-->
+const modals        = useModals();
+const notifications = useNotificationsStore();
 
-<!--onMounted(async () => {-->
-<!--});-->
-<!--</script>-->
+async function onBtnClick () {
+	if (0 === 1) {
+	} else {
+		for (const notification of notifications.notifications) {
+			// modals.message("Lorem ipsum dolor sit amet", {
+			// 	okBtnText: "Yes",
+			// });
+			await modals.showNotification(notification, {
+				timeoutMs: 1000000,
+			});
+		}
+	}
+}
+</script>
+-->
 
 <style scoped lang="scss">
 .jumbotron-wrap {

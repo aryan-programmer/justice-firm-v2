@@ -20,8 +20,8 @@ function onLoad () {
 <v-card v-if="isFilePreviewable(props.file)" density="compact" color="gradient--sharp-glass">
 	<FilePreview :file="props.file" @imageLoad="onLoad" image-size="lg" />
 	<v-card-actions class="py-1" style="min-height: unset;">
-		<FileDownloadButton :file="props.file" class="text-none mx-auto" />
+		<FileDownloadButton :file="props.file" class="text-none mx-auto" color="gradient--shy-rainbow" />
 	</v-card-actions>
 </v-card>
-<FileDownloadButton v-else :file="props.file" class="text-none mx-auto" />
+<FileDownloadButton v-else :file="props.file" class="text-none mx-auto" color="gradient--shy-rainbow" />
 </template>

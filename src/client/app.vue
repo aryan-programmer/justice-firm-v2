@@ -174,12 +174,12 @@ async function notificationsViewMore () {
 
 		<template v-slot:append>
 		<v-menu
+			v-if="userStore.authToken != null"
 			v-model="showingNotifications"
-			:close-on-content-click="false"
 			location="end"
 		>
 			<template v-slot:activator="{ props }">
-			<v-btn class="me-3" icon v-bind="props">
+			<v-btn v-if="userStore.authToken != null" class="me-3" icon v-bind="props">
 				<v-badge :content="notifications.notifications.length" color="blue">
 					<v-icon>fa-bell</v-icon>
 				</v-badge>

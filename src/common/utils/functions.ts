@@ -8,6 +8,7 @@ import {
 	TSchema,
 	Type
 } from "@sinclair/typebox";
+import path from "path";
 import {strToDate} from "../../server/common/utils/date-to-str";
 import {AuthToken} from "../api-types";
 import {
@@ -34,24 +35,34 @@ export function nullOrEmptyCoalesce<T> (s: string | Nuly, s2: T) {
 	return isNullOrEmpty(s) ? s2 : s;
 }
 
-export function trimStr (s: string, wordCount: number = textMaxWords, maxTextLength: number = textMaxLength): string {
+export function trimStr (
+	s: string,
+	wordCount: number     = textMaxWords,
+	maxTextLength: number = textMaxLength,
+	overflowTrail         = "..."
+): string {
 	const words = s.split(/([^A-Za-z0-9]+)/g);
 	let res     = s;
 	// Consecutive non-alphanumeric character are part of the array as separate elements i.e. as a separate "word"
 	wordCount *= 2;
 	if (words.length > wordCount) {
-		res = words.slice(0, wordCount).join("") + "...";
+		res = words.slice(0, wordCount).join("") + overflowTrail;
 	}
 	if (res.length > maxTextLength) {
-		const actualMaxLength = maxTextLength - 3;
+		const actualMaxLength = maxTextLength - overflowTrail.length;
 		res                   = "";
 		for (const word of words) {
 			if ((res.length + word.length) > actualMaxLength) break;
 			res += word;
 		}
-		res += "...";
+		res += overflowTrail;
 	}
 	return res;
+}
+
+export function trimFileName (s: string, maxTextLength: number = 30): string {
+	const parsedPath = path.parse(s);
+	return trimStr(parsedPath.name, 10000000, maxTextLength - parsedPath.ext.length, "[…]") + parsedPath.ext;
 }
 
 export function dateStringFormat (s: string | Nuly): string | Nuly {

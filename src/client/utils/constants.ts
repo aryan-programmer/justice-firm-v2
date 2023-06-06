@@ -13,7 +13,7 @@ export const gavelIcon        = "fa-gavel";
 
 export const successColor = "green-accent-4";
 export const infoColor    = "blue-accent-4";
-export const warningColor = "warning";
+export const warningColor = "amber-darken-2";
 export const errorColor   = "red-accent-3";
 
 export const levelToColorMap = {

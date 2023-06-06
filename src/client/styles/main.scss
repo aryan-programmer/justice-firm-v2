@@ -24,25 +24,29 @@
 	background: rgb(255, 255, 255, 0.5) !important;
 }
 
-.v-card-actions {
+.v-snackbar__actions .v-btn {
+	//margin-inline-start: 0.5rem;
+}
+
+.v-card-actions, .v-snackbar__actions {
 	flex-wrap: wrap;
+
+	& .v-btn:first-child {
+		margin-inline-start: 0.5rem;
+	}
+
+	& .v-btn {
+		margin-top: 0.25rem;
+		margin-bottom: 0.25rem;
+	}
+
+	& .v-btn-ish {
+		margin-inline-start: 0.5rem;
+		margin-top: 0.25rem;
+		margin-bottom: 0.25rem;
+	}
 }
 
-.v-card-actions .v-btn:first-child {
-	margin-inline-start: 0.5rem;
-}
-
-.v-card-actions .v-btn {
-	margin-top: 0.5rem;
-}
-
-.v-card-actions .v-btn-ish {
-	margin-inline-start: 0.5rem;
-}
-
-.v-card-actions .v-btn-ish {
-	margin-top: 0.5rem;
-}
 
 // The multiple repetitions are for increasing the precedence of this selector
 .v-card-title.v-card-title.v-card-title {

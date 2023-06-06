@@ -71,12 +71,12 @@
 //			(linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 100%)),
 //);
 //
-//// 011 Dusty Grass
-//@include gradient_defs.define-gradient(
-//		gradient--dusty-grass,
-//		#b8f18e,
-//			(linear-gradient(120deg, #d4fc79 0%, #96e6a1 100%)),
-//);
+// 011 Dusty Grass
+@include gradient_defs.define-gradient(
+		gradient--dusty-grass,
+		#b8f18e,
+			(linear-gradient(120deg, #d4fc79 0%, #96e6a1 100%)),
+);
 //
 //// 012 Tempting Azure
 //@include gradient_defs.define-gradient(
@@ -127,19 +127,19 @@
 //			(linear-gradient(120deg, #fdfbfb 0%, #ebedee 100%)),
 //);
 //
-//// 019 Malibu Beach
-//@include gradient_defs.define-gradient(
-//		gradient--malibu-beach,
-//		#38d2fe,
-//			(linear-gradient(to right, #4facfe 0%, #00f2fe 100%)),
-//);
+// 019 Malibu Beach
+@include gradient_defs.define-gradient(
+		gradient--malibu-beach,
+		#38d2fe,
+			(linear-gradient(to right, #4facfe 0%, #00f2fe 100%)),
+);
 //
-//// 020 New Life
-//@include gradient_defs.define-gradient(
-//		gradient--new-life,
-//		#3ef1af,
-//			(linear-gradient(to right, #43e97b 0%, #38f9d7 100%)),
-//);
+// 020 New Life
+@include gradient_defs.define-gradient(
+		gradient--new-life,
+		#3ef1af,
+			(linear-gradient(to right, #43e97b 0%, #38f9d7 100%)),
+);
 //
 //// 021 True Sunset
 //@include gradient_defs.define-gradient(
@@ -967,12 +967,12 @@
 //			(linear-gradient(to top, #50cc7f 0%, #f5d100 100%)),
 //);
 //
-//// 139 High Flight
-//@include gradient_defs.define-gradient(
-//		gradient--high-flight,
-//		#34a0ff,
-//			(linear-gradient(to right, #0acffe 0%, #495aff 100%)),
-//);
+// 139 High Flight // Slightly modified
+@include gradient_defs.define-gradient(
+		gradient--high-flight,
+		#34a0ff,
+			(linear-gradient(to right, #0bcdfe 0%, #4785ff 50%, #707eff 100%)),
+);
 //
 // 140 Mole Hall
 @include gradient_defs.define-gradient(
@@ -1072,12 +1072,12 @@
 //			(linear-gradient(-225deg, #2CD8D5 0%, #6B8DD6 48%, #8E37D7 100%)),
 //);
 //
-//// 154 Grass Shampoo
-//@include gradient_defs.define-gradient(
-//		gradient--grass-shampoo,
-//		#9df9c4,
-//			(linear-gradient(-225deg, #DFFFCD 0%, #90F9C4 48%, #39F3BB 100%)),
-//);
+// 154 Grass Shampoo
+@include gradient_defs.define-gradient(
+		gradient--grass-shampoo,
+		#9df9c4,
+			(linear-gradient(-225deg, #DFFFCD 0%, #90F9C4 48%, #39F3BB 100%)),
+);
 //
 // 155 Landing Aircraft
 @include gradient_defs.define-gradient(
