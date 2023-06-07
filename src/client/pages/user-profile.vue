@@ -5,6 +5,7 @@ import {
 	justiceFirmApi,
 	navigateTo,
 	ref,
+	useHead,
 	useRoute,
 	useRouter,
 	watch,
@@ -24,6 +25,8 @@ import {useUserStore} from "../store/userStore";
 definePageMeta({
 	middleware: "yes-user-page"
 });
+
+useHead({title: () => "Profile page"});
 
 const {message, error} = useModals();
 const router           = useRouter();

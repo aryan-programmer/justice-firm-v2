@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, justiceFirmApi, navigateTo, nextTick, ref, useRoute, useRouter, watch} from "#imports";
+import {computed, justiceFirmApi, navigateTo, nextTick, ref, useHead, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {LocationQuery} from "vue-router";
 import {useDisplay} from "vuetify";
@@ -23,6 +23,8 @@ import UploadFileWithDescriptionDialog from "../components/uploaded-files/Upload
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
 import {UploadFileWithDescriptionDialogEventData} from "../utils/types";
+
+useHead({title: () => "Case details"});
 
 const {message, error} = useModals();
 const route            = useRoute();

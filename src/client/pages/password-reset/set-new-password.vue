@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {definePageMeta, justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
+import {definePageMeta, justiceFirmApi, navigateTo, ref, useHead, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import isEmpty from "lodash/isEmpty";
 import {useField, useForm} from 'vee-validate';
@@ -13,6 +13,8 @@ import {useUserStore} from "../../store/userStore";
 definePageMeta({
 	middleware: "no-user-page"
 });
+
+useHead({title: () => "Reset password"});
 
 let validationSchema         = yup.object({
 	otp:        yup.string().required().matches(validOtpRegex).min(otpLength).max(otpLength).label("OTP"),

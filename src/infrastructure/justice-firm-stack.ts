@@ -27,7 +27,8 @@ import {
 	CONNECTION_ID,
 	connectionsByGroupIdIndex,
 	MESSAGE_GROUP,
-	MESSAGE_TIMESTAMP
+	MESSAGE_TIMESTAMP,
+	SETTINGS_GROUP
 } from "../common/infrastructure-constants";
 import {justiceFirmApiSchema} from "../common/rest-api-schema";
 import {jfChatterBoxApiSchema} from "../common/ws-chatter-box-api-schema";
@@ -48,6 +49,7 @@ export class JusticeFirmStack extends Stack {
 	private eventAndNotifsLambda: Function;
 	private s3Bucket: Bucket;
 	private passwordResetOtpTable: aws_dynamodb.Table;
+	private settingsTable: aws_dynamodb.Table;
 	private connectionsTable: aws_dynamodb.Table;
 	private messagesTable: aws_dynamodb.Table;
 	private api: RestApi;
@@ -74,6 +76,7 @@ export class JusticeFirmStack extends Stack {
 
 		this.apiName = justiceFirmApiSchema.name;
 		this.makeDataBucket();
+		this.makeSettingsTable();
 		this.makeMessagesTable();
 		this.makeConnectionsTable();
 		this.makePasswordResetOtpTable();
@@ -101,6 +104,23 @@ export class JusticeFirmStack extends Stack {
 
 		new CfnOutput(this, "S3BucketArn", {
 			value: this.s3Bucket.bucketArn,
+		});
+	}
+
+	private makeSettingsTable () {
+		this.settingsTable = new aws_dynamodb.Table(this, "SettingsTable", {
+			partitionKey:  {
+				name: SETTINGS_GROUP,
+				type: AttributeType.STRING
+			},
+			removalPolicy: RemovalPolicy.DESTROY,
+			billingMode:   BillingMode.PROVISIONED,
+			readCapacity:  4,
+			writeCapacity: 4,
+		});
+
+		new CfnOutput(this, "SettingsTableArn", {
+			value: this.settingsTable.tableArn,
 		});
 	}
 
@@ -233,6 +253,7 @@ export class JusticeFirmStack extends Stack {
 			environment: {
 				...commonEnvironment,
 				WS_NOTIFICATIONS_API_CALLBACK_URL_PARAM_NAME: notificationsCallbackUrlParamName,
+				SETTINGS_TABLE_NAME:                          this.settingsTable.tableName,
 			},
 			memorySize:  1024,
 		};
@@ -384,6 +405,7 @@ export class JusticeFirmStack extends Stack {
 		this.jwtSecret.grantRead(this.eventAndNotifsLambda);
 		this.messagesTable.grantReadWriteData(this.eventAndNotifsLambda);
 		this.connectionsTable.grantReadWriteData(this.eventAndNotifsLambda);
+		this.settingsTable.grantReadWriteData(this.eventAndNotifsLambda);
 		this.jfNotificationsWsApi.grantManageConnections(this.eventAndNotifsLambda);
 
 		this.eventAndNotifsLambda.addToRolePolicy(new PolicyStatement({

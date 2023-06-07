@@ -82,10 +82,9 @@ export function eventsSender<TEndpoints extends APIEndpoints = APIEndpoints,
 				}
 			}
 
-			// TODO: No spread body
 			let eventBody  = {
 				event: eventName,
-				...body
+				body
 			};
 			const postData = JSON.stringify(eventBody, null, 0);
 			await manager.send(new PostToConnectionCommand({

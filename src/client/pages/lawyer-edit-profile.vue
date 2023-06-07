@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {definePageMeta, justiceFirmApi, navigateTo, readFileAsDataUrl, ref, watch} from "#imports";
+import {definePageMeta, justiceFirmApi, navigateTo, readFileAsDataUrl, ref, useHead, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import isEmpty from "lodash/isEmpty";
 import {FieldContext, useField, useForm} from 'vee-validate';
@@ -20,6 +20,8 @@ import {getEditProfileSchemaForLawyer} from "../utils/validation-schemas";
 definePageMeta({
 	middleware: "lawyer-only-page"
 });
+
+useHead({title: () => "Edit profile"});
 
 let caseTypes                           = getCaseTypes();
 let caseSpecializationsValidationSchema = yup.object(caseTypes.reduce((previousValue, currentValue) => {

@@ -17,6 +17,7 @@ export const useNotificationsStore = defineStore('NotificationsStore', () => {
 	const userStore                          = useUserStore();
 	const notificationsClient                = ref<NotificationsWSAPIClient | Nuly>();
 	const isLoading                          = ref<boolean>(true);
+	const unreadNotifications                = ref<Set<string>>(new Set<string>());
 	const notificationsArray                 = ref<NotificationDataDisplayable[]>([]);
 	const notifications                      = new ReactiveSplayTree<Date, NotificationDataDisplayable>(() => {
 		const v                  = notifications.values();
@@ -32,6 +33,7 @@ export const useNotificationsStore = defineStore('NotificationsStore', () => {
 	watch(notificationsClient, (value, oldValue) => {
 		if (oldValue != null) {
 			oldValue.removeAllListeners('notification');
+			oldValue.removeAllListeners('unreadNotifications');
 			oldValue.close();
 		}
 		const cl = notificationsClient.value;
@@ -45,6 +47,9 @@ export const useNotificationsStore = defineStore('NotificationsStore', () => {
 			await showNotification(notif, {
 				timeoutMs: defaultNotificationTimeout,
 			});
+		});
+		cl.on('unreadNotifications', newUnreads => {
+			unreadNotifications.value = new Set<string>(newUnreads);
 		});
 	});
 
@@ -76,15 +81,36 @@ export const useNotificationsStore = defineStore('NotificationsStore', () => {
 				await error(`Failed to get messages`);
 				return;
 			}
-			const msgs: NotificationDataDisplayable[] = messagesRes.right.body.map(notificationDataToDisplayable);
+			const msgs: NotificationDataDisplayable[] = messagesRes.right.body.notifications.map(
+				notificationDataToDisplayable);
 			for (const msg of msgs) {
 				pastNotifications.add(msg.id);
 			}
 			notifications.load(msgs.map(v => v.timestamp), msgs, true);
+			unreadNotifications.value = new Set<string>(messagesRes.right.body.unreadNotifications);
+			console.log(unreadNotifications.value);
 		} finally {
 			isLoading.value = false;
 		}
 	}
 
-	return {notifications: notificationsArray};
+	async function setIsReadStatus (notificationId: string, isRead: boolean) {
+		if (userStore.authToken == null) return;
+		if (notificationsClient.value == null) return;
+		await notificationsClient.value.setIsReadStatus({
+			notificationId,
+			isRead,
+			authToken: userStore.authToken
+		});
+	}
+
+	async function markAllAsRead () {
+		if (userStore.authToken == null) return;
+		if (notificationsClient.value == null) return;
+		await notificationsClient.value.markAllAsRead({
+			authToken: userStore.authToken
+		});
+	}
+
+	return {notifications: notificationsArray, unreadNotifications, setIsReadStatus, markAllAsRead};
 });

@@ -17,8 +17,6 @@ import {
 	ATTACHMENT_PATH,
 	CONNECTION_GROUP_ID,
 	CONNECTION_ID,
-	connectionsByGroupIdIndex,
-	ConnectionsTable_ExpressionAttributeNames,
 	GroupIdFromType,
 	MESSAGE_GROUP,
 	MESSAGE_ID,
@@ -26,9 +24,8 @@ import {
 	MESSAGE_TEXT,
 	MESSAGE_TIMESTAMP
 } from "../../common/infrastructure-constants";
-import {filterMap} from "../../common/utils/array-methods/filterMap";
 import {nn} from "../../common/utils/asserts";
-import {isNullOrEmpty} from "../../common/utils/functions";
+import {getExpressionAttributeNames, isNullOrEmpty} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import {uniqId} from "../../common/utils/uniq-id";
 import {
@@ -81,14 +78,11 @@ const GetMessages_ProjectionExpression     = [
 ].map(v => "#" + v).join(",");
 const GetMessages_EAV_CNeedGroup           = ":needGroup";
 const GetMessages_KeyConditionExpression   = `#${MESSAGE_GROUP} = ${GetMessages_EAV_CNeedGroup}`;
-const GetMessages_ExpressionAttributeNames = [
+const GetMessages_ExpressionAttributeNames = getExpressionAttributeNames([
 	MESSAGE_GROUP,
 	MESSAGE_TIMESTAMP, MESSAGE_TEXT, MESSAGE_SENDER_ID, MESSAGE_ID,
 	ATTACHMENT_PATH, ATTACHMENT_NAME, ATTACHMENT_MIME
-].reduce((prev, curr) => {
-	prev["#" + curr] = curr;
-	return prev;
-}, {} as Record<string, string>);
+]);
 
 let fakeOn = true ? undefined as never : eventsSender(jfChatterBoxApiSchema, {validateEventsBody: true, endpoint: ""});
 
@@ -293,24 +287,8 @@ export class JusticeFirmWsChatterBoxAPIImpl
 	}
 
 	private async sendMessageEventToGroup (group: string, messageData: MessageData) {
-		const queryResponse = await dynamoDbClient.send(new QueryCommand({
-			TableName:                 connectionsTableName,
-			IndexName:                 connectionsByGroupIdIndex,
-			ProjectionExpression:      `#${CONNECTION_ID}`,
-			KeyConditionExpression:    `#${CONNECTION_GROUP_ID} = :needGroup`,
-			ExpressionAttributeNames:  ConnectionsTable_ExpressionAttributeNames,
-			ExpressionAttributeValues: {
-				":needGroup": {S: GroupIdFromType.Chat(group)},
-				// ":needConnType": {S: ConnectionIdFromType.ChatGroupConnection}
-			},
-			Select:                    Select.SPECIFIC_ATTRIBUTES,
-			ReturnConsumedCapacity:    ReturnConsumedCapacity.INDEXES
-		}));
-		printConsumedCapacity("postMessage: Connections", queryResponse);
-		const conns = filterMap(queryResponse.Items, value => value?.[CONNECTION_ID]?.S?.toString());
-		await this.common.onAllConnections(conns, async conn => {
-			await this.on.incomingMessage(messageData, conn);
-		});
+		const groupId = GroupIdFromType.Chat(group);
+		await this.common.sendToGroup(groupId, (conn) => this.on.incomingMessage(messageData, conn));
 		return message(200, "Message sent");
 	}
 }

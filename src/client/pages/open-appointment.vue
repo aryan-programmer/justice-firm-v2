@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import {computed, definePageMeta, justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
+import {computed, definePageMeta, justiceFirmApi, navigateTo, ref, useHead, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {ClientAuthToken} from "../../common/api-types";
 import {StatusEnum, UserAccessType} from "../../common/db-types";
 import {LawyerSearchResult} from "../../common/rest-api-schema";
 import {assert} from "../../common/utils/asserts";
-import {isNullOrEmpty} from "../../common/utils/functions";
+import {isNullOrEmpty, nullOrEmptyCoalesce} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import {useModals} from "../store/modalsStore";
 import {useUserStore} from "../store/userStore";
@@ -13,6 +13,8 @@ import {useUserStore} from "../store/userStore";
 definePageMeta({
 	middleware: "client-only-page"
 });
+
+useHead({title: () => "Open appointment for lawyer: " + nullOrEmptyCoalesce(lawyer.value?.name, route.query.id ?? "")});
 
 const {message, error} = useModals();
 const userStore        = useUserStore();

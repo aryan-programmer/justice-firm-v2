@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import {useRouter} from "#app";
-import {computed, navigateTo} from "#imports";
+import {computed, navigateTo, useHead, useRoute, watch} from "#imports";
 import {ref} from "vue";
 import {useDisplay} from "vuetify";
+import IconButton from "~/components/general/IconButton.vue";
 import {UserAccessType} from "../common/db-types";
 import LawyerStatusDisplayer from "./components/general/LawyerStatusDisplayer.vue";
 import ModalDisplayer from "./components/general/ModalDisplayer.vue";
@@ -11,6 +12,12 @@ import SnackbarListDisplayer from "./components/general/SnackbarListDisplayer.vu
 import {useNotificationsStore} from "./store/notificationsStore";
 import {useUserStore} from "./store/userStore";
 import {appointmentsIcon, casesIcon, gavelIcon} from "./utils/constants";
+
+useHead({
+	titleTemplate: (titleChunk) => {
+		return titleChunk ? `${titleChunk} - Justice Firm` : 'Justice Firm';
+	}
+});
 
 const userStore     = useUserStore();
 const notifications = useNotificationsStore();
@@ -24,6 +31,7 @@ const notificationsMaxWidth = computed(() => xs.value ? width.value : width.valu
 const rail                  = computed(() => !hideSideNavBreakpoint.value);
 
 const router = useRouter();
+const route  = useRoute();
 
 const userInfo    = computed(() => {
 	if (userStore.authToken == null) {
@@ -116,6 +124,11 @@ async function notificationsViewMore () {
 	showingNotifications.value = false;
 	await navigateTo("/notifications");
 }
+
+watch(() => route.fullPath, value => {
+	console.log(value);
+	showingNotifications.value = false;
+});
 </script>
 
 <style scoped lang="scss">
@@ -177,10 +190,12 @@ async function notificationsViewMore () {
 			v-if="userStore.authToken != null"
 			v-model="showingNotifications"
 			location="end"
+			:close-on-content-click="false"
 		>
 			<template v-slot:activator="{ props }">
 			<v-btn v-if="userStore.authToken != null" class="me-3" icon v-bind="props">
-				<v-badge :content="notifications.notifications.length" color="blue">
+				<v-icon v-if="notifications.unreadNotifications.size === 0">fa-bell</v-icon>
+				<v-badge v-else :content="notifications.unreadNotifications.size" color="blue">
 					<v-icon>fa-bell</v-icon>
 				</v-badge>
 			</v-btn>
@@ -194,14 +209,10 @@ async function notificationsViewMore () {
 						density="compact"
 						class="notifications-actions-card rounded-b-lg rounded-t-0">
 						<v-card-text class="notifications-actions">
-							<v-btn
-								class="px-2"
-								rounded
-								density="compact"
+							<IconButton
+								class="px-2 visibility-hidden"
 								variant="tonal"
-								style="min-width: 0px; visibility: hidden;">
-								<v-icon>fa-close</v-icon>
-							</v-btn>
+								icon="fa-close" />
 							<v-btn
 								to="/notifications"
 								density="compact"
@@ -212,18 +223,15 @@ async function notificationsViewMore () {
 							>
 								View More
 							</v-btn>
-							<v-btn
+							<IconButton
 								class="px-2"
-								rounded
-								density="compact"
 								variant="tonal"
-								style="min-width: 0px"
-								@click="showingNotifications=false">
-								<v-icon>fa-close</v-icon>
-							</v-btn>
+								icon="fa-close"
+								color="black"
+								@click="showingNotifications=false" />
 						</v-card-text>
 					</v-card>
-					<NotificationsList :notifications="notifications.notifications" />
+					<NotificationsList compact-ui />
 				</v-card-text>
 			</v-card>
 		</v-menu>

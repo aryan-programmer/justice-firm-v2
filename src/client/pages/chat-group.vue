@@ -8,6 +8,7 @@ import {
 	onBeforeUnmount,
 	reactive,
 	ref,
+	useHead,
 	useRoute,
 	useRouter,
 	watch
@@ -57,6 +58,8 @@ const canPost          = computed(() =>
 const messages         = reactive({messages: [] as MessageData[]});
 const pastMessages     = new Set<ID_T>();
 let chatGroupId: string | Nuly;
+
+useHead({title: () => "Chat group: " + nullOrEmptyCoalesce(chatData.value?.name, chatGroupId ?? "")});
 
 watch(() => route.query, value => {
 	openConnection(value);

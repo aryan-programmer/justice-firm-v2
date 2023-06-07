@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import {definePageMeta} from "#imports";
+import {definePageMeta, useHead} from "#imports";
 import CasesPage from "../components/appointments-cases/CasesPage.vue";
 
 definePageMeta({
 	middleware: "client-only-page"
 });
+
+useHead({title: () => "Cases"});
 </script>
 
 <template>

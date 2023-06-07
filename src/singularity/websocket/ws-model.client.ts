@@ -167,13 +167,14 @@ export function websocketClient<TEndpoints extends APIEndpoints = APIEndpoints,
 		async open () {
 			const value = await this.wsConnection.open();
 			this.wsConnection.onMessage.addListener(ev => {
-				// console.log(ev);
 				const data: Record<string, any> =
 					      typeof ev === "string" ?
 					      isNullOrEmpty(ev) ? null : JSON.parse(ev) :
 					      ev;
+				// console.log(ev, data);
 				if (data == null || !("event" in data) || typeof data.event !== "string") return;
 				const eventName = data.event;
+				const body      = data.body;
 				if (validateEventsData) {
 					let checker: CheckerFunction<unknown> | undefined;
 					if (eventName.startsWith(WS_RESPONSE_EVENT_PREFIX)) {
@@ -181,9 +182,9 @@ export function websocketClient<TEndpoints extends APIEndpoints = APIEndpoints,
 					} else {
 						checker = modelSchema.events[eventName];
 					}
-					if (!checker?.check(data)) {
+					if (!checker?.check(body)) {
 						console.error("Data ",
-							data,
+							body,
 							"for the event",
 							eventName,
 							"does not match the schema",
@@ -192,10 +193,8 @@ export function websocketClient<TEndpoints extends APIEndpoints = APIEndpoints,
 					}
 				}
 
-				const {event, ...dataWithoutEvent} = data;
-
 				// @ts-ignore
-				this.emit(data.event, dataWithoutEvent);
+				this.emit(data.event, body);
 			});
 			return value;
 		}

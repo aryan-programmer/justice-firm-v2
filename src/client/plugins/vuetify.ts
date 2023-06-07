@@ -19,6 +19,7 @@ import {
 	faCircle,
 	faClose,
 	faDownload,
+	faEllipsisVertical,
 	faFile,
 	faFileArchive,
 	faFileAudio,
@@ -126,7 +127,8 @@ library.add(
 	faIdBadge,
 	faInfo,
 	faInfoCircle,
-	faBell
+	faBell,
+	faEllipsisVertical,
 );
 // import * as components from 'vuetify/components'
 // import * as directives from 'vuetify/directives'

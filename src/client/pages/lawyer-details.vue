@@ -4,6 +4,7 @@ import {
 	justiceFirmApi,
 	navigateTo,
 	ref,
+	useHead,
 	useRoute,
 	useRouter,
 	watch,
@@ -12,6 +13,7 @@ import {
 import {isLeft} from "fp-ts/Either";
 import {StatusEnum, UserAccessType} from "../../common/db-types";
 import {GetLawyerInput, LawyerSearchResult} from "../../common/rest-api-schema";
+import {nullOrEmptyCoalesce} from "../../common/utils/functions";
 import {Nuly} from "../../common/utils/types";
 import BareAppointmentsDistributor from "../components/appointments-cases/BareAppointmentsDistributor.vue";
 import BareCasesTable from "../components/appointments-cases/BareCasesTable.vue";
@@ -27,6 +29,8 @@ const userStore        = useUserStore();
 const lawyer           = ref<LawyerSearchResult | Nuly>();
 const isAdmin          = computed(() => userStore.authToken != null && userStore.authToken.userType === UserAccessType.Admin);
 const isLoading        = ref<boolean>(false);
+
+useHead({title: () => "Lawyer: " + nullOrEmptyCoalesce(lawyer.value?.name, route.query.id ?? "")});
 
 watch(() => route.query.id, async value => {
 	const id = value?.toString();

@@ -11,7 +11,7 @@ import {
 import {NotificationMessageData, NotificationType, UserNotification} from "../../../common/notification-types";
 import {nn} from "../../../common/utils/asserts";
 import {StatusEnum} from "../../../common/utils/constants";
-import {isNullOrEmpty} from "../../../common/utils/functions";
+import {getExpressionAttributeNames, isNullOrEmpty} from "../../../common/utils/functions";
 import {Nuly} from "../../../common/utils/types";
 
 const NOTIFICATION_TYPE = "ntyp";
@@ -47,13 +47,10 @@ export const GetNotifications_ProjectionExpression     = [
 ].map(v => "#" + v).join(",");
 export const GetNotifications_EAV_CNeedGroup           = ":needGroup";
 export const GetNotifications_KeyConditionExpression   = `#${MESSAGE_GROUP} = ${GetNotifications_EAV_CNeedGroup}`;
-export const GetNotifications_ExpressionAttributeNames = [
+export const GetNotifications_ExpressionAttributeNames = getExpressionAttributeNames([
 	MESSAGE_GROUP,
 	MESSAGE_TIMESTAMP, MESSAGE_ID, NOTIFICATION_TYPE, NOTIFICATION_DATA
-].reduce((prev, curr) => {
-	prev["#" + curr] = curr;
-	return prev;
-}, {} as Record<string, string>);
+]);
 
 function getStringFieldIf (name: string, value: string | Nuly, condition: boolean = true): Record<string, AttributeValue> {
 	return !isNullOrEmpty(value) && condition ? {

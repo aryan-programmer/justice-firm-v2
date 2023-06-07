@@ -6,6 +6,7 @@ import {
 	justiceFirmApi,
 	navigateTo,
 	ref,
+	useHead,
 	useRoute,
 	useRouter,
 	watch
@@ -57,12 +58,13 @@ const shouldShowCardActions                  = computed(() =>
 	(showingAppointmentConfirmRejectButtons.value || showingUpgradeAppointmentButton.value || showViewCaseButton.value)
 );
 
-
 const showSetAppointmentTimestamp = computed(() => appointment.value?.timestamp == null || appointment.value.timestamp === "");
 const appointmentDateTimeValid    = computed(() => {
 	// if showSetAppointmentTimestamp then appointmentDateTime.value !== ""
 	return !showSetAppointmentTimestamp.value || (appointmentDateTime.value !== "" && new Date(appointmentDateTime.value).getTime() >= todayUnixTs);
 });
+
+useHead({title: () => "Appointment details"});
 
 watch(() => route.query, value => {
 	fetchAppointment(value);

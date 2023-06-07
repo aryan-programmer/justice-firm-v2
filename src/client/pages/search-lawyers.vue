@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, justiceFirmApi, navigateTo, ref, useRoute, useRouter, watch} from "#imports";
+import {computed, justiceFirmApi, navigateTo, ref, useHead, useRoute, useRouter, watch} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {useField, useForm} from 'vee-validate';
 import {LocationQueryValue} from "vue-router";
@@ -17,6 +17,8 @@ import {useUserStore} from "../store/userStore";
 import {withMessageBodyIfApplicable} from "../utils/functions";
 import {FormTextFieldData} from "../utils/types";
 import {optionalNumber} from "../utils/validation-schemas";
+
+useHead({title: () => "Search lawyers"});
 
 let validationSchema         = yup.object({
 	name:      yup.string(),

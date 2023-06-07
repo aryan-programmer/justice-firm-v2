@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {navigateTo} from "#app";
-import {definePageMeta, ref, watch} from "#imports";
+import {definePageMeta, ref, useHead, watch} from "#imports";
 import {isLeft} from "fp-ts/lib/Either";
 import isEmpty from "lodash/isEmpty";
 import {FieldContext, useField, useForm} from 'vee-validate';
@@ -20,6 +20,8 @@ import {getEditProfileSchemaForClient} from "../utils/validation-schemas";
 definePageMeta({
 	middleware: "user-but-not-lawyer-page"
 });
+
+useHead({title: () => "Edit profile"});
 
 let validationSchema         = yup.object({
 	...getEditProfileSchemaForClient(),

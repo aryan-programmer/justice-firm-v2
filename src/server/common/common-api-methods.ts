@@ -1,9 +1,15 @@
 import {GoneException} from "@aws-sdk/client-apigatewaymanagementapi";
-import {DeleteItemCommand, ReturnConsumedCapacity} from "@aws-sdk/client-dynamodb";
+import {DeleteItemCommand, QueryCommand, ReturnConsumedCapacity, Select} from "@aws-sdk/client-dynamodb";
 import {GetParameterCommand} from "@aws-sdk/client-ssm";
 import pMap from "p-map";
 import {createClient} from "redis";
-import {CONNECTION_ID} from "../../common/infrastructure-constants";
+import {filterMap} from "~~/src/common/utils/array-methods/filterMap";
+import {
+	CONNECTION_GROUP_ID,
+	CONNECTION_ID,
+	connectionsByGroupIdIndex,
+	ConnectionsTable_ExpressionAttributeNames
+} from "../../common/infrastructure-constants";
 import {nn} from "../../common/utils/asserts";
 import {Nuly} from "../../common/utils/types";
 import {
@@ -74,10 +80,11 @@ export class CommonApiMethods {
 	}
 
 	async onAllConnections (conns: string[], predicate: (conn: string) => Promise<void>) {
-		if (conns.length === 0) return;
-		await pMap(conns, async conn => {
+		if (conns.length === 0) return 0;
+		return (await pMap(conns, async conn => {
 			try {
 				await predicate(conn);
+				return 1;
 			} catch (ex) {
 				if (ex instanceof GoneException) {
 					console.log({GoneException: ex});
@@ -86,7 +93,26 @@ export class CommonApiMethods {
 					console.log({ex});
 				}
 			}
-		});
+			return 0;
+		})).reduce((a: number, b: number) => a + b, 0 as number);
+	}
+
+	async sendToGroup (groupId: string, predicate: (conn: string) => Promise<void>) {
+		const queryResponse = await dynamoDbClient.send(new QueryCommand({
+			TableName:                 connectionsTableName,
+			IndexName:                 connectionsByGroupIdIndex,
+			ProjectionExpression:      `#${CONNECTION_ID}`,
+			KeyConditionExpression:    `#${CONNECTION_GROUP_ID} = :needGroupId`,
+			ExpressionAttributeNames:  ConnectionsTable_ExpressionAttributeNames,
+			ExpressionAttributeValues: {
+				":needGroupId": {S: groupId},
+			},
+			Select:                    Select.SPECIFIC_ATTRIBUTES,
+			ReturnConsumedCapacity:    ReturnConsumedCapacity.INDEXES
+		}));
+		printConsumedCapacity("sendToGroup: Connections", queryResponse);
+		const conns = filterMap(queryResponse.Items, value => value?.[CONNECTION_ID]?.S?.toString());
+		return await this.onAllConnections(conns, predicate);
 	}
 
 	async cacheResult<T> (

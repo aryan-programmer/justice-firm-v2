@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {navigateTo} from "#app";
-import {definePageMeta} from "#imports";
+import {definePageMeta, useHead} from "#imports";
 import {isLeft} from "fp-ts/lib/Either";
 import isEmpty from "lodash/isEmpty";
 import {FieldContext, useField, useForm} from 'vee-validate';
@@ -19,6 +19,8 @@ import {getRegistrationSchemaForClient} from "../utils/validation-schemas";
 definePageMeta({
 	middleware: "no-user-page"
 });
+
+useHead({title: () => "Register as a client"});
 
 let validationSchema         = yup.object({
 	...getRegistrationSchemaForClient(),

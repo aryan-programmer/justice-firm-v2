@@ -1,12 +1,11 @@
-import {GoneException} from "@aws-sdk/client-apigatewaymanagementapi";
 import {
 	BatchWriteItemCommand,
 	ExecuteStatementCommand,
 	PutItemCommand,
-	QueryCommand,
 	ReturnConsumedCapacity,
 	ReturnItemCollectionMetrics,
-	Select
+	ReturnValue,
+	UpdateItemCommand
 } from "@aws-sdk/client-dynamodb";
 import {AttributeValue} from "@aws-sdk/client-dynamodb/dist-types/models/models_0";
 import {GetParameterCommand} from "@aws-sdk/client-ssm";
@@ -16,13 +15,15 @@ import {
 	CONNECTION_GROUP_ID,
 	CONNECTION_ID,
 	connectionsByGroupIdIndex,
-	ConnectionsTable_ExpressionAttributeNames,
-	GroupIdFromType
+	GroupIdFromType,
+	SETTINGS_GROUP,
+	SETTINGS_UNREAD_NOTIFICATIONS
 } from "../../../common/infrastructure-constants";
 import {NotificationMessageData, UserNotification} from "../../../common/notification-types";
-import {filterMap} from "../../../common/utils/array-methods/filterMap";
 import {nn} from "../../../common/utils/asserts";
+import {getExpressionAttributeNames} from "../../../common/utils/functions";
 import {prettyPrint} from "../../../common/utils/pretty-print";
+import {Nuly} from "../../../common/utils/types";
 import {uniqId} from "../../../common/utils/uniq-id";
 import {jfNotificationsApiSchema} from "../../../common/ws-notifications-api-schema";
 import {eventsSender} from "../../../singularity/websocket/ws-model.server";
@@ -33,6 +34,14 @@ import {printConsumedCapacity, repeatedQuestionMarks} from "../../common/utils/f
 import {notificationToDynamoDbRecord} from "./notifications-transformer";
 
 export const WS_NOTIFICATIONS_API_CALLBACK_URL_PARAM_NAME = nn(process.env.WS_NOTIFICATIONS_API_CALLBACK_URL_PARAM_NAME);
+export const settingsTableName                            = nn(process.env.SETTINGS_TABLE_NAME);
+export const HASH_SETTINGS_UNREAD_NOTIFICATIONS           = `#${SETTINGS_UNREAD_NOTIFICATIONS}`;
+export const EAN_SETTINGS_UNREAD_NOTIFICATIONS            = getExpressionAttributeNames([SETTINGS_UNREAD_NOTIFICATIONS]);
+
+export function extractUnreadNotifications (item: Record<string, AttributeValue> | Nuly) {
+	const res = item?.[SETTINGS_UNREAD_NOTIFICATIONS]?.SS;
+	return res == null ? [] : [...res];
+}
 
 let fakeOn = true ? undefined as never : eventsSender(jfNotificationsApiSchema,
 	{validateEventsBody: true, endpoint: ""});
@@ -87,21 +96,12 @@ export class WsNotificationsHelper {
 		}));
 		printConsumedCapacity("sendNotification: ", putNotifResponse);
 
-		const queryResponse = await dynamoDbClient.send(new QueryCommand({
-			TableName:                 connectionsTableName,
-			IndexName:                 connectionsByGroupIdIndex,
-			ProjectionExpression:      `#${CONNECTION_ID}`,
-			KeyConditionExpression:    `#${CONNECTION_GROUP_ID} = :needGroupId`,
-			ExpressionAttributeNames:  ConnectionsTable_ExpressionAttributeNames,
-			ExpressionAttributeValues: {
-				":needGroupId": {S: groupId},
-			},
-			Select:                    Select.SPECIFIC_ATTRIBUTES,
-			ReturnConsumedCapacity:    ReturnConsumedCapacity.INDEXES
-		}));
-		printConsumedCapacity("sendNotification: Connections", queryResponse);
-		const conns = filterMap(queryResponse.Items, value => value?.[CONNECTION_ID]?.S?.toString());
-		await this.common.onAllConnections(conns, (conn) => this.on.notification(notifData, conn));
+		const numOpenConnections = await this.common.sendToGroup(groupId,
+			(conn) => this.on.notification(notifData, conn));
+		prettyPrint({groupId, numOpenConnections, notifData});
+		if (numOpenConnections === 0) {
+			await WsNotificationsHelper.markAsUnread_NoSend(groupId, [notifData.id]);
+		}
 	}
 
 	async sendNotifications (notifications: BatchSendNotif_T[]) {
@@ -137,56 +137,85 @@ export class WsNotificationsHelper {
 		prettyPrint(`Item Collection Metrics for sendNotifications BatchWriteItemCommand: `,
 			batchWriteOutput.ItemCollectionMetrics);
 
-		const uniqueUserIds = _
+		const uniqueGroupIds = _
 			.chain(notifications)
 			.map(value => (+value.userId))
 			.filter(value => !Number.isNaN(value))
 			.uniq()
-			.map(value => ({S: GroupIdFromType.UserNotifications(value.toString())}) as AttributeValue)
+			.map(value => GroupIdFromType.UserNotifications(value.toString()))
 			.value();
+
+		const uniqueGroupIdRecords = uniqueGroupIds
+			.map(value => ({S: value}) as AttributeValue);
 
 		const statement =
 			      `SELECT "${CONNECTION_GROUP_ID}", "${CONNECTION_ID}"
 			       FROM "${connectionsTableName}"."${connectionsByGroupIdIndex}"
-			       WHERE "${CONNECTION_GROUP_ID}" IN [${repeatedQuestionMarks(uniqueUserIds.length)}]`;
+			       WHERE "${CONNECTION_GROUP_ID}" IN [${repeatedQuestionMarks(uniqueGroupIdRecords.length)}]`;
 
-		prettyPrint({statement, uniqueUserIds});
+		prettyPrint({statement, uniqueUserIds: uniqueGroupIds});
 		const queryResponse = await dynamoDbClient.send(new ExecuteStatementCommand({
 			Statement:              statement,
 			ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES,
-			Parameters:             uniqueUserIds
+			Parameters:             uniqueGroupIdRecords
 		}));
 		printConsumedCapacity("sendNotifications: Connections", queryResponse);
-		const items = queryResponse.Items;
-		prettyPrint(items);
-		if (items == null || items.length === 0) return;
-		await pMap(items, async item => {
-			const groupId = item[CONNECTION_GROUP_ID]?.S;
-			const conn    = item[CONNECTION_ID]?.S;
-			if (conn == null) return;
+		const connectionWithGroupIds = queryResponse.Items ?? [];
+		prettyPrint(connectionWithGroupIds);
+		const connsByGroupId = {} as Record<string, string[] | undefined>;
+
+		const laterQueue = [] as Promise<void>[];
+
+		for (const connectionWithGroupId of connectionWithGroupIds) {
+			const groupId = connectionWithGroupId[CONNECTION_GROUP_ID]?.S;
+			const conn    = connectionWithGroupId[CONNECTION_ID]?.S;
+			if (conn == null) continue;
 			if (groupId == null) {
-				await this.common.deleteConnection(conn);
-				return;
+				laterQueue.push(this.common.deleteConnection(conn));
+				continue;
 			}
+			(connsByGroupId[groupId] ??= []).push(conn);
+		}
+		if (laterQueue.length > 0) {
+			await Promise.all(laterQueue);
+		}
+		await pMap(uniqueGroupIds, async groupId => {
 			const notifications = notificationsByGroupId[groupId];
+			const conns         = connsByGroupId[groupId];
 			if (notifications == null || notifications.length === 0) return;
 			if (notifications.length > 1) {
 				notifications.sort((a, b) => {
 					return (+a.timestamp) - (+b.timestamp);
 				});
 			}
-			try {
+			const numOpenConnections = conns == null ? 0 : await this.common.onAllConnections(conns, async conn => {
 				for (const notification of notifications) {
 					await this.on.notification(notification, conn);
 				}
-			} catch (ex) {
-				if (ex instanceof GoneException) {
-					console.log({GoneException: ex});
-					await this.common.deleteConnection(conn);
-				} else {
-					console.log({ex});
-				}
+			});
+			prettyPrint({groupId, numOpenConnections, notifications});
+			if (numOpenConnections === 0) {
+				await WsNotificationsHelper.markAsUnread_NoSend(groupId, notifications.map(value => value.id));
 			}
-		});
+		})
+	}
+
+	public static async markAsUnread_NoSend (groupId: string, notificationIds: string[]) {
+		const markAsUnreadCommandOutput = await dynamoDbClient.send(new UpdateItemCommand({
+			TableName:                 settingsTableName,
+			ReturnConsumedCapacity:    ReturnConsumedCapacity.INDEXES,
+			UpdateExpression:          `ADD #${SETTINGS_UNREAD_NOTIFICATIONS} :newUnreadNotifications`,
+			ExpressionAttributeNames:  EAN_SETTINGS_UNREAD_NOTIFICATIONS,
+			Key:                       {
+				[SETTINGS_GROUP]: {S: groupId},
+			},
+			ExpressionAttributeValues: {
+				':newUnreadNotifications': {SS: notificationIds},
+			},
+			ReturnValues:              ReturnValue.ALL_NEW,
+		}));
+		printConsumedCapacity("updateRowDeleteItemFromSet", markAsUnreadCommandOutput);
+		prettyPrint("updateRowDeleteItemFromSet: ", markAsUnreadCommandOutput);
+		return extractUnreadNotifications(markAsUnreadCommandOutput.Attributes);
 	}
 }

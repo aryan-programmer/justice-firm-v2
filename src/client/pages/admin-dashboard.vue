@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {definePageMeta, justiceFirmApi, onMounted, ref} from "#imports";
+import {definePageMeta, justiceFirmApi, onMounted, ref, useHead} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import {AdminAuthToken} from "../../common/api-types";
 import {LawyerSearchResult} from "../../common/db-types";
@@ -14,6 +14,8 @@ import {useUserStore} from "../store/userStore";
 definePageMeta({
 	middleware: "admin-only-page"
 });
+
+useHead({title: "Administrator Dashboard"});
 
 const {message, error} = useModals();
 const userStore        = useUserStore();

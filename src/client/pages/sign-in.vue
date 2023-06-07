@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {definePageMeta, navigateTo} from "#imports";
+import {definePageMeta, navigateTo, useHead} from "#imports";
 import {isLeft} from "fp-ts/Either";
 import isEmpty from "lodash/isEmpty";
 import {useField, useForm} from 'vee-validate';
@@ -13,6 +13,8 @@ import {getSignInSchema} from "../utils/validation-schemas";
 definePageMeta({
 	middleware: "no-user-page"
 });
+
+useHead({title: () => "Sign in"});
 
 let validationSchema         = yup.object(getSignInSchema());
 const {handleSubmit, errors} = useForm({
